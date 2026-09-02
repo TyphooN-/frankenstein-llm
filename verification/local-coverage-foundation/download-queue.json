@@ -1,0 +1,394 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-01T09:39:54-0400",
+  "source_of_truth": "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/research/hf",
+  "policy": {
+    "single_writer": true,
+    "resume": "curl --continue-at - against a .partial sibling",
+    "promotion": "os.replace only after exact size and, when published, SHA-256 match",
+    "hash_available": "LFS files only; small config/tokenizer files are size-gated"
+  },
+  "total_bytes": 72134030730,
+  "artifacts": [
+    {
+      "key": "embedding-qwen3-8b-q6k",
+      "capability": "embeddings",
+      "repository": "Qwen/Qwen3-Embedding-8B-GGUF",
+      "revision": "69d0e58a13e463cd99a9b83e3f5fee7c10265fab",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:27:43-0400",
+      "notes": "Official Qwen GGUF. Served by the existing stable llama.cpp with --embedding --pooling last. Q6_K keeps 4096-dim quality while leaving room to co-reside with the reranker.",
+      "total_bytes": 6214476096,
+      "files": [
+        {
+          "repo_path": "Qwen3-Embedding-8B-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/Qwen3-Embedding-8B-Q6_K.gguf",
+          "size": 6214476096,
+          "sha256": "25e215d4283e3a48ca65a622b70a357599fd480282f48a3ecd6e3e8828d92a66"
+        }
+      ]
+    },
+    {
+      "key": "reranker-qwen3-8b-source",
+      "capability": "reranking",
+      "repository": "Qwen/Qwen3-Reranker-8B",
+      "revision": "77d193c791ed757ca307ee72715aa132723da912",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:37:18-0400",
+      "notes": "Publisher safetensors snapshot. Qwen ships no reranker GGUF and community conversions commonly drop cls.output.weight and score garbage, so the GGUF is produced locally by llama.cpp convert_hf_to_gguf.py, which detects Qwen3-Reranker, keeps the classifier head and sets pooling_type=RANK.",
+      "total_bytes": 16393070159,
+      "files": [
+        {
+          "repo_path": "1_LogitScore/config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/1_LogitScore/config.json",
+          "size": 57,
+          "sha256": null
+        },
+        {
+          "repo_path": "README.md",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/README.md",
+          "size": 11286,
+          "sha256": null
+        },
+        {
+          "repo_path": "chat_template.jinja",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/chat_template.jinja",
+          "size": 741,
+          "sha256": null
+        },
+        {
+          "repo_path": "config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/config.json",
+          "size": 729,
+          "sha256": null
+        },
+        {
+          "repo_path": "config_sentence_transformers.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/config_sentence_transformers.json",
+          "size": 294,
+          "sha256": null
+        },
+        {
+          "repo_path": "generation_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/generation_config.json",
+          "size": 214,
+          "sha256": null
+        },
+        {
+          "repo_path": "merges.txt",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/merges.txt",
+          "size": 1671853,
+          "sha256": null
+        },
+        {
+          "repo_path": "model-00001-of-00005.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/model-00001-of-00005.safetensors",
+          "size": 4027618768,
+          "sha256": "22cdfea4a13b7b3e866573800eeeb638fc38962940adf631d06dc03befed047a"
+        },
+        {
+          "repo_path": "model-00002-of-00005.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/model-00002-of-00005.safetensors",
+          "size": 4060268160,
+          "sha256": "d2163b74137e35b4614bd2aa5bf27bcb07de4ca61c6962495feb968385eb0df8"
+        },
+        {
+          "repo_path": "model-00003-of-00005.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/model-00003-of-00005.safetensors",
+          "size": 4043508680,
+          "sha256": "a5038caa78c817e8acce6806104869675938a33fd4e60ed038e9931d390d6989"
+        },
+        {
+          "repo_path": "model-00004-of-00005.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/model-00004-of-00005.safetensors",
+          "size": 3003274088,
+          "sha256": "247f85538c5996d4c296291b0e4004f618c9b17ca8cdc25d1fc726567eb15803"
+        },
+        {
+          "repo_path": "model-00005-of-00005.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/model-00005-of-00005.safetensors",
+          "size": 1242472576,
+          "sha256": "8ba41b93c2e4ec8339ad16b000bc977fde196aeac054956cbfc8c0186ee6d4cf"
+        },
+        {
+          "repo_path": "model.safetensors.index.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/model.safetensors.index.json",
+          "size": 32878,
+          "sha256": null
+        },
+        {
+          "repo_path": "modules.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/modules.json",
+          "size": 280,
+          "sha256": null
+        },
+        {
+          "repo_path": "sentence_bert_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/sentence_bert_config.json",
+          "size": 362,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/tokenizer.json",
+          "size": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "repo_path": "tokenizer_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/tokenizer_config.json",
+          "size": 9706,
+          "sha256": null
+        },
+        {
+          "repo_path": "vocab.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B/vocab.json",
+          "size": 2776833,
+          "sha256": null
+        }
+      ]
+    },
+    {
+      "key": "ocr-hunyuanocr-bf16",
+      "capability": "ocr",
+      "repository": "ggml-org/HunyuanOCR-GGUF",
+      "revision": "8e070c9ad79e4ca97a9b4daa2f1ce17e8759afb1",
+      "license": null,
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:27:44-0400",
+      "notes": "First-party ggml-org conversion, so llama.cpp mtmd support is authoritative rather than inferred. 1B class: bf16 costs little and avoids quantisation damage on dense-layout character recognition.",
+      "total_bytes": 2080454368,
+      "files": [
+        {
+          "repo_path": "HunyuanOCR-bf16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/ocr/HunyuanOCR-bf16.gguf",
+          "size": 1083218528,
+          "sha256": "a160215620dbd0ab43ec6faa28259654fd24c929953aa97c765176f7c0363217"
+        },
+        {
+          "repo_path": "mmproj-HunyuanOCR-bf16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/ocr/mmproj-HunyuanOCR-bf16.gguf",
+          "size": 997235840,
+          "sha256": "46401739a91d0778d86369bb952db685b215512d61a941c3b859f337f6014fcd"
+        }
+      ]
+    },
+    {
+      "key": "asr-qwen3-1.7b-hf",
+      "capability": "asr",
+      "repository": "Qwen/Qwen3-ASR-1.7B-hf",
+      "revision": "bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:27:44-0400",
+      "notes": "Transformers-native snapshot. Runs in a dedicated ROCm venv; there is no llama.cpp path for this architecture.",
+      "total_bytes": 4087644754,
+      "files": [
+        {
+          "repo_path": "README.md",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/README.md",
+          "size": 16538,
+          "sha256": null
+        },
+        {
+          "repo_path": "chat_template.jinja",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/chat_template.jinja",
+          "size": 1434,
+          "sha256": null
+        },
+        {
+          "repo_path": "config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/config.json",
+          "size": 2399,
+          "sha256": null
+        },
+        {
+          "repo_path": "generation_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/generation_config.json",
+          "size": 165,
+          "sha256": null
+        },
+        {
+          "repo_path": "model.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/model.safetensors",
+          "size": 4076193080,
+          "sha256": "2db53c7d81bd9b8cbc6a074e89be2c968a0d373fb4ee68bb1b1e14f7042dfee1"
+        },
+        {
+          "repo_path": "processor_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/processor_config.json",
+          "size": 487,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/tokenizer.json",
+          "size": 11429653,
+          "sha256": "fe1fad59be22a41ee293363fcf95fdedbc7c93f3b49270b1d2e18bd1399a7a05"
+        },
+        {
+          "repo_path": "tokenizer_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf/tokenizer_config.json",
+          "size": 998,
+          "sha256": null
+        }
+      ]
+    },
+    {
+      "key": "tts-qwen3-12hz-1.7b-base",
+      "capability": "tts",
+      "repository": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "revision": "fd4b254389122332181a7c3db7f27e918eec64e3",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:27:45-0400",
+      "notes": "Complete snapshot including the bundled speech_tokenizer/ codec, so the separate Qwen3-TTS-Tokenizer-12Hz repository is not required.",
+      "total_bytes": 4544228181,
+      "files": [
+        {
+          "repo_path": "README.md",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/README.md",
+          "size": 57817,
+          "sha256": null
+        },
+        {
+          "repo_path": "config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/config.json",
+          "size": 4494,
+          "sha256": null
+        },
+        {
+          "repo_path": "generation_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/generation_config.json",
+          "size": 245,
+          "sha256": null
+        },
+        {
+          "repo_path": "merges.txt",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/merges.txt",
+          "size": 1671839,
+          "sha256": null
+        },
+        {
+          "repo_path": "model.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/model.safetensors",
+          "size": 3857413744,
+          "sha256": "38fc7fc51c5e776e840414b6fd443962e9411b9654888fd7913e4da643cb857c"
+        },
+        {
+          "repo_path": "preprocessor_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/preprocessor_config.json",
+          "size": 127,
+          "sha256": null
+        },
+        {
+          "repo_path": "speech_tokenizer/config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/speech_tokenizer/config.json",
+          "size": 2336,
+          "sha256": null
+        },
+        {
+          "repo_path": "speech_tokenizer/configuration.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/speech_tokenizer/configuration.json",
+          "size": 76,
+          "sha256": null
+        },
+        {
+          "repo_path": "speech_tokenizer/model.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/speech_tokenizer/model.safetensors",
+          "size": 682293092,
+          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258"
+        },
+        {
+          "repo_path": "speech_tokenizer/preprocessor_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/speech_tokenizer/preprocessor_config.json",
+          "size": 234,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/tokenizer_config.json",
+          "size": 7344,
+          "sha256": null
+        },
+        {
+          "repo_path": "vocab.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/tts/Qwen3-TTS-12Hz-1.7B-Base/vocab.json",
+          "size": 2776833,
+          "sha256": null
+        }
+      ]
+    },
+    {
+      "key": "music-acestep-1.5-turbo-aio",
+      "capability": "music",
+      "repository": "Comfy-Org/ace_step_1.5_ComfyUI_files",
+      "revision": "694a9723ff772285c73f0700caacf944d3f02f8d",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:27:46-0400",
+      "notes": "All-in-one turbo checkpoint: bundles diffusion, text encoder and VAE, so no split_files dependency is downloaded.",
+      "total_bytes": 10025478736,
+      "files": [
+        {
+          "repo_path": "checkpoints/ace_step_1.5_turbo_aio.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/checkpoints/ace_step_1.5_turbo_aio.safetensors",
+          "size": 10025478736,
+          "sha256": "67b0f43aa5c51c840bd0228e6a935d8ff416ec87e5df2fc0637da17a561252bc"
+        }
+      ]
+    },
+    {
+      "key": "image-z-image-turbo-bf16",
+      "capability": "image",
+      "repository": "Comfy-Org/z_image_turbo",
+      "revision": "08d04455279082882deaabc8d0d09fc914c071e1",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:38:29-0400",
+      "notes": "bf16 weights chosen deliberately: gfx1030 is RDNA2 and has no FP8/FP4/INT8 tensor acceleration, so the int8_convrot and nvfp4 variants would add conversion risk without a speed win.",
+      "total_bytes": 20690152836,
+      "files": [
+        {
+          "repo_path": "split_files/diffusion_models/z_image_turbo_bf16.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/diffusion_models/z_image_turbo_bf16.safetensors",
+          "size": 12309866400,
+          "sha256": "2407613050b809ffdff18a4ac99af83ea6b95443ecebdf80e064a79c825574a6"
+        },
+        {
+          "repo_path": "split_files/text_encoders/qwen_3_4b.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/text_encoders/qwen_3_4b.safetensors",
+          "size": 8044982048,
+          "sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a"
+        },
+        {
+          "repo_path": "split_files/vae/ae.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/vae/ae.safetensors",
+          "size": 335304388,
+          "sha256": "afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38"
+        }
+      ]
+    },
+    {
+      "key": "fim-qwen2.5-coder-7b-q8",
+      "capability": "fim",
+      "repository": "ggml-org/Qwen2.5-Coder-7B-Q8_0-GGUF",
+      "revision": "bca77e0a8c88fc224882bcc404170c3ef17efacc",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:38:28-0400",
+      "notes": "Exactly the artifact the installed llama-server blesses via --fim-qwen-7b-default, so /infill prefix/suffix/middle tokens are known good rather than assumed.",
+      "total_bytes": 8098525600,
+      "files": [
+        {
+          "repo_path": "qwen2.5-coder-7b-q8_0.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/fim/qwen2.5-coder-7b-q8_0.gguf",
+          "size": 8098525600,
+          "sha256": "0ef48dc94a3c551a6736ac2601de38413dc9aa9318534b16e8baee08290a4aaf"
+        }
+      ]
+    }
+  ]
+}

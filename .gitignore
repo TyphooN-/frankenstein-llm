@@ -1,0 +1,54 @@
+# Weights, shards, and media checkpoints stay on local disk only.
+/models/
+
+# Local virtualenvs and nested upstream checkouts.
+/venvs/
+/tools/ComfyUI/
+/tools/qwen38-mtp/
+
+# Runtime logs, router snapshots, locks, stamps, and transfer debris.
+/logs/
+router-state.json
+*.log
+*.lock
+*.partial
+*.recovered
+*.tmp.*
+*.ok
+
+# Python debris.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Ad-hoc probe dumps. Keep named fixtures under verification/*/fixtures/.
+/verify-*
+/verification/hermes-*.png
+/verification/hermes-*-output.txt
+/verification/hermes-*-usage.json
+/verification/direct-*.json
+/verification/router-state-after-direct.json
+/verification/workspace-move-report.json
+/verification/obliterated-mmproj-download.log
+/verification/**/evidence/
+/verification/**/build-*/
+/verification/glm53flash-local/build-*/
+/verification/**/transcript-*.jsonl
+/verification/**/download-state*.json
+/verification/**/mission-state.json
+/verification/**/lane.json
+/verification/qwen38-obliterated-functional/*.json
+/verification/qwen38-obliterated-functional/*.txt
+/verification/glm53flash-local/gate-glm32.json
+/verification/glm53flash-local/verified-state.json
+/verification/glm53flash-local/hf-tree.json
+/verification/obliteratus-hf-inventory-*.json
+/verification/local-coverage-foundation/research/hf/
+/verification/local-coverage-foundation/continuation*.md
+/verification/local-coverage-foundation/pre-reboot-kernel-baseline.json
+
+# Editor and OS noise.
+.DS_Store
+*~
+*.swp

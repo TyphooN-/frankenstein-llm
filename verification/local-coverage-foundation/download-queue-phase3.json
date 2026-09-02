@@ -1,0 +1,83 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-02T10:50:00-0400",
+  "source_of_truth": "official ComfyUI Qwen-Image-Edit-2511 int8 template plus pinned Hugging Face tree metadata",
+  "policy": {
+    "single_writer": true,
+    "phase": "starts only after phase-one and phase-two state and completion stamps agree",
+    "resume": "curl --continue-at - against a .partial sibling",
+    "promotion": "os.replace only after exact size and SHA-256 match",
+    "selection": "Qwen-Image-Edit-2511 INT8 ConvRot closes instruction-guided editing on the 32 GiB headless V620; supporting encoder, VAE and official 4-step LoRA are required by the current native ComfyUI template"
+  },
+  "total_bytes": 30987169046,
+  "artifacts": [
+    {
+      "key": "image-edit-qwen-2511-int8-convrot",
+      "capability": "image-editing",
+      "repository": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
+      "revision": "984166f60a9b1fcede5e9b9287b7a7aebc050010",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 20499083824,
+      "files": [
+        {
+          "repo_path": "split_files/diffusion_models/qwen_image_edit_2511_int8_convrot.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/diffusion_models/qwen_image_edit_2511_int8_convrot.safetensors",
+          "size": 20499083824,
+          "sha256": "11b5af5ac601821d73930c84846c9a158e67177356daf927ce1c8d10f3963829"
+        }
+      ]
+    },
+    {
+      "key": "image-edit-qwen25-vl-7b-fp8-encoder",
+      "capability": "image-editing",
+      "repository": "Comfy-Org/HunyuanVideo_1.5_repackaged",
+      "revision": "144e6ea259230936cdc6f140b3fe69c8529b5c47",
+      "license": "tencent-hunyuan-community",
+      "gated": false,
+      "total_bytes": 9384670680,
+      "files": [
+        {
+          "repo_path": "split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "size": 9384670680,
+          "sha256": "cb5636d852a0ea6a9075ab1bef496c0db7aef13c02350571e388aea959c5c0b4"
+        }
+      ]
+    },
+    {
+      "key": "image-edit-qwen-vae",
+      "capability": "image-editing",
+      "repository": "Comfy-Org/Qwen-Image_ComfyUI",
+      "revision": "7beb7b647f04469fbe64ba8adc2bb0d7e5e9f73f",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 253806246,
+      "files": [
+        {
+          "repo_path": "split_files/vae/qwen_image_vae.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/vae/qwen_image_vae.safetensors",
+          "size": 253806246,
+          "sha256": "a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f"
+        }
+      ]
+    },
+    {
+      "key": "image-edit-qwen-2511-lightning-lora",
+      "capability": "image-editing",
+      "repository": "lightx2v/Qwen-Image-Edit-2511-Lightning",
+      "revision": "d74eba145674fd7e31b949324e148e21e7118abd",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 849608296,
+      "files": [
+        {
+          "repo_path": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+          "size": 849608296,
+          "sha256": "22226e8d05d354bb356627d428809f5afd7819399b077238a2b70a82883a904f"
+        }
+      ]
+    }
+  ]
+}

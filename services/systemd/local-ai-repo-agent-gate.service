@@ -1,0 +1,13 @@
+[Unit]
+Description=Run bounded local repository-agent admission gate
+After=local-ai-tts-gate.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /home/typhoon/git/frankenstein-llm/verification/repository-agent/run_serialized.sh
+TimeoutStartSec=infinity
+KillMode=control-group
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal

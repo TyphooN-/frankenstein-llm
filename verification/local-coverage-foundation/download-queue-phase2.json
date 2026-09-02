@@ -1,0 +1,136 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-01T10:34:00-0400",
+  "source_of_truth": "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/research/hf/ByteDance-Seed__UI-TARS-1.5-7B.json",
+  "policy": {
+    "single_writer": true,
+    "phase": "starts only after phase-one completion stamp",
+    "resume": "curl --continue-at - against a .partial sibling",
+    "promotion": "os.replace only after exact size and, when published, SHA-256 match",
+    "hash_available": "LFS files only; small config/tokenizer files are size-gated"
+  },
+  "total_bytes": 33184695056,
+  "artifacts": [
+    {
+      "key": "computer-use-ui-tars-1.5-7b",
+      "capability": "computer-use-grounding",
+      "repository": "ByteDance-Seed/UI-TARS-1.5-7B",
+      "revision": "683d002dd99d8f95104d31e70391a39348857f4e",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-01T09:27:46-0400",
+      "notes": "Explicitly promoted from conditional to roadmap download by user direction. Validate against deterministic screen-coordinate fixtures after corrected-kernel reboot; do not grant autonomous desktop authority merely because weights load.",
+      "total_bytes": 33184695056,
+      "files": [
+        {
+          "repo_path": "README.md",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/README.md",
+          "size": 8370,
+          "sha256": null
+        },
+        {
+          "repo_path": "added_tokens.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/added_tokens.json",
+          "size": 605,
+          "sha256": null
+        },
+        {
+          "repo_path": "chat_template.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/chat_template.json",
+          "size": 1050,
+          "sha256": null
+        },
+        {
+          "repo_path": "config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/config.json",
+          "size": 1374,
+          "sha256": null
+        },
+        {
+          "repo_path": "merges.txt",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/merges.txt",
+          "size": 1671853,
+          "sha256": null
+        },
+        {
+          "repo_path": "model-00001-of-00007.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model-00001-of-00007.safetensors",
+          "size": 4952311608,
+          "sha256": "791690d15fbd7cb35c5024562a333b6962b4f399e8e00c1d039d516744fd8a9c"
+        },
+        {
+          "repo_path": "model-00002-of-00007.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model-00002-of-00007.safetensors",
+          "size": 4984124272,
+          "sha256": "63fdb5528959e72f74516d7e4a5e66337e129428ad49ed82acef03ef648991ca"
+        },
+        {
+          "repo_path": "model-00003-of-00007.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model-00003-of-00007.safetensors",
+          "size": 4932743936,
+          "sha256": "8cd4f439df9219991790e0bd557176445165bfcdcae6b98acd4b2a4e70b4adfb"
+        },
+        {
+          "repo_path": "model-00004-of-00007.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model-00004-of-00007.safetensors",
+          "size": 4998852296,
+          "sha256": "8cd5267eecb26fd6c77a88cf76a52805b887f2c571c424eb244b97464d3071f2"
+        },
+        {
+          "repo_path": "model-00005-of-00007.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model-00005-of-00007.safetensors",
+          "size": 4984124336,
+          "sha256": "68774baed4c0324a411f21b30d3a9e69959f0ac0713eef456dbaaa798d0076d0"
+        },
+        {
+          "repo_path": "model-00006-of-00007.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model-00006-of-00007.safetensors",
+          "size": 4932743992,
+          "sha256": "4fce8e78b8af34aa378ab2e6b627711a2527a4de66256d81d444b5e95b956c05"
+        },
+        {
+          "repo_path": "model-00007-of-00007.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model-00007-of-00007.safetensors",
+          "size": 3383846800,
+          "sha256": "7b9c3b8638e8cab6cacf3315f2326816ceef2afc0706647d71be37494b462d9c"
+        },
+        {
+          "repo_path": "model.safetensors.index.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/model.safetensors.index.json",
+          "size": 57619,
+          "sha256": null
+        },
+        {
+          "repo_path": "preprocessor_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/preprocessor_config.json",
+          "size": 350,
+          "sha256": null
+        },
+        {
+          "repo_path": "special_tokens_map.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/special_tokens_map.json",
+          "size": 613,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/tokenizer.json",
+          "size": 11421896,
+          "sha256": "9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa"
+        },
+        {
+          "repo_path": "tokenizer_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/tokenizer_config.json",
+          "size": 7253,
+          "sha256": null
+        },
+        {
+          "repo_path": "vocab.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-TARS-1.5-7B/vocab.json",
+          "size": 2776833,
+          "sha256": null
+        }
+      ]
+    }
+  ]
+}

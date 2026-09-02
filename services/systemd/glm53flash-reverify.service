@@ -1,0 +1,16 @@
+[Unit]
+Description=GLM-5.3-Flash IQ3_XXS force publisher-hash reverify
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=GLM_FORCE_REVERIFY=1
+ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/glm53flash-local/download_and_verify.py
+WorkingDirectory=/home/typhoon/git/frankenstein-llm/verification/glm53flash-local
+StandardOutput=append:/home/typhoon/git/frankenstein-llm/verification/glm53flash-local/download.log
+StandardError=append:/home/typhoon/git/frankenstein-llm/verification/glm53flash-local/download.log
+TimeoutStartSec=infinity
+Nice=10
+
+[Install]
+WantedBy=default.target

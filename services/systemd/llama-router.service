@@ -1,0 +1,15 @@
+[Unit]
+Description=llama.cpp local model router (ROCm, 3 GPU, on-demand)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/typhoon/.local/bin/llama-server --models-preset /home/typhoon/git/frankenstein-llm/llama-models.ini --models-max 1 --host 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/home/typhoon/git/frankenstein-llm
+StandardOutput=append:/home/typhoon/git/frankenstein-llm/logs/router-server.log
+StandardError=append:/home/typhoon/git/frankenstein-llm/logs/router-server.log
+
+[Install]
+WantedBy=default.target

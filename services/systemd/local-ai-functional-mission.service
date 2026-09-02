@@ -1,0 +1,18 @@
+[Unit]
+Description=Serialized non-benchmark local AI functional qualification mission
+After=network-online.target llama-router.service local-ai-model-downloads.service local-ai-model-downloads-phase2.service local-ai-model-downloads-phase3.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/mission-supervisor/run_functional_mission.py
+TimeoutStartSec=infinity
+Nice=5
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/typhoon/git/frankenstein-llm/verification /home/typhoon/git/frankenstein-llm/models /run/user/%U
+
+[Install]
+WantedBy=default.target

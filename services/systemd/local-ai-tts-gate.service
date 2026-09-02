@@ -1,0 +1,13 @@
+[Unit]
+Description=Run local TTS and ASR round-trip admission gate
+After=local-ai-computer-use-gate.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /home/typhoon/git/frankenstein-llm/verification/tts-local/run_serialized.sh
+TimeoutStartSec=infinity
+KillMode=control-group
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal

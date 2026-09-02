@@ -1,0 +1,15 @@
+[Unit]
+Description=Download and verify Pliny Qwen3.8 OBLITERATED mmproj
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/download_obliterated_mmproj.py
+WorkingDirectory=/home/typhoon/git/frankenstein-llm/verification
+StandardOutput=append:/home/typhoon/git/frankenstein-llm/verification/obliterated-mmproj-download.log
+StandardError=append:/home/typhoon/git/frankenstein-llm/verification/obliterated-mmproj-download.log
+TimeoutStartSec=infinity
+Nice=10
+
+[Install]
+WantedBy=default.target

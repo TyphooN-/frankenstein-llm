@@ -1,0 +1,10 @@
+# Local ComfyUI extra paths. Not installed into the ComfyUI git checkout.
+# Pass with --extra-model-paths-config. Loopback gates only; no downloads.
+frankenstein:
+    base_path: /home/typhoon/git/frankenstein-llm/models/comfy
+    is_default: true
+    checkpoints: checkpoints
+    diffusion_models: diffusion_models
+    text_encoders: text_encoders
+    vae: vae
+    loras: loras

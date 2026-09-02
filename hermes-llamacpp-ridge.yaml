@@ -1,0 +1,27 @@
+# Merge into ~/.hermes/config.yaml (or apply with hermes config).
+# Does NOT replace the current openai-codex default.
+
+providers:
+  llamacpp-ridge:
+    name: llama.cpp Ridge 27B
+    api: http://127.0.0.1:8080/v1
+    transport: chat_completions
+    default_model: Qwen3.8-27B-Ridge
+    discover_models: true
+    context_length: 131072
+
+model_aliases:
+  ridge:
+    model: Qwen3.8-27B-Ridge
+    provider: llamacpp-ridge
+    base_url: http://127.0.0.1:8080/v1
+
+# After llama-server is healthy, optionally make it the default for NEW sessions:
+#   hermes config set model.provider llamacpp-ridge
+#   hermes config set model.default Qwen3.8-27B-Ridge
+#   hermes config set model.base_url http://127.0.0.1:8080/v1
+#   hermes config set model.context_length 131072
+#
+# Mid-session switch in a new chat:
+#   /model ridge
+#   /model custom:llamacpp-ridge:Qwen3.8-27B-Ridge

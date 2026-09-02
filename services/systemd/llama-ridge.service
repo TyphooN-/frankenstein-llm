@@ -1,0 +1,19 @@
+[Unit]
+Description=llama.cpp Qwen3.8 Ridge 27B (ROCm, 3 GPU, MTP)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/typhoon/git/frankenstein-llm/scripts/serve-ridge.sh
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=mixed
+Environment=LLAMA_CTX=131072
+Environment=SPEC_DRAFT_N_MAX=2
+StandardOutput=append:/home/typhoon/git/frankenstein-llm/logs/ridge-server.log
+StandardError=append:/home/typhoon/git/frankenstein-llm/logs/ridge-server.log
+
+[Install]
+WantedBy=default.target

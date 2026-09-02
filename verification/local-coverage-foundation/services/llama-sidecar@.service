@@ -1,0 +1,37 @@
+[Unit]
+Description=llama.cpp local sidecar service (%i)
+Documentation=file:/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/EXECUTION-LEDGER.md
+After=network.target
+# Deliberately NOT bound to llama-router.service. Sidecars are small, single
+# purpose and pinned to their own GPU, so router restarts must not cycle them.
+
+# NOTE: SIDECAR_EXTRA_ARGS is referenced as $VAR, not ${VAR}. systemd only performs
+# word splitting on the unbraced form; ${VAR} would pass the whole string as one
+# argument and llama-server would reject it.
+[Service]
+Type=simple
+EnvironmentFile=/home/typhoon/git/frankenstein-llm/services/sidecar-%i.env
+ExecStart=/home/typhoon/.local/bin/llama-server \
+    --host 127.0.0.1 --port ${SIDECAR_PORT} \
+    --alias ${SIDECAR_ALIAS} \
+    --model ${SIDECAR_MODEL} \
+    --device ${SIDECAR_DEVICE} \
+    --n-gpu-layers ${SIDECAR_NGL} \
+    --ctx-size ${SIDECAR_CTX} \
+    --batch-size ${SIDECAR_BATCH} \
+    --ubatch-size ${SIDECAR_UBATCH} \
+    --parallel 1 \
+    --load-mode none \
+    $SIDECAR_EXTRA_ARGS
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/home/typhoon/git/frankenstein-llm
+StandardOutput=append:/home/typhoon/git/frankenstein-llm/logs/sidecar-%i.log
+StandardError=append:/home/typhoon/git/frankenstein-llm/logs/sidecar-%i.log
+# Sidecars must never win a resource fight against the interactive router.
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+[Install]
+WantedBy=default.target

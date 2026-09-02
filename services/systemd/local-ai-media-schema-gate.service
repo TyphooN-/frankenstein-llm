@@ -1,0 +1,13 @@
+[Unit]
+Description=Run loopback ComfyUI live schema/model discovery gate
+After=local-ai-repo-agent-gate.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /home/typhoon/git/frankenstein-llm/verification/generative-media/run_schema_serialized.sh
+TimeoutStartSec=infinity
+KillMode=control-group
+Nice=10
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,75 @@
+{
+  "document": {
+    "path": "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/fixtures/ocr-document.png",
+    "lines": [
+      "INCIDENT REPORT 4172",
+      "Pool zroot completed a recovery scrub on 2026-08-29.",
+      "Result: repaired 0B with 0 errors; no known data errors."
+    ],
+    "table_header": [
+      "Device",
+      "Read",
+      "Write",
+      "Cksum"
+    ],
+    "table_rows": [
+      [
+        "nvme0n1",
+        "0",
+        "0",
+        "0"
+      ],
+      [
+        "ROCm1",
+        "0",
+        "0",
+        "0"
+      ]
+    ]
+  },
+  "screen": {
+    "path": "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/fixtures/screen-grounding.png",
+    "size": [
+      900,
+      420
+    ],
+    "buttons": [
+      {
+        "label": "Restart Router",
+        "box": [
+          72,
+          132,
+          292,
+          188
+        ]
+      },
+      {
+        "label": "Stop Downloads",
+        "box": [
+          332,
+          132,
+          552,
+          188
+        ]
+      },
+      {
+        "label": "Open Evidence",
+        "box": [
+          72,
+          232,
+          292,
+          288
+        ]
+      },
+      {
+        "label": "Clear Cache",
+        "box": [
+          332,
+          232,
+          552,
+          288
+        ]
+      }
+    ]
+  }
+}

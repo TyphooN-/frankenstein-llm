@@ -1,0 +1,78 @@
+[Unit]
+# Persistent unit definition for the UI-TARS-1.5-7B three-GPU admission gate.
+#
+# This replaces a transient `systemd-run` invocation. A transient unit is not a
+# definition: it exists only inside the running manager, so an interrupted or
+# crashed run leaves nothing behind to inspect -- the unit is simply not there
+# any more, and `systemctl --user status` cannot tell "never ran" from "died".
+# On 2026-09-01 the 21:06:32 transient run disappeared exactly that way when the
+# host went down at 21:09:48, taking the manager with it. A unit file on disk
+# survives reboots and keeps a stable journal identity.
+#
+# Deliberately no [Install] section: this gate places ~15.5 GiB across all three
+# GPUs and must never start by itself at boot. It is started explicitly.
+Description=UI-TARS-1.5-7B three-GPU computer-use admission gate (six-block placement)
+Documentation=file:///home/typhoon/git/frankenstein-llm/verification/computer-use-grounding/gate_computer_use.py
+After=default.target llama-router.service
+# Bound restart attempts. The gate is heavy and this host has crashed under
+# concurrent load; a restart loop must not be able to hammer it.
+StartLimitIntervalSec=3600
+StartLimitBurst=3
+
+[Service]
+# Type=exec, not oneshot: the manager tracks the runner as the main process for
+# the whole run, so a stop, a kill or a non-zero exit produces a real result the
+# journal records. Type=oneshot cannot be combined with Restart=.
+Type=exec
+ExecStart=/usr/bin/bash /home/typhoon/git/frankenstein-llm/verification/computer-use-grounding/run_when_idle.sh
+WorkingDirectory=/home/typhoon/git/frankenstein-llm/verification/computer-use-grounding
+Environment=PYTHONUNBUFFERED=1
+
+# The run is genuinely unbounded: model load plus six batteries of generation
+# across three GPUs has no honest upper bound, and a start timeout would kill it
+# mid-battery for no reason.
+TimeoutStartSec=infinity
+RuntimeMaxSec=infinity
+# Stopping, by contrast, must terminate. This is the budget the gate has to
+# unload the model, stop telemetry and write computer-use-grounding.json after
+# SIGTERM. SIGKILL follows when it expires.
+TimeoutStopSec=300
+
+# Signal the whole control group so the Python worker is reached even if the
+# shell is wedged. The runner also forwards SIGTERM to its Python child and waits
+# for it, so the unit's status is the gate's real status, never a shell trap's.
+KillMode=control-group
+KillSignal=SIGTERM
+SendSIGHUP=no
+SendSIGKILL=yes
+FinalKillSignal=SIGKILL
+
+# Restart only where retrying can change the outcome. The gate's own exit codes
+# are excluded because retrying them cannot:
+#   1 = the gate ran and the verdict was a failure
+#   3 = another instance holds the lock (retrying would duplicate the worker)
+#   5 = the runner failed closed because no usable artifact was produced
+# Exit 4 (interrupted by a handled signal) and death by signal do restart.
+# `systemctl --user stop` never triggers Restart=, so an operator stop stays a
+# stop. Duplicate model workers are additionally prevented by an flock the gate
+# holds for its whole life, which the kernel releases on any death.
+Restart=on-failure
+RestartSec=120
+RestartPreventExitStatus=1 3 5
+
+# If anything in the cgroup is OOM-killed, stop rather than restart into the
+# same memory pressure.
+OOMPolicy=stop
+
+Nice=10
+IOSchedulingClass=idle
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=computer-use-gate
+
+# The piece the transient run was missing: a result line that is always written.
+# SERVICE_RESULT/EXIT_CODE/EXIT_STATUS are set by the manager for ExecStopPost,
+# so the ending is recorded even when the payload never got to describe it --
+# including SIGKILL after the stop timeout, and OOM kills.
+ExecStopPost=/usr/bin/bash /home/typhoon/git/frankenstein-llm/verification/computer-use-grounding/run_when_idle.sh --stop-post
