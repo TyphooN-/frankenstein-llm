@@ -2,6 +2,8 @@
 """Reboot-resumable, fail-closed functional qualification supervisor.
 
 This mission deliberately records no token rate or comparative benchmark data.
+Independent gates continue after a functional failure so one capability cannot
+hide the status of every later one; the aggregate mission still fails closed.
 """
 from __future__ import annotations
 
@@ -282,7 +284,7 @@ def main() -> int:
         log("another mission supervisor owns the lock")
         return 75
     state = load_state()
-    for stale in ("signal", "error", "failed_step", "exit_code",
+    for stale in ("signal", "error", "failed_step", "failed_steps", "exit_code",
                   "interrupted_step", "step_exit_code", "step_status"):
         state.pop(stale, None)
     state.update({
@@ -294,6 +296,7 @@ def main() -> int:
     })
     atomic_json(state)
     wait_for_inputs(state)
+    failures = []
     for name, command in STEPS:
         if state["steps"].get(name, {}).get("status") == "passed":
             log(f"step already passed; skipping name={name}")
@@ -317,9 +320,24 @@ def main() -> int:
             atomic_json(state)
             return 128 + stop_signal
         if rc != 0:
-            state.update({"status": "failed", "failed_step": name, "exit_code": rc, "updated_at": now()})
+            failures.append({"name": name, "exit_code": rc})
+            state.update({"status": "running-with-failures", "failed_steps": failures,
+                          "updated_at": now()})
             atomic_json(state)
-            return rc or 1
+    if failures:
+        state.update({
+            "status": "functional-foundation-incomplete",
+            "current_step": None,
+            "failed_steps": failures,
+            "exit_code": 1,
+            "remaining": [failure["name"] for failure in failures] + [
+                "build bounded end-to-end computer control only after grounding passes",
+            ],
+            "updated_at": now(),
+        })
+        atomic_json(state)
+        log(f"functional foundation incomplete; failed steps={failures}")
+        return 1
     state.update({
         "status": "functional-foundation-complete",
         "current_step": None,

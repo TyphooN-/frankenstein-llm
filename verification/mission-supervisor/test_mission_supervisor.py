@@ -244,10 +244,20 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
 
     def test_a_genuine_step_failure_is_reported_as_a_failure(self):
         code, state, calls = self.drive([0, 3, 0])
-        self.assertEqual(3, code)
-        self.assertEqual("failed", state["status"])
-        self.assertEqual("step-1", state["failed_step"])
-        self.assertEqual(["step-0", "step-1"], calls, "a failed mission kept going")
+        self.assertEqual(1, code)
+        self.assertEqual("functional-foundation-incomplete", state["status"])
+        self.assertEqual([{"name": "step-1", "exit_code": 3}], state["failed_steps"])
+        self.assertEqual(["step-0", "step-1", "step-2"], calls,
+                         "one functional failure hid independent gate results")
+
+    def test_multiple_functional_failures_are_aggregated(self):
+        code, state, calls = self.drive([2, 0, 4])
+        self.assertEqual(1, code)
+        self.assertEqual(
+            [{"name": "step-0", "exit_code": 2}, {"name": "step-2", "exit_code": 4}],
+            state["failed_steps"],
+        )
+        self.assertEqual(["step-0", "step-1", "step-2"], calls)
 
     def test_a_forwarded_signal_is_an_interruption_not_a_step_failure(self):
         # SIGTERM to the supervisor is forwarded to the child, so the child exits
