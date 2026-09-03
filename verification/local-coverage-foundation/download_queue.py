@@ -129,6 +129,20 @@ def durable_promote(partial: Path, destination: Path) -> None:
     fsync_parent(destination.parent)
 
 
+def aria_control_path(partial: Path) -> Path:
+    return partial.with_name(partial.name + ".aria2")
+
+
+def quarantine_partial(partial: Path, suffix: str) -> Path:
+    """Move bad bytes and matching aria2 piece metadata out of the active path."""
+    quarantine = partial.with_name(partial.name + suffix)
+    os.replace(partial, quarantine)
+    control = aria_control_path(partial)
+    if control.exists():
+        os.replace(control, quarantine.with_name(quarantine.name + ".aria2"))
+    return quarantine
+
+
 def promote_complete_partial(partial: Path, destination: Path, expected_sha: str | None) -> bool:
     """Promote a ``.partial`` that already holds every byte, or quarantine it.
 
@@ -144,8 +158,7 @@ def promote_complete_partial(partial: Path, destination: Path, expected_sha: str
     if expected_sha is not None:
         actual_sha = sha256(partial)
         if actual_sha != expected_sha:
-            quarantine = partial.with_name(partial.name + f".bad-{actual_sha[:12]}")
-            os.replace(partial, quarantine)
+            quarantine = quarantine_partial(partial, f".bad-{actual_sha[:12]}")
             log(f"quarantined complete-size partial with wrong sha256 {partial} -> {quarantine}")
             return False
     durable_promote(partial, destination)
@@ -155,8 +168,15 @@ def promote_complete_partial(partial: Path, destination: Path, expected_sha: str
 
 
 def transfer_command(url: str, partial: Path, connections: int) -> list[str]:
-    """Build a resumable transfer command; use ranges when aria2 is available."""
-    if connections > 1 and shutil.which("aria2c"):
+    """Build a resumable command without mixing incompatible resume metadata.
+
+    aria2 can safely resume its own sparse multi-range file when its control
+    sidecar exists. It cannot infer which ranges are valid in a contiguous file
+    created by curl, so such legacy partials remain on curl.
+    """
+    aria_managed = aria_control_path(partial).exists()
+    fresh = not partial.exists() or partial.stat().st_size == 0
+    if connections > 1 and shutil.which("aria2c") and (fresh or aria_managed):
         return [
             "aria2c", "--continue=true", "--file-allocation=none",
             "--auto-file-renaming=false", "--allow-overwrite=true",
@@ -186,8 +206,7 @@ def download(repository: str, revision: str, repo_path: str, destination: Path, 
         os.replace(destination, quarantine)
         log(f"quarantined invalid final {destination} -> {quarantine}")
     if partial.exists() and partial.stat().st_size > size:
-        quarantine = partial.with_name(partial.name + f".bad-{int(time.time())}")
-        os.replace(partial, quarantine)
+        quarantine = quarantine_partial(partial, f".bad-{int(time.time())}")
         log(f"quarantined oversized partial {partial} -> {quarantine}")
     if partial.exists() and partial.stat().st_size == size:
         # A death between "curl finished" and "os.replace" leaves a partial that
@@ -214,8 +233,7 @@ def download(repository: str, revision: str, repo_path: str, destination: Path, 
     if expected_sha is not None:
         actual_sha = sha256(partial)
         if actual_sha != expected_sha:
-            quarantine = partial.with_name(partial.name + f".bad-{actual_sha[:12]}")
-            os.replace(partial, quarantine)
+            quarantine_partial(partial, f".bad-{actual_sha[:12]}")
             raise RuntimeError(f"SHA-256 mismatch for {repo_path}: expected {expected_sha}, got {actual_sha}")
     durable_promote(partial, destination)
     log(f"promoted {destination} bytes={size} sha256={expected_sha or 'size-only'}")

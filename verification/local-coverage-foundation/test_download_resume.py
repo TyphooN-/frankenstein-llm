@@ -4,7 +4,8 @@ The queue is restarted by systemd on failure and survives reboots, so the states
 it can wake up in are the interesting ones: a partial that stopped mid-transfer,
 a partial that is already the whole file because the host died between the last
 byte and the rename, and a partial that is full-size but wrong. Only the first
-of those may reach curl. The second must be promoted, and the third quarantined
+of those may reach a compatible transport. The second must be promoted, and the
+third quarantined
 -- otherwise the unit restarts forever without transferring anything.
 
 Nothing here performs a download; ``subprocess.run`` is replaced by a recorder.
@@ -77,6 +78,16 @@ class TransferStateTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.fetch(self.digest)
         self.assertTrue(self.partial.exists(), "a resumable partial was discarded")
+
+    def test_quarantine_moves_aria_piece_metadata_with_the_partial(self):
+        self.partial.write_bytes(b"bad-ranges")
+        control = dq.aria_control_path(self.partial)
+        control.write_bytes(b"piece-map")
+        quarantined = dq.quarantine_partial(self.partial, ".bad-test")
+        self.assertFalse(self.partial.exists())
+        self.assertFalse(control.exists())
+        self.assertEqual(b"bad-ranges", quarantined.read_bytes())
+        self.assertEqual(b"piece-map", Path(str(quarantined) + ".aria2").read_bytes())
 
     def test_valid_destination_short_circuits(self):
         self.destination.write_bytes(self.payload)

@@ -81,6 +81,23 @@ class TransferCommandTests(unittest.TestCase):
         self.assertEqual("curl", command[0])
         self.assertIn("--continue-at", command)
 
+    def test_curl_partial_without_aria_metadata_stays_on_curl(self):
+        with tempfile.TemporaryDirectory() as directory:
+            partial = Path(directory) / "artifact.partial"
+            partial.write_bytes(b"curl-prefix")
+            with mock.patch.object(dq.shutil, "which", return_value="/usr/bin/aria2c"):
+                command = dq.transfer_command("https://example.invalid/file", partial, 16)
+        self.assertEqual("curl", command[0])
+
+    def test_aria_partial_with_control_metadata_resumes_on_aria(self):
+        with tempfile.TemporaryDirectory() as directory:
+            partial = Path(directory) / "artifact.partial"
+            partial.write_bytes(b"sparse-ranges")
+            dq.aria_control_path(partial).write_bytes(b"piece-map")
+            with mock.patch.object(dq.shutil, "which", return_value="/usr/bin/aria2c"):
+                command = dq.transfer_command("https://example.invalid/file", partial, 16)
+        self.assertEqual("aria2c", command[0])
+
 
 class ParallelQueueTests(unittest.TestCase):
     def run_queue(self, queue: dict, fake_download, workers: int = 4,
