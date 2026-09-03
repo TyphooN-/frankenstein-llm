@@ -46,7 +46,8 @@ only verified bytes. Independent files run concurrently according to
 
 When `aria2c` is installed, each file can also use bounded HTTP range
 connections. `HERMES_DOWNLOAD_CONNECTION_BUDGET` is shared across active files
-(default and service policy 32), with at most 16 connections assigned to one
+(default and general service policy 32; phase three 64), with at most 16
+connections assigned to one
 file. If aria2 is unavailable or only one connection is assigned, the portable
 curl continuation path is used. Model loading and functional qualification
 remain serialized even though transfers are parallel.

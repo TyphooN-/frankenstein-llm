@@ -18,7 +18,7 @@ ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/home/typhoon/git/frankenstein-llm/models /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation
 Environment=HERMES_DOWNLOAD_WORKERS=16
-Environment=HERMES_DOWNLOAD_CONNECTION_BUDGET=32
+Environment=HERMES_DOWNLOAD_CONNECTION_BUDGET=64
 
 [Install]
 WantedBy=default.target
