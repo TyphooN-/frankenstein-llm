@@ -5,8 +5,8 @@
   "policy": {
     "single_writer": true,
     "phase": "starts only after phase-one and phase-two state and completion stamps agree",
-    "resume": "curl --continue-at - against a .partial sibling",
-    "promotion": "os.replace only after exact size and SHA-256 match",
+    "resume": "aria2 bounded multi-range continuation when available, otherwise curl --continue-at -, against a .partial sibling",
+    "promotion": "fsync content, replace, and fsync the parent directory only after exact size and SHA-256 match",
     "selection": "Qwen-Image-Edit-2511 INT8 ConvRot closes instruction-guided editing on the 32 GiB headless V620; supporting encoder, VAE and official 4-step LoRA are required by the current native ComfyUI template"
   },
   "total_bytes": 30987169046,

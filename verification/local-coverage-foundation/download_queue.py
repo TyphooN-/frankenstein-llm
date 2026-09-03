@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 import sys
 import threading
@@ -23,6 +24,8 @@ STAMP = Path(os.environ.get("HERMES_DOWNLOAD_STAMP", str(ROOT / "downloads-compl
 LOG = Path(os.environ.get("HERMES_DOWNLOAD_LOG", str(ROOT / "downloads.log")))
 DEFAULT_WORKERS = 16
 MAX_WORKERS = 64
+DEFAULT_CONNECTION_BUDGET = 32
+MAX_CONNECTIONS_PER_FILE = 16
 LOG_LOCK = threading.Lock()
 
 PROGRAM = "download_queue.py"
@@ -41,6 +44,7 @@ environment:
   HERMES_DOWNLOAD_STAMP   completion stamp   (default: {ROOT / "downloads-complete.ok"})
   HERMES_DOWNLOAD_LOG     append-only log    (default: {ROOT / "downloads.log"})
   HERMES_DOWNLOAD_WORKERS concurrent files   (default: {DEFAULT_WORKERS}, max: {MAX_WORKERS})
+  HERMES_DOWNLOAD_CONNECTION_BUDGET total HTTP connections (default: {DEFAULT_CONNECTION_BUDGET})
 
 exit codes:
   0   queue complete, or --help
@@ -150,7 +154,28 @@ def promote_complete_partial(partial: Path, destination: Path, expected_sha: str
     return True
 
 
-def download(repository: str, revision: str, repo_path: str, destination: Path, size: int, expected_sha: str | None) -> None:
+def transfer_command(url: str, partial: Path, connections: int) -> list[str]:
+    """Build a resumable transfer command; use ranges when aria2 is available."""
+    if connections > 1 and shutil.which("aria2c"):
+        return [
+            "aria2c", "--continue=true", "--file-allocation=none",
+            "--auto-file-renaming=false", "--allow-overwrite=true",
+            f"--max-connection-per-server={connections}", f"--split={connections}",
+            "--min-split-size=1M", "--max-tries=20", "--retry-wait=5",
+            "--connect-timeout=30", "--timeout=60", "--summary-interval=30",
+            "--console-log-level=notice", "--download-result=hide",
+            "--dir", str(partial.parent), "--out", partial.name, url,
+        ]
+    return [
+        "curl", "--fail", "--location", "--show-error", "--silent",
+        "--retry", "20", "--retry-delay", "5", "--retry-all-errors",
+        "--connect-timeout", "30", "--continue-at", "-",
+        "--output", str(partial), url,
+    ]
+
+
+def download(repository: str, revision: str, repo_path: str, destination: Path, size: int,
+             expected_sha: str | None, connections: int = 1) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_name(destination.name + ".partial")
     if valid(destination, size, expected_sha):
@@ -176,16 +201,13 @@ def download(repository: str, revision: str, repo_path: str, destination: Path, 
     encoded_path = quote(repo_path, safe="/")
     url = f"https://huggingface.co/{repository}/resolve/{revision}/{encoded_path}?download=true"
     start = partial.stat().st_size if partial.exists() else 0
-    log(f"download start key={repository}@{revision} file={repo_path} resume={start} expected={size}")
-    command = [
-        "curl", "--fail", "--location", "--show-error", "--silent",
-        "--retry", "20", "--retry-delay", "5", "--retry-all-errors",
-        "--connect-timeout", "30", "--continue-at", "-",
-        "--output", str(partial), url,
-    ]
+    command = transfer_command(url, partial, connections)
+    log(f"download start key={repository}@{revision} file={repo_path} resume={start} "
+        f"expected={size} transport={command[0]} connections={connections if command[0] == 'aria2c' else 1}")
     result = subprocess.run(command, check=False)
     if result.returncode != 0:
-        raise RuntimeError(f"curl exited {result.returncode} for {repository}/{repo_path}")
+        raise RuntimeError(
+            f"{command[0]} exited {result.returncode} for {repository}/{repo_path}")
     actual_size = partial.stat().st_size
     if actual_size != size:
         raise RuntimeError(f"size mismatch for {partial}: expected {size}, got {actual_size}")
@@ -209,6 +231,19 @@ def configured_workers() -> int:
         raise ValueError(
             f"HERMES_DOWNLOAD_WORKERS must be between 1 and {MAX_WORKERS}, got {workers}")
     return workers
+
+
+def configured_connection_budget() -> int:
+    raw = os.environ.get("HERMES_DOWNLOAD_CONNECTION_BUDGET", str(DEFAULT_CONNECTION_BUDGET))
+    try:
+        budget = int(raw)
+    except ValueError as error:
+        raise ValueError(
+            f"HERMES_DOWNLOAD_CONNECTION_BUDGET must be an integer, got {raw!r}") from error
+    if not 1 <= budget <= 256:
+        raise ValueError(
+            f"HERMES_DOWNLOAD_CONNECTION_BUDGET must be between 1 and 256, got {budget}")
+    return budget
 
 
 def prepare_jobs(queue: dict, state: dict[str, object]) -> list[tuple[str, dict, dict]]:
@@ -249,14 +284,19 @@ def prepare_jobs(queue: dict, state: dict[str, object]) -> list[tuple[str, dict,
     return jobs
 
 
-def run_downloads(queue: dict, state: dict[str, object], workers: int) -> None:
+def run_downloads(queue: dict, state: dict[str, object], workers: int,
+                  connection_budget: int | None = None) -> None:
     """Download independent files concurrently; publish state in this thread."""
     jobs = prepare_jobs(queue, state)
     atomic_json(STATE, state)
     if not jobs:
         return
     active_workers = min(workers, len(jobs))
-    log(f"parallel queue start files={len(jobs)} workers={active_workers}")
+    budget = configured_connection_budget() if connection_budget is None else connection_budget
+    per_file_connections = min(
+        MAX_CONNECTIONS_PER_FILE, max(1, budget // active_workers))
+    log(f"parallel queue start files={len(jobs)} workers={active_workers} "
+        f"connection_budget={budget} connections_per_file={per_file_connections}")
     failures: list[str] = []
     with ThreadPoolExecutor(max_workers=active_workers, thread_name_prefix="hf-file") as pool:
         pending = {
@@ -264,6 +304,7 @@ def run_downloads(queue: dict, state: dict[str, object], workers: int) -> None:
                 download,
                 artifact["repository"], artifact["revision"], item["repo_path"],
                 Path(item["destination"]), int(item["size"]), item.get("sha256"),
+                per_file_connections,
             ): (key, item["repo_path"])
             for key, artifact, item in jobs
         }

@@ -37,6 +37,20 @@ See:
 - `docs/LOCAL-AI-MODEL-STRATEGY.md`
 - `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — reviewed but not downloaded or qualified
 
+## Downloads
+
+The download queues preserve one writer per resolved artifact, resume into an
+ignored `.partial` sibling, verify exact size and SHA-256, and durably promote
+only verified bytes. Independent files run concurrently according to
+`HERMES_DOWNLOAD_WORKERS` (default 4, service policy 16).
+
+When `aria2c` is installed, each file can also use bounded HTTP range
+connections. `HERMES_DOWNLOAD_CONNECTION_BUDGET` is shared across active files
+(default and service policy 32), with at most 16 connections assigned to one
+file. If aria2 is unavailable or only one connection is assigned, the portable
+curl continuation path is used. Model loading and functional qualification
+remain serialized even though transfers are parallel.
+
 ## Runtime
 
 User systemd units live in `~/.config/systemd/user/` and are copied here under `services/systemd/`. After clone or path changes:

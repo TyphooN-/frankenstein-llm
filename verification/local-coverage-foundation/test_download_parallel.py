@@ -53,14 +53,43 @@ class WorkerConfigurationTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     dq.configured_workers()
 
+    def test_connection_budget_defaults_to_32_and_is_bounded(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(32, dq.configured_connection_budget())
+        for raw in ("0", "257", "many"):
+            with self.subTest(raw=raw), \
+                 mock.patch.dict(os.environ, {"HERMES_DOWNLOAD_CONNECTION_BUDGET": raw}):
+                with self.assertRaises(ValueError):
+                    dq.configured_connection_budget()
+
+
+class TransferCommandTests(unittest.TestCase):
+    def test_aria2_uses_resumable_bounded_ranges(self):
+        partial = Path("/models/artifact.partial")
+        with mock.patch.object(dq.shutil, "which", return_value="/usr/bin/aria2c"):
+            command = dq.transfer_command("https://example.invalid/file", partial, 16)
+        self.assertEqual("aria2c", command[0])
+        self.assertIn("--continue=true", command)
+        self.assertIn("--max-connection-per-server=16", command)
+        self.assertIn("--split=16", command)
+        self.assertEqual(partial.name, command[command.index("--out") + 1])
+
+    def test_curl_is_the_portable_single_connection_fallback(self):
+        partial = Path("/models/artifact.partial")
+        with mock.patch.object(dq.shutil, "which", return_value=None):
+            command = dq.transfer_command("https://example.invalid/file", partial, 16)
+        self.assertEqual("curl", command[0])
+        self.assertIn("--continue-at", command)
+
 
 class ParallelQueueTests(unittest.TestCase):
-    def run_queue(self, queue: dict, fake_download, workers: int = 4):
+    def run_queue(self, queue: dict, fake_download, workers: int = 4,
+                  budget: int | None = None):
         state: dict[str, object] = {"artifacts": {}}
         with mock.patch.object(dq, "download", side_effect=fake_download), \
              mock.patch.object(dq, "atomic_json"), \
              mock.patch.object(dq, "log"):
-            dq.run_downloads(queue, state, workers)
+            dq.run_downloads(queue, state, workers, connection_budget=budget)
         return state
 
     def test_independent_files_overlap_up_to_the_bound(self):
@@ -93,6 +122,24 @@ class ParallelQueueTests(unittest.TestCase):
 
         self.run_queue(queue_with_files(3), fake_download, workers=16)
         self.assertEqual(3, len(threads))
+
+    def test_connection_budget_is_shared_across_active_files(self):
+        observed = []
+
+        def fake_download(*args):
+            observed.append(args[-1])
+
+        self.run_queue(queue_with_files(4), fake_download, workers=16, budget=32)
+        self.assertEqual([8] * 4, sorted(observed))
+
+    def test_single_remaining_file_receives_the_per_file_maximum(self):
+        observed = []
+
+        def fake_download(*args):
+            observed.append(args[-1])
+
+        self.run_queue(queue_with_files(1), fake_download, workers=16, budget=32)
+        self.assertEqual([16], observed)
 
     def test_duplicate_destination_is_rejected_before_work_starts(self):
         queue = queue_with_files(2)
