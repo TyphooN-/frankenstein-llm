@@ -49,7 +49,10 @@ Two steps, in order. Neither is a download.
    image-generation gate itself has passed — which it has not.
 2. **Only if step 1 fails.** Run a metadata-collection pass for a dedicated
    instruction-following editor and pin exact repo, revision, files, sizes, and
-   SHA-256 before proposing any queue.
+   SHA-256 before proposing any queue. The 2026-09-02 candidate sweep names
+   FLUX.2-klein-4B as the leading editor candidate for that pass
+   (`docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`); it is a *starting point for
+   metadata collection*, not a pin, and step 1 still comes first.
 
 Budget constraint to carry into step 2: the Z-Image UNet is 12.3 GB bf16 and its
 text encoder 8.0 GB. A second editor family adds roughly another 20 GB competing
@@ -79,6 +82,13 @@ exactly the part of its gate that never ran.
 If the gate passes, the follow-on is a bounded scaffold in the shape of the
 existing repository-agent and Strix scaffolds — deny-by-default, state readback
 after every action, screen text treated as untrusted data — not a new model.
+
+A separate 2026-09-02 sweep does name a candidate *model* worth A/B-testing
+against UI-TARS for typed GUI action selection — Tencent UI-Mate-9B, see
+`docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`. That comparison is blocked behind
+the same precondition: without a grounding verdict there is no baseline to
+compare against. That review also records the standing rule that a GUI actor is
+never abliterated.
 
 ## Gaps deliberately not pursued
 

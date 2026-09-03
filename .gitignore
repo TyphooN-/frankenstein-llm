@@ -13,6 +13,10 @@ router-state.json
 *.lock
 *.partial
 *.recovered
+# Durable state is published by writing "<name>.tmp" and renaming. A crash
+# between those two steps leaves the temp file behind; "*.tmp.*" only covers the
+# pid-suffixed mission variant, so cover the plain suffix too.
+*.tmp
 *.tmp.*
 *.ok
 

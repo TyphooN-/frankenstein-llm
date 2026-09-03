@@ -16,7 +16,7 @@ import re
 import sys
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import GateFailure, check, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
+from gatelib import GateFailure, check, ensure_unloaded, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
 
 BASE = "http://127.0.0.1:8083"
 UNIT = "llama-sidecar@ocr.service"
@@ -47,6 +47,7 @@ def transcribe(image_path: Path, instruction: str) -> str:
 
 def main() -> int:
     summary: dict = {"gate": "ocr", "base_url": BASE}
+    baseline: dict[str, int] | None = None
     try:
         truth = json.loads((FIXTURES / "ground-truth.json").read_text())["document"]
         baseline, waited = managed_sidecar(UNIT, BASE)
@@ -85,6 +86,8 @@ def main() -> int:
     except (GateFailure, Exception) as error:  # noqa: BLE001
         summary["pass"] = False
         summary["error"] = f"{type(error).__name__}: {error}"
+    finally:
+        ensure_unloaded(summary, UNIT, baseline)
     return record("gate-ocr", summary)
 
 

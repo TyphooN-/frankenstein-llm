@@ -1,8 +1,10 @@
 # Local and frontier AI model strategy
 
-Last updated: 2026-08-31
+Last updated: 2026-09-03
 
 This document is the decision record for Hermes, local llama.cpp models, coding, creative generation, and authorized security research on `frankenstein`. The coverage-complete deployment roadmap is maintained in `docs/LOCAL-HERMES-CAPABILITY-COVERAGE-PLAN.md`.
+
+The 2026-09-02 candidate sweep — Qwen3-Coder-Next, Gemma-4-12B Heretic, UI-Mate-9B, WeMM-Embedding-2B, FLUX.2-klein-4B and the models rejected alongside them — is recorded with pinned revisions and source links in `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`. Nothing in that review has been downloaded or qualified.
 
 ## Executive decision
 
@@ -135,12 +137,12 @@ Decision: queue one Q6_K download and controlled A/B after the active GLM transf
 
 #### Qwen3-Coder-Next
 
-- Strong dedicated coding-agent candidate.
-- A Q4_K_M build is roughly 52 GB, so it is a 48-64 GB-class model.
-- It may fit the aggregate GPUs, but leaves much less room for KV cache and runtime overhead than the installed 27B models.
-- It is not an automatic upgrade over newer Qwen3.8-27B for every task.
+- Strong dedicated coding-agent candidate, and the clearest upgrade available for the repository-agent lane: `Qwen/Qwen3-Coder-Next-GGUF`, revision `b82fb738`, Apache-2.0, 80B MoE with 3B active and 262K context, specifically post-trained for agentic coding and tool calls.
+- Official Q4_K_M is roughly 48.4 GB; the Q3 variants are roughly 35-38 GB. Q3 fits GPU0+1; Q4 requires host spill once KV/cache overhead is counted, so it is a 48-64 GB-class model with much less runtime headroom than the installed 27B models.
+- It is not an automatic upgrade over Qwen3.8-27B for every task, and it must not replace the Qwen2.5 Coder FIM model: low-latency completion and long-horizon agentic coding are different jobs.
+- An uncensored derivative exists (Huihui abliterated, plus a Bartowski GGUF of it), but Huihui's own card describes the method as a crude, proof-of-concept refusal-direction removal with no KL or task-retention evidence.
 
-Decision: do not download until an A/B benchmark defines a real gap in `heretic`.
+Decision (updated 2026-09-02): the gap this model fills is now named, so it is promoted from "do not download" to the qualification backlog — **adopt the official model, keep Qwen2.5 Coder for FIM, and watch the abliterated variant only**. It still does not enter a download queue until per-file sizes and SHA-256 digests are collected independently and the Q3 fit is checked against KV overhead, and it is promoted over `heretic` only on local A/B evidence. Details and links: `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`.
 
 #### Devstral Small 2
 
@@ -392,6 +394,7 @@ Primary/project sources:
 - OrcaRouter uncensored Flash checkpoint: https://huggingface.co/orcarouter/GLM-5.3-Flash-Uncensored-FP8
 - Regular Flash GGUF quant evidence: https://unsloth.ai/docs/models/glm-5.3-flash
 - TrustedSec local offensive-model experiment: https://trustedsec.com/blog/benchmarking-self-hosted-llms-for-offensive-security
+- 2026-09-02 candidate sweep (pinned revisions and per-model source links): `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`
 - ACE-Step 1.5: https://github.com/ace-step/ACE-Step-1.5
 - AMD ACE-Step/ROCm guidance: https://www.amd.com/en/blogs/2026/commercial-grade-ai-music-generation-on-amd-ryzen-ai-and-radeon-ace-step-1-5.html
 - ComfyUI ACE-Step documentation: https://docs.comfy.org/tutorials/audio/ace-step/ace-step-v1

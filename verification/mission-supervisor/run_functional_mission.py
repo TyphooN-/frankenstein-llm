@@ -23,6 +23,35 @@ FOUNDATION = ROOT / "verification" / "local-coverage-foundation"
 MIN_AVAILABLE = 32 << 30
 MAX_LOAD = 6.0
 POLL_SECONDS = 30
+
+
+def quiet_timeout(raw: str | None) -> int:
+    """Resolve the deadline for the quiet-host wait.
+
+    ``wait_for_inputs`` is deliberately unbounded: it waits on ~136 GB of
+    downloads that legitimately take days, and giving up on them would be wrong.
+    The quiet-host wait is different. Its conditions are all things that should
+    clear in minutes, so a wait that never ends means something is stuck -- a
+    sidecar left resident by a failed gate used to do exactly that -- and an
+    unbounded wait turns that into a unit which looks busy forever. Fail loudly
+    instead, and fail loudly on an unusable override rather than silently
+    substituting a default for it.
+    """
+    if raw is None or raw == "":
+        return 6 * 3600
+    try:
+        seconds = int(raw)
+    except ValueError as error:
+        raise ValueError(
+            f"HERMES_MISSION_QUIET_TIMEOUT must be a positive integer, got {raw!r}"
+        ) from error
+    if seconds <= 0:
+        raise ValueError(
+            f"HERMES_MISSION_QUIET_TIMEOUT must be a positive integer, got {seconds}")
+    return seconds
+
+
+QUIET_WAIT_TIMEOUT = quiet_timeout(os.environ.get("HERMES_MISSION_QUIET_TIMEOUT"))
 UPSTREAM = (
     (FOUNDATION / "download-state.json", FOUNDATION / "downloads-complete.ok", "72134030730"),
     (FOUNDATION / "download-state-phase2.json", FOUNDATION / "downloads-phase2-complete.ok", "33184695056"),
@@ -55,9 +84,20 @@ def log(message: str) -> None:
 
 
 def atomic_json(value: dict) -> None:
+    """Publish mission state durably; a resumed run reads it to skip passed steps."""
     temp = STATE.with_suffix(f".tmp.{os.getpid()}")
-    temp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    with temp.open("w", encoding="utf-8") as handle:
+        handle.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
     os.replace(temp, STATE)
+    directory = os.open(str(STATE.parent), os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    except OSError:
+        pass
+    finally:
+        os.close(directory)
 
 
 def load_state() -> dict:
@@ -153,9 +193,10 @@ def wait_for_inputs(state: dict) -> None:
         time.sleep(POLL_SECONDS)
 
 
-def wait_for_quiet(state: dict) -> None:
+def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
     quiet = 0
     last = None
+    deadline = time.monotonic() + timeout
     while quiet < 2:
         active = conflicts()
         available = mem_available()
@@ -179,6 +220,14 @@ def wait_for_quiet(state: dict) -> None:
         state.update({"status": "waiting-safe-host", "updated_at": now()})
         atomic_json(state)
         if quiet < 2:
+            # Report the blockers observed in this poll, not "unknown": the whole
+            # point of bounding the wait is to say what the host was busy with.
+            if time.monotonic() >= deadline:
+                state.update({"status": "failed", "updated_at": now()})
+                atomic_json(state)
+                raise RuntimeError(
+                    f"host did not become quiet within {timeout}s; still blocked by: "
+                    f"{'; '.join(reasons) or 'two consecutive quiet polls not yet observed'}")
             time.sleep(POLL_SECONDS)
 
 
@@ -233,7 +282,8 @@ def main() -> int:
         log("another mission supervisor owns the lock")
         return 75
     state = load_state()
-    for stale in ("signal", "error", "failed_step", "exit_code"):
+    for stale in ("signal", "error", "failed_step", "exit_code",
+                  "interrupted_step", "step_exit_code", "step_status"):
         state.pop(stale, None)
     state.update({
         "status": "starting",
@@ -249,14 +299,27 @@ def main() -> int:
             log(f"step already passed; skipping name={name}")
             continue
         rc = run_step(name, command, state)
+        # Order matters. A SIGTERM to this supervisor is forwarded to the running
+        # step, which then exits non-zero -- so testing rc first recorded every
+        # operator stop as "step X failed" and lost the fact that the mission was
+        # interrupted at all. The signal is the more specific explanation, and a
+        # non-zero exit under it is the stop rather than a verdict, so the step is
+        # marked interrupted and the resume runs it again. A step that still
+        # exited 0 really did pass; demoting that would discard a completed gate
+        # and repeat hours of GPU work on the next boot.
+        if stop_signal is not None:
+            if rc != 0:
+                state["steps"][name]["status"] = "interrupted"
+            state.update({"status": "interrupted", "signal": stop_signal,
+                          "interrupted_step": name, "step_exit_code": rc,
+                          "step_status": state["steps"][name]["status"],
+                          "updated_at": now()})
+            atomic_json(state)
+            return 128 + stop_signal
         if rc != 0:
             state.update({"status": "failed", "failed_step": name, "exit_code": rc, "updated_at": now()})
             atomic_json(state)
             return rc or 1
-        if stop_signal is not None:
-            state.update({"status": "interrupted", "signal": stop_signal, "updated_at": now()})
-            atomic_json(state)
-            return 128 + stop_signal
     state.update({
         "status": "functional-foundation-complete",
         "current_step": None,

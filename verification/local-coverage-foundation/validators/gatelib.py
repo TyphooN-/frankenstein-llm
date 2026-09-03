@@ -48,6 +48,50 @@ def vram_used() -> dict[str, int]:
     return readings
 
 
+def vram_residue(baseline: dict[str, int], released: dict[str, int]) -> tuple[dict[str, int], list[str]]:
+    """Per-card VRAM still held after unload, plus the cards that could not be read.
+
+    ``vram_used`` reports -1 for a card whose sysfs node did not answer. Treating
+    that as a number makes ``released - baseline`` hugely negative, which sails
+    under any residue tolerance and turns "we could not measure" into "it
+    released cleanly". Unreadable cards are therefore returned separately so a
+    caller can fail on them instead of scoring them.
+    """
+    residue: dict[str, int] = {}
+    unreadable: list[str] = []
+    for card, base in baseline.items():
+        if base < 0:
+            unreadable.append(card)
+            continue
+        after = released.get(card, -1)
+        if after < 0:
+            unreadable.append(card)
+            continue
+        residue[card] = after - base
+    return residue, sorted(unreadable)
+
+
+def unload_verdict(baseline: dict[str, int], released: dict[str, int],
+                   tolerance: int = 256 * 1024 * 1024) -> dict:
+    """Score a clean-unload check so that missing evidence never reads as a pass."""
+    residue, unreadable = vram_residue(baseline, released)
+    problems = []
+    if unreadable:
+        problems.append(f"VRAM unreadable for {unreadable}; release is unproven")
+    if not residue:
+        problems.append("no card produced a usable before/after VRAM pair")
+    over = {card: value for card, value in residue.items() if value > tolerance}
+    if over:
+        problems.append(f"VRAM still held after unload: {over}")
+    return {
+        "vram_residue_bytes": residue,
+        "unreadable_cards": unreadable,
+        "tolerance_bytes": tolerance,
+        "problems": problems,
+        "pass": not problems,
+    }
+
+
 def post_json(url: str, payload: dict, timeout: int = 600) -> dict:
     request = urllib.request.Request(
         url,
@@ -91,21 +135,65 @@ def unload_gate(unit: str, baseline: dict[str, int], tolerance: int = 256 * 1024
     one-resident-large-model policy depends on eviction genuinely freeing memory.
     """
     systemd("stop", unit)
-    settled = None
+    verdict: dict = {"vram_residue_bytes": {}, "unreadable_cards": sorted(baseline),
+                     "tolerance_bytes": tolerance, "problems": ["unload never sampled"],
+                     "pass": False}
     for _ in range(30):
         time.sleep(2)
-        settled = vram_used()
-        if all(settled[c] - baseline[c] <= tolerance for c in baseline if baseline[c] >= 0):
+        verdict = unload_verdict(baseline, vram_used(), tolerance)
+        if verdict["pass"]:
             break
-    residue = {c: settled[c] - baseline[c] for c in baseline if baseline[c] >= 0}
     active = systemd("is-active", unit).stdout.strip()
     check(active != "active", f"{unit} still active after stop")
-    worst = max(residue.values()) if residue else 0
-    check(
-        worst <= tolerance,
-        f"{unit} left {worst} bytes of VRAM allocated after stop (tolerance {tolerance})",
-    )
-    return {"unit": unit, "residue_bytes": residue, "tolerance_bytes": tolerance, "pass": True}
+    check(verdict["pass"], f"{unit} unload not proven: {verdict['problems']}")
+    return {"unit": unit, "residue_bytes": verdict["vram_residue_bytes"],
+            "unreadable_cards": verdict["unreadable_cards"],
+            "tolerance_bytes": tolerance, "pass": True}
+
+
+def ensure_unloaded(summary: dict, unit: str, baseline: dict[str, int] | None,
+                    tolerance: int = 256 * 1024 * 1024) -> None:
+    """Stop a sidecar even when the gate failed before its unload check.
+
+    ``unload_gate`` lives on the success path, so any failing assertion used to
+    return through the error handler with the model still resident. That breaks
+    the one-resident-large-model policy and stalls the serialized mission, whose
+    quiet-host check treats a live unmanaged llama-server as a conflict and waits
+    for it. Cleanup is therefore unconditional, and it is recorded as cleanup:
+    an unload check that never ran is not a passing unload check.
+
+    Callers invoke this from a ``finally``, so it must not raise. An exception
+    escaping a ``finally`` would replace the gate's own failure and skip
+    ``record``, leaving the run with no evidence file at all -- the one outcome a
+    gate may never produce. Anything that goes wrong here is recorded instead.
+    """
+    if summary.get("unload"):
+        return
+    report: dict = {
+        "unit": unit,
+        "ran_as": "cleanup",
+        "reason": "the gate failed before its unload check; the sidecar was stopped anyway",
+        "pass": False,
+    }
+    summary["unload"] = report
+    try:
+        stop = systemd("stop", unit)
+        report["stop_returncode"] = stop.returncode
+        settled = None
+        for _ in range(30):
+            time.sleep(2)
+            if systemd("is-active", unit).stdout.strip() == "active":
+                continue
+            # The unit is gone; give the driver a moment to hand the memory back
+            # before deciding what the cleanup actually released.
+            settled = vram_used()
+            if baseline is None or unload_verdict(baseline, settled, tolerance)["pass"]:
+                break
+        report["still_active"] = systemd("is-active", unit).stdout.strip() == "active"
+        report["vram_release"] = (unload_verdict(baseline, settled, tolerance)
+                                  if baseline and settled is not None else None)
+    except Exception as error:                                  # noqa: BLE001
+        report["cleanup_error"] = f"{type(error).__name__}: {error}"[:300]
 
 
 def managed_sidecar(unit: str, base_url: str, timeout: int = 900) -> tuple[dict, float]:

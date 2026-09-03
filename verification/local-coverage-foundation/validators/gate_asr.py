@@ -10,6 +10,7 @@ import difflib
 import gc
 import json
 from pathlib import Path
+import sys
 import time
 
 import numpy as np
@@ -18,6 +19,9 @@ from scipy.signal import resample_poly
 import torch
 from transformers import AutoModelForMultimodalLM, AutoProcessor
 
+sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
+from gatelib import unload_verdict, vram_used  # noqa: E402
+
 MODEL = Path("/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf")
 AUDIO = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav")
 EVIDENCE = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/evidence/gate-asr.json")
@@ -25,14 +29,7 @@ EXPECTED = "Mr. Quilter is the apostle of the middle classes, and we are glad to
 AUDIO_SHA256 = "799f78ed4beb4de7ceae3a809262d4ce242394342ccd1d58cef7d49dbc2def46"
 # Memory caps express the host policy GPU0:GPU1:GPU2 = 1:2:1.
 MAX_MEMORY = {0: "2GiB", 1: "4GiB", 2: "2GiB", "cpu": "8GiB"}
-
-
-def vram_used() -> dict[str, int]:
-    out = {}
-    for index in range(3):
-        p = Path(f"/sys/class/drm/card{index}/device/mem_info_vram_used")
-        out[f"card{index}"] = int(p.read_text().strip())
-    return out
+VRAM_RESIDUE_TOLERANCE = 768 * 1024 * 1024
 
 
 def load_audio_16k(path: Path) -> np.ndarray:
@@ -119,17 +116,26 @@ def main() -> int:
                 with torch.cuda.device(index):
                     torch.cuda.empty_cache()
                     torch.cuda.ipc_collect()
+        # Scored through the shared helper so a card whose sysfs node stopped
+        # answering cannot be scored as a release: -1 minus a real baseline is a
+        # hugely negative residue that clears any tolerance. Reading sysfs also
+        # goes through gatelib, which reports -1 instead of raising -- an
+        # exception here would escape the finally and leave no evidence file.
         settled = None
+        verdict = unload_verdict(baseline, {}, VRAM_RESIDUE_TOLERANCE)
         for _ in range(30):
             time.sleep(2)
             settled = vram_used()
-            if all(settled[c] - baseline[c] <= 768 * 1024 * 1024 for c in baseline):
+            verdict = unload_verdict(baseline, settled, VRAM_RESIDUE_TOLERANCE)
+            if verdict["pass"]:
                 break
         summary["vram_after_unload"] = settled
-        summary["vram_residue_bytes"] = {c: settled[c] - baseline[c] for c in baseline}
-        if any(value > 768 * 1024 * 1024 for value in summary["vram_residue_bytes"].values()):
+        summary["vram_residue_bytes"] = verdict["vram_residue_bytes"]
+        summary["unload"] = verdict
+        if not verdict["pass"]:
             summary["pass"] = False
-            summary["error"] = "VRAM did not return within 768 MiB of baseline"
+            # Keep whatever failed first; the unload problems are in summary["unload"].
+            summary.setdefault("error", f"clean unload not proven: {verdict['problems']}")
         summary["recorded_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
         EVIDENCE.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")

@@ -141,6 +141,35 @@ def unload(model: str) -> None:
     wait_state(model, {"unloaded"}, timeout=300)
 
 
+def record_release(result: dict, before: dict) -> None:
+    """Compare post-unload host state against the pre-load baseline.
+
+    ``vram_used`` omits a card whose sysfs node did not answer. Substituting the
+    baseline for a missing reading gave a zero delta, so a card that stopped
+    reporting scored exactly like a card that released its memory -- the eviction
+    check passed with no evidence behind it. Missing readings, and a baseline
+    that saw no card at all, are recorded as problems instead.
+    """
+    after = sample("after_unload")
+    result["after_unload"] = after
+    problems = result["problems"]
+    if not before["vram_used_bytes"]:
+        problems.append("no GPU reported VRAM before the load; eviction is unproven")
+    for card, base in before["vram_used_bytes"].items():
+        if card not in after["vram_used_bytes"]:
+            problems.append(f"{card} stopped reporting VRAM after unload; eviction is unproven")
+            continue
+        delta = after["vram_used_bytes"][card] - base
+        if delta > VRAM_TOLERANCE:
+            problems.append(f"{card} retained {delta} bytes after unload")
+    ram_delta = before["mem_available_bytes"] - after["mem_available_bytes"]
+    if ram_delta > RAM_TOLERANCE:
+        problems.append(f"available RAM remained {ram_delta} bytes below baseline")
+    swap_growth = after["swap_used_bytes"] - before["swap_used_bytes"]
+    if swap_growth > RAM_TOLERANCE:
+        problems.append(f"swap grew by {swap_growth} bytes")
+
+
 def check_model(model: str) -> dict:
     before = sample("before")
     result: dict = {"model": model, "before": before, "checks": {}, "problems": []}
@@ -206,18 +235,7 @@ def check_model(model: str) -> dict:
             unload(model)
         except Exception as error:  # noqa: BLE001
             result["problems"].append(f"unload error: {type(error).__name__}: {error}"[:500])
-        after = sample("after_unload")
-        result["after_unload"] = after
-        for card, base in before["vram_used_bytes"].items():
-            delta = after["vram_used_bytes"].get(card, base) - base
-            if delta > VRAM_TOLERANCE:
-                result["problems"].append(f"{card} retained {delta} bytes after unload")
-        ram_delta = before["mem_available_bytes"] - after["mem_available_bytes"]
-        if ram_delta > RAM_TOLERANCE:
-            result["problems"].append(f"available RAM remained {ram_delta} bytes below baseline")
-        swap_growth = after["swap_used_bytes"] - before["swap_used_bytes"]
-        if swap_growth > RAM_TOLERANCE:
-            result["problems"].append(f"swap grew by {swap_growth} bytes")
+        record_release(result, before)
     result["pass"] = not result["problems"] and all(
         check.get("pass") is True for check in result["checks"].values()
     ) and set(result["checks"]) == {"coherence", "structured_output", "tool_call"}
@@ -254,18 +272,7 @@ def check_vision_model() -> dict:
             unload(model)
         except Exception as error:  # noqa: BLE001
             result["problems"].append(f"unload error: {type(error).__name__}: {error}"[:500])
-        after = sample("after_unload")
-        result["after_unload"] = after
-        for card, base in before["vram_used_bytes"].items():
-            delta = after["vram_used_bytes"].get(card, base) - base
-            if delta > VRAM_TOLERANCE:
-                result["problems"].append(f"{card} retained {delta} bytes after unload")
-        ram_delta = before["mem_available_bytes"] - after["mem_available_bytes"]
-        if ram_delta > RAM_TOLERANCE:
-            result["problems"].append(f"available RAM remained {ram_delta} bytes below baseline")
-        swap_growth = after["swap_used_bytes"] - before["swap_used_bytes"]
-        if swap_growth > RAM_TOLERANCE:
-            result["problems"].append(f"swap grew by {swap_growth} bytes")
+        record_release(result, before)
     result["pass"] = (
         not result["problems"]
         and result["checks"].get("vision_grounding", {}).get("pass") is True

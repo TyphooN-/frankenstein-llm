@@ -15,6 +15,7 @@ IOSchedulingPriority=7
 CPUWeight=10
 IOWeight=10
 Environment=PYTHONUNBUFFERED=1
+Environment=HERMES_DOWNLOAD_WORKERS=16
 
 [Install]
 WantedBy=default.target

@@ -17,6 +17,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadWritePaths=/home/typhoon/git/frankenstein-llm/models /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation
+Environment=HERMES_DOWNLOAD_WORKERS=16
 
 [Install]
 WantedBy=default.target

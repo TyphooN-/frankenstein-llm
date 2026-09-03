@@ -14,7 +14,7 @@ from __future__ import annotations
 import sys
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import GateFailure, check, cosine, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
+from gatelib import GateFailure, check, ensure_unloaded, cosine, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
 
 BASE = "http://127.0.0.1:8081"
 UNIT = "llama-sidecar@embeddings.service"
@@ -34,6 +34,7 @@ def embed(texts: list[str]) -> list[list[float]]:
 
 def main() -> int:
     summary: dict = {"gate": "embeddings", "base_url": BASE}
+    baseline: dict[str, int] | None = None
     try:
         baseline, waited = managed_sidecar(UNIT, BASE)
         summary["vram_baseline"] = baseline
@@ -78,6 +79,8 @@ def main() -> int:
     except (GateFailure, Exception) as error:  # noqa: BLE001 - gates report, never raise
         summary["pass"] = False
         summary["error"] = f"{type(error).__name__}: {error}"
+    finally:
+        ensure_unloaded(summary, UNIT, baseline)
     return record("gate-embeddings", summary)
 
 

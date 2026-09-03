@@ -13,7 +13,7 @@ import statistics
 import sys
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import GateFailure, check, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
+from gatelib import GateFailure, check, ensure_unloaded, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
 
 BASE = "http://127.0.0.1:8082"
 UNIT = "llama-sidecar@reranker.service"
@@ -42,6 +42,7 @@ def rerank(query: str) -> list[dict]:
 
 def main() -> int:
     summary: dict = {"gate": "reranker", "base_url": BASE}
+    baseline: dict[str, int] | None = None
     try:
         baseline, waited = managed_sidecar(UNIT, BASE)
         summary["vram_baseline"] = baseline
@@ -79,6 +80,8 @@ def main() -> int:
     except (GateFailure, Exception) as error:  # noqa: BLE001
         summary["pass"] = False
         summary["error"] = f"{type(error).__name__}: {error}"
+    finally:
+        ensure_unloaded(summary, UNIT, baseline)
     return record("gate-reranker", summary)
 
 

@@ -21,7 +21,7 @@ import sys
 import time
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import CARDS, GateFailure, check, vram_used  # noqa: E402,F401
+from gatelib import CARDS, GateFailure, check, unload_verdict, vram_used  # noqa: E402,F401
 
 ROOT = Path("/home/typhoon/git/frankenstein-llm/verification/computer-use-grounding")
 FIXTURES = ROOT / "fixtures"

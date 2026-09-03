@@ -7,10 +7,14 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import sys
 import threading
 import time
 import urllib.error
 import urllib.request
+
+sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
+from gatelib import unload_verdict, vram_used  # noqa: E402
 
 ROOT = Path("/home/typhoon/git/frankenstein-llm/verification/glm53flash-local")
 BINARY = ROOT / "build-pr27752-c9ddd682/bin/llama-server"
@@ -44,10 +48,12 @@ def memory() -> dict[str, int]:
 
 
 def vram() -> dict[str, int]:
-    return {
-        card: int(Path(f"/sys/class/drm/{card}/device/mem_info_vram_used").read_text())
-        for card in CARDS
-    }
+    return vram_used()
+
+
+def unreadable_cards(readings: dict[str, int]) -> list[str]:
+    """Return required cards whose VRAM reading is absent or unreadable."""
+    return sorted(card for card in CARDS if readings.get(card, -1) < 0)
 
 
 def request(path: str, payload: dict | None = None, timeout: int = 600) -> tuple[int, dict | str]:
@@ -125,12 +131,20 @@ def main() -> int:
         for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
     }
     try:
+        missing = unreadable_cards(baseline_vram)
+        if missing:
+            raise RuntimeError(f"baseline VRAM telemetry unreadable for {missing}")
         process = subprocess.Popen(COMMAND, stdout=log_handle, stderr=subprocess.STDOUT, start_new_session=True)
 
         def resource_guard() -> None:
             while not guard_stop.wait(2):
                 mem = memory()
                 gpu = vram()
+                missing = unreadable_cards(gpu)
+                if missing:
+                    guard_errors.append(f"VRAM telemetry unreadable for {missing}")
+                    terminate(process)
+                    return
                 summary["samples"] += 1
                 summary["minimum_mem_available_bytes"] = min(summary["minimum_mem_available_bytes"], mem["MemAvailable"])
                 summary["peak_vram"] = {card: max(summary["peak_vram"][card], gpu[card]) for card in CARDS}
@@ -214,16 +228,19 @@ def main() -> int:
             terminate(process)
             summary["server_exit_status"] = process.returncode
         log_handle.close()
-        settled = None
+        settled: dict[str, int] = {}
+        verdict = unload_verdict(baseline_vram, settled, VRAM_TOLERANCE)
         for _ in range(30):
             time.sleep(2)
             settled = vram()
-            if all(settled[c] - baseline_vram[c] <= VRAM_TOLERANCE for c in CARDS):
+            verdict = unload_verdict(baseline_vram, settled, VRAM_TOLERANCE)
+            if verdict["pass"]:
                 break
         summary["vram_after_unload"] = settled
-        summary["vram_residue"] = {c: settled[c] - baseline_vram[c] for c in CARDS}
+        summary["unload"] = verdict
+        summary["vram_residue"] = verdict["vram_residue_bytes"]
         summary["memory_after_unload"] = memory()
-        summary["clean_unload"] = all(value <= VRAM_TOLERANCE for value in summary["vram_residue"].values())
+        summary["clean_unload"] = verdict["pass"]
         if received_signal is not None:
             summary["received_signal"] = signal.Signals(received_signal).name
         summary["pass"] = bool(summary.get("functional_pass") and summary["clean_unload"])

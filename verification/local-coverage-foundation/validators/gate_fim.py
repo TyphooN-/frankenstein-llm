@@ -11,7 +11,7 @@ from __future__ import annotations
 import sys
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import GateFailure, check, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
+from gatelib import GateFailure, check, ensure_unloaded, managed_sidecar, post_json, record, unload_gate, vram_used  # noqa: E402
 
 BASE = "http://127.0.0.1:8084"
 UNIT = "llama-sidecar@fim.service"
@@ -51,6 +51,7 @@ def infill(case: dict) -> str:
 
 def main() -> int:
     summary: dict = {"gate": "fim", "base_url": BASE, "cases": []}
+    baseline: dict[str, int] | None = None
     try:
         baseline, waited = managed_sidecar(UNIT, BASE)
         summary["vram_baseline"] = baseline
@@ -78,6 +79,8 @@ def main() -> int:
     except (GateFailure, Exception) as error:  # noqa: BLE001
         summary["pass"] = False
         summary["error"] = f"{type(error).__name__}: {error}"
+    finally:
+        ensure_unloaded(summary, UNIT, baseline)
     return record("gate-fim", summary)
 
 

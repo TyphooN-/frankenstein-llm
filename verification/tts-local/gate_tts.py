@@ -26,7 +26,7 @@ import time
 import unicodedata
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import vram_used  # noqa: E402
+from gatelib import unload_verdict, vram_used  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
 EVIDENCE = ROOT / "evidence"
@@ -64,6 +64,10 @@ MALFORMED = [
     ("rtl_mixed", "hello ‮evil‬ world"),
 ]
 LONG_INPUT_WORDS = 400
+# Hard deadline for the separate ASR process. Generous, because it loads a model
+# on a possibly busy host, but finite: an unbounded wait here would hold the
+# serialized mission open indefinitely.
+ASR_ROUNDTRIP_TIMEOUT = 3600
 
 
 SECTION_KEYS = ("gpu_use", "long_input", "malformed_inputs", "memory_safety",
@@ -323,15 +327,13 @@ def main() -> int:
         time.sleep(8)
         after = memory_sample("after-unload")
         summary["memory_after_unload"] = after
-        residue = {c: after["vram_used"][c] - baseline["vram_used"][c]
-                   for c in baseline["vram_used"] if baseline["vram_used"].get(c, -1) >= 0}
-        summary["unload"] = {
-            "vram_residue_bytes": residue,
-            "tolerance_bytes": VRAM_RESIDUE_TOLERANCE,
-            "pass": all(v <= VRAM_RESIDUE_TOLERANCE for v in residue.values()),
-        }
-        if not summary["unload"]["pass"]:
-            note(problems, f"VRAM not released: {residue}")
+        # Cards that could not be read are not cards that released: an empty
+        # residue set used to make ``all(...)`` vacuously true, so a host whose
+        # sysfs nodes stopped answering passed the clean-unload gate outright.
+        summary["unload"] = unload_verdict(
+            baseline["vram_used"], after["vram_used"], VRAM_RESIDUE_TOLERANCE)
+        for problem in summary["unload"]["problems"]:
+            note(problems, f"unload: {problem}")
 
     # --- intelligibility round trip (separate process so TTS is fully unloaded)
     # This is the gate's central claim, so it is never silently absent: if it did
@@ -350,17 +352,39 @@ def main() -> int:
             "reason": "no audio was generated, so there was nothing to transcribe",
         }
     else:
-        rt = subprocess.run(
-            [sys.executable, str(ROOT / "asr_roundtrip.py"),
-             "--pairs", json.dumps([{"path": g["path"], "text": g["text"],
-                                     "name": g["name"]} for g in summary["generated"]])],
-            capture_output=True, text=True, timeout=3600)
-        summary["intelligibility_stdout_tail"] = rt.stdout[-600:]
+        # The round trip loads a second model, so it is bounded. A blown deadline
+        # or a runtime that will not start must still leave gate-tts.json behind:
+        # letting TimeoutExpired escape here would abandon the run with no
+        # artifact at all, which is the one outcome this gate may not produce.
         try:
-            summary["intelligibility"] = json.loads(rt.stdout.strip().splitlines()[-1])
-        except Exception:                                       # noqa: BLE001
-            summary["intelligibility"] = {"pass": False, "rc": rt.returncode,
-                                          "stderr_tail": rt.stderr[-800:]}
+            rt = subprocess.run(
+                [sys.executable, str(ROOT / "asr_roundtrip.py"),
+                 "--pairs", json.dumps([{"path": g["path"], "text": g["text"],
+                                         "name": g["name"]} for g in summary["generated"]])],
+                capture_output=True, text=True, timeout=ASR_ROUNDTRIP_TIMEOUT)
+        except subprocess.TimeoutExpired as error:
+            note(problems, f"intelligibility round trip exceeded "
+                           f"{ASR_ROUNDTRIP_TIMEOUT}s and was killed")
+            summary["intelligibility"] = {
+                "pass": False, "timed_out": True,
+                "timeout_seconds": ASR_ROUNDTRIP_TIMEOUT,
+                "stdout_tail": (error.stdout or b"")[-600:].decode(errors="replace")
+                if isinstance(error.stdout, bytes) else (error.stdout or "")[-600:],
+            }
+        except OSError as error:
+            note(problems, f"intelligibility round trip could not start: "
+                           f"{type(error).__name__}")
+            summary["intelligibility"] = {
+                "pass": False,
+                "error": f"{type(error).__name__}: {error}"[:300],
+            }
+        else:
+            summary["intelligibility_stdout_tail"] = rt.stdout[-600:]
+            try:
+                summary["intelligibility"] = json.loads(rt.stdout.strip().splitlines()[-1])
+            except Exception:                                   # noqa: BLE001
+                summary["intelligibility"] = {"pass": False, "rc": rt.returncode,
+                                              "stderr_tail": rt.stderr[-800:]}
 
     finalize(summary)
     summary["recorded_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")

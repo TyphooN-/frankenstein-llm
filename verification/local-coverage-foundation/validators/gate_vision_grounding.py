@@ -22,12 +22,13 @@ import sys
 import time
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import GateFailure, check, post_json, record, vram_used, wait_healthy  # noqa: E402
+from gatelib import GateFailure, check, post_json, record, unload_verdict, vram_used, wait_healthy  # noqa: E402
 
 BASE = "http://127.0.0.1:8090"
 FIXTURES = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/fixtures")
 PIDFILE = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/vision-probe.pid")
 REQUIRED_HITS = 3  # of 4 controls
+VRAM_RESIDUE_TOLERANCE = 768 * 1024 * 1024
 
 
 def ask(image_bytes: bytes, instruction: str, max_tokens: int = 160) -> str:
@@ -137,10 +138,25 @@ def main() -> int:
         summary["error"] = f"{type(error).__name__}: {error}"
     finally:
         stop_probe()
-        time.sleep(8)
-        released = vram_used()
-        summary["vram_after_stop"] = released
-        summary["vram_residue"] = {c: released[c] - baseline[c] for c in baseline if baseline[c] >= 0}
+        # The probe exiting is not the instant the driver hands the memory back,
+        # so settle before scoring instead of sampling once. Scored through the
+        # shared helper: a card that stopped answering reads as -1, and -1 minus
+        # a real baseline is a hugely negative residue that clears any tolerance,
+        # which turns "we could not measure" into "it released cleanly".
+        settled = None
+        verdict = unload_verdict(baseline, {}, VRAM_RESIDUE_TOLERANCE)
+        for _ in range(30):
+            time.sleep(2)
+            settled = vram_used()
+            verdict = unload_verdict(baseline, settled, VRAM_RESIDUE_TOLERANCE)
+            if verdict["pass"]:
+                break
+        summary["vram_after_stop"] = settled
+        summary["vram_residue"] = verdict["vram_residue_bytes"]
+        summary["unload"] = verdict
+        if not verdict["pass"]:
+            summary["pass"] = False
+            summary.setdefault("error", f"clean unload not proven: {verdict['problems']}")
     return record("gate-vision-grounding", summary)
 
 

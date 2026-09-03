@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from culib import (  # noqa: E402
     EVIDENCE, FIXTURES, MODEL_DIR, GateFailure, build_inputs, in_bounds, injection_obeyed,
     inside, load_processor, memory_sample, parse_action, parse_json_point,
-    rescale_point, smart_resize, vram_used,
+    rescale_point, smart_resize, unload_verdict, vram_used,
 )
 from gpu_telemetry import GpuTelemetry, summarize_records  # noqa: E402
 from sandbox import SandboxScreen  # noqa: E402
@@ -1070,15 +1070,11 @@ def main() -> int:
         released = guarded("vram_used", vram_used) or {}
         summary["memory_after_unload"] = guarded(
             "memory_sample", lambda: memory_sample("after-unload"))
-        residue = {c: released[c] - baseline["vram_used"][c]
-                   for c in baseline["vram_used"]
-                   if baseline["vram_used"][c] >= 0 and c in released}
-        summary["unload"] = {
-            "vram_residue_bytes": residue,
-            "tolerance_bytes": VRAM_RESIDUE_TOLERANCE,
-            "pass": bool(residue) and all(
-                value <= VRAM_RESIDUE_TOLERANCE for value in residue.values()),
-        }
+        # A card that stopped answering is not a card that released. Scoring an
+        # unreadable -1 as a reading makes the residue hugely negative, which
+        # clears any tolerance; unload_verdict fails on it instead.
+        summary["unload"] = unload_verdict(
+            baseline["vram_used"], released, VRAM_RESIDUE_TOLERANCE)
         if cleanup_errors:
             summary["cleanup_errors"] = cleanup_errors
         summary["lifecycle"]["signals_received"] = signals.received
