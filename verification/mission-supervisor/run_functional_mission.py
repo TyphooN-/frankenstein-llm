@@ -58,6 +58,7 @@ UPSTREAM = (
     (FOUNDATION / "download-state.json", FOUNDATION / "downloads-complete.ok", "72134030730"),
     (FOUNDATION / "download-state-phase2.json", FOUNDATION / "downloads-phase2-complete.ok", "33184695056"),
     (FOUNDATION / "download-state-phase3.json", FOUNDATION / "downloads-phase3-complete.ok", "30987169046"),
+    (FOUNDATION / "download-state-phase4.json", FOUNDATION / "downloads-phase4-complete.ok", "98653778996"),
 )
 STEPS = (
     ("router-reload-presets", ["/usr/bin/systemctl", "--user", "restart", "llama-router.service"]),

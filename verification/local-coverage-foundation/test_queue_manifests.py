@@ -1,9 +1,9 @@
-"""Cross-file consistency for the three download queues.
+"""Cross-file consistency for the four download queues.
 
 The expected byte totals are repeated in four places: each queue JSON, the
-phase-two and phase-three runners that refuse to start until the previous stamp
-matches, and the mission supervisor that refuses to qualify anything until all
-three do. A queue edited without updating those copies produces a stamp mismatch
+later-phase runners that refuse to start until the previous stamp matches, and
+the mission supervisor that refuses to qualify anything until all four do. A
+queue edited without updating those copies produces a stamp mismatch
 that fails a unit *after* the transfer, or -- worse -- a supervisor that waits
 forever for a number nothing will ever write. Cheap to check here; expensive to
 discover at 70 GB.
@@ -24,6 +24,7 @@ QUEUES = {
     "phase1": HERE / "download-queue.json",
     "phase2": HERE / "download-queue-phase2.json",
     "phase3": HERE / "download-queue-phase3.json",
+    "phase4": HERE / "download-queue-phase4.json",
 }
 STAMP_BYTES = {name: json.loads(path.read_text())["total_bytes"]
                for name, path in QUEUES.items()}
@@ -107,7 +108,13 @@ class StampConstantTests(unittest.TestCase):
             with self.subTest(phase=phase):
                 self.assertIn(str(STAMP_BYTES[phase]), found)
 
-    def test_mission_supervisor_waits_for_all_three_totals(self):
+    def test_phase_four_runner_waits_for_all_prior_totals(self):
+        found = literals(HERE / "run_download_phase4.py")
+        for phase in ("phase1", "phase2", "phase3"):
+            with self.subTest(phase=phase):
+                self.assertIn(str(STAMP_BYTES[phase]), found)
+
+    def test_mission_supervisor_waits_for_all_four_totals(self):
         supervisor = HERE.parent / "mission-supervisor" / "run_functional_mission.py"
         found = literals(supervisor)
         for phase, total in STAMP_BYTES.items():

@@ -35,7 +35,7 @@ See:
 - `docs/decisions/0002-serialized-functional-qualification.md`
 - `docs/decisions/0003-hardware-allocation-and-memory-policy.md`
 - `docs/LOCAL-AI-MODEL-STRATEGY.md`
-- `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — reviewed but not downloaded or qualified
+- `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — reviewed candidate selection and qualification backlog
 
 ## Downloads
 
@@ -46,11 +46,18 @@ only verified bytes. Independent files run concurrently according to
 
 When `aria2c` is installed, each file can also use bounded HTTP range
 connections. `HERMES_DOWNLOAD_CONNECTION_BUDGET` is shared across active files
-(default and general service policy 32; phase three 64), with at most 16
+(default and general service policy 32; phases three and four 64), with at most 16
 connections assigned to one
 file. If aria2 is unavailable or only one connection is assigned, the portable
 curl continuation path is used. Model loading and functional qualification
 remain serialized even though transfers are parallel.
+
+Phase four is the pinned research-candidate queue. It installs Qwen3-Coder-Next
+Q4_K_M, Gemma-4 Heretic Q6_K with its projector, UI-Mate-9B, WeMM-Embedding-2B,
+and the non-duplicated FLUX.2-klein-4B runtime files. Qwen3-ASR-1.7B is not
+duplicated because the same pinned revision was already verified by phase one.
+The mission supervisor treats successful phase-four completion as a prerequisite
+for subsequent serialized functional qualification.
 
 ## Runtime
 

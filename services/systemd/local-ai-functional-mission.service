@@ -1,6 +1,6 @@
 [Unit]
 Description=Serialized non-benchmark local AI functional qualification mission
-After=network-online.target llama-router.service local-ai-model-downloads.service local-ai-model-downloads-phase2.service local-ai-model-downloads-phase3.service
+After=network-online.target llama-router.service local-ai-model-downloads.service local-ai-model-downloads-phase2.service local-ai-model-downloads-phase3.service local-ai-model-downloads-phase4.service
 Wants=network-online.target
 
 [Service]

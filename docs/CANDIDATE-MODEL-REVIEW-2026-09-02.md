@@ -37,10 +37,10 @@ Links are pinned to the Hugging Face commit observed on 2026-09-02.
 
 | # | Candidate (pinned revision) | Release / license / shape | Why it is a real gain | Compatibility | Verdict |
 |---|---|---|---|---|---|
-| 1 | [Qwen3-Coder-Next-GGUF `b82fb738`](https://huggingface.co/Qwen/Qwen3-Coder-Next-GGUF/tree/b82fb7382639d97b38fa7672e526c760c2fb358e) | 2026-02-02, Apache-2.0. 80B MoE, 3B active, 262K context. Q4_K_M ≈48.4 GB; Q3 ≈35–38 GB. | Clearest upgrade for the repository-agent lane: post-trained for agentic coding and tool calls. Q3 fits GPU0+1; Q4 spills to host once KV overhead is counted. | Official llama.cpp/GGUF, Transformers, vLLM, SGLang. No ComfyUI role. | **ADOPT (official)** for repo agents. **Keep Qwen2.5 Coder for FIM** — do not replace the completion model with this. |
+| 1 | [Qwen3-Coder-Next-GGUF `b82fb738`](https://huggingface.co/Qwen/Qwen3-Coder-Next-GGUF/tree/b82fb7382639d97b38fa7672e526c760c2fb358e) | 2026-02-02, Apache-2.0. 80B MoE, 3B active, 262K context. Official Q4_K_M is ≈48.4 GB. | Clearest upgrade for the repository-agent lane: post-trained for agentic coding and tool calls. Q4_K_M uses GPU0+1 with bounded host/display-GPU spill as required by cache and runtime overhead. | Official llama.cpp/GGUF, Transformers, vLLM, SGLang. No ComfyUI role. | **ADOPT (official)** for repo agents. **Keep Qwen2.5 Coder for FIM** — do not replace the completion model with this. |
 | 2 | [SC117/Gemma-4-12B-it-heretic-GGUF `efa14611`](https://huggingface.co/SC117/Gemma-4-12B-it-heretic-GGUF/tree/efa14611b0b04ab1ab1e38356596ac8d673a619a) | 2026-06-06 (refreshed 06-07), Apache-2.0 metadata. Dense 11.95B, 256K. Q4_K_M 7.38 GB, Q6_K 9.79 GB, Q8 12 GB. | The one genuinely distinct uncensored addition: native text/image/audio/video understanding rather than another Qwen chat merge. Heretic v2 ARA+LoRA, card reports KL 0.055 and 15/100 residual refusals — less censored, not "zero refusal". | GGUF/llama.cpp packaged; BF16 base in recent Transformers. Media paths need a Gemma-4-capable llama.cpp build and must be validated modality by modality. | **TRIAL** as the lightweight uncensored multimodal/audio preset. Keep it away from high-privilege tool execution. |
 | 3 | [tencent/UI-Mate-9B `05dd5f29`](https://huggingface.co/tencent/UI-Mate-9B/tree/05dd5f2975195a5bb03d4363e8767f12158c8421) | 2026-08-14, Apache-2.0. Qwen3.5-based 9B multimodal GUI policy, BF16 ≈18.82 GB — a good V620 fit. | Long-horizon native desktop interaction, structured mouse/keyboard actions, in-context demonstrations. Directly challenges the already-downloaded UI-TARS-1.5-7B. | Official Transformers, vLLM, SGLang with the official prompt/parser/harness. Community GGUFs exist but llama.cpp is not the reference action path. | **A/B AGAINST UI-TARS.** Do **not** abliterate a GUI actor — action authorization and confirmations are a safety boundary, not friction. |
-| 4 | [tencent/WeMM-Embedding-2B `df8094e5`](https://huggingface.co/tencent/WeMM-Embedding-2B/tree/df8094e5caf29083d9cac28e96fad6cfbe3ee57f) | 2026-08-25. Card text says Apache-2.0; the HF API labels the repo `other` — resolve before adoption. 2.72B, ≈5.44 GB BF16, 2048-D Matryoshka. | Joint retrieval over text, images, video, visual documents and interleaved inputs — a capability the Qwen3 text embedder does not have. | Transformers 5.2 with remote code, SentenceTransformers, vLLM pooling, SGLang. No verified llama.cpp path. | **ADOPT** if screenshot/document/image/video retrieval is wanted. Build a **separate** index: vector spaces are not interchangeable, so keep Qwen3 embedding/reranker for text-only. |
+| 4 | [tencent/WeMM-Embedding-2B `bbd6cd4b`](https://huggingface.co/tencent/WeMM-Embedding-2B/tree/bbd6cd4bf52cfc6716f752a2df80b2706720bd95) | 2026-08-25. This refreshed pin includes an explicit Apache-2.0 `LICENSE`; its only change from reviewed `df8094e5` is `README.md`, and runtime objects are byte-identical. 2.72B, ≈5.44 GB BF16, 2048-D Matryoshka. | Joint retrieval over text, images, video, visual documents and interleaved inputs — a capability the Qwen3 text embedder does not have. | Transformers 5.2 with remote code, SentenceTransformers, vLLM pooling, SGLang. No verified llama.cpp path. | **ADOPT** if screenshot/document/image/video retrieval is wanted. Build a **separate** index: vector spaces are not interchangeable, so keep Qwen3 embedding/reranker for text-only. |
 | 5 | [black-forest-labs/FLUX.2-klein-4B `e7b7dc27`](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/tree/e7b7dc27f91deacad38e78976d1f2b499d76a294) | 2026-01-14, Apache-2.0. 3.88B rectified flow; card targets ≈13 GB VRAM and four-step generation. | Unified text generation, image editing and multi-reference editing at low latency. Complements Z-Image Turbo rather than replacing it, and speaks directly to the open image-editing gap. | Native ComfyUI and Diffusers. Not llama.cpp. | **ADOPT** as the fast editing / multi-reference lane; retain Z-Image for its established quality lane. An "uncensored text encoder" repack is not worth adopting without a prompt-refusal test showing a real limitation. |
 | 6 | [Qwen/Qwen3-ASR-1.7B-hf `bcd2b5b7`](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf/tree/bcd2b5b7f32b480ab5790554cfa8347f246a14f3) | 2026-06-26, Apache-2.0. 2.04B, ≈4.08 GB BF16. | Useful refresh *if* the installed ASR lacks streaming/offline unification, hotword/context prompting, singing/BGM handling, or the documented 52 languages. Pair `Qwen3-ForcedAligner-0.6B-hf` only when timestamps are needed. | Native Transformers ≥5.13. Community GGUFs exist; the supported path is Transformers. | **WATCH** — adopt only after a WER/RTF comparison against the installed ASR on the real microphones and accents. |
 | 7 | [mistralai/Mistral-Small-4-119B-2603 `a11f36be`](https://huggingface.co/mistralai/Mistral-Small-4-119B-2603/tree/a11f36bebf709121056b1dbcc943d1c6afbe494d) · [Huihui abliterated-v2](https://huggingface.co/huihui-ai/Huihui-Mistral-Small-4-119B-2603-BF16-abliterated-v2-GGUF) | 2026-01-23 (card updated July), Apache-2.0. 119B MoE, 6.5B active, 256K, vision + tool use. IQ4 GGUFs ≈58–59 GB. | Possible fast-MoE alternate with integrated reasoning/vision. Cannot sit entirely on GPU0+1: ~10+ GB host spill before cache. The abliterated v2 touches every layer but the first and publishes no KL, perplexity or task-retention evidence. | Base: llama.cpp GGUF, vLLM, current Mistral/Transformers. Abliterated repo ships split GGUF and its own tool-call template. | **WATCH.** Not a priority over Qwen3.8 plus Coder-Next; adopt only if a real agent benchmark offsets the memory and provenance cost. |
@@ -51,29 +51,25 @@ Links are pinned to the Hugging Face commit observed on 2026-09-02.
 
 ## Backlog, in order
 
-1. **Qwen3-Coder-Next (official)** — collect per-file metadata for the Q3 class,
-   confirm the fit against KV overhead, then A/B against `heretic` on repository
-   tasks. Keep the Qwen2.5 Coder FIM model in place regardless of the outcome.
-   This supersedes the older "do not download until an A/B defines a real gap"
-   line in `LOCAL-AI-MODEL-STRATEGY.md`: the gap is now named, but the download
-   still waits on metadata collection and a fit check.
+1. **Qwen3-Coder-Next (official)** — phase four pins the official Q4_K_M shards;
+   A/B against `heretic` on repository tasks after verification. Keep the
+   Qwen2.5 Coder FIM model in place regardless of the outcome.
 2. **UI-Mate-9B vs UI-TARS-1.5-7B** — blocked until the
    `computer-use-grounding` gate produces a verdict at all. Per
    `verification/local-coverage-foundation/docs/GAP-DECISIONS-2026-09-02.md`,
    that gate was killed mid-run and never finished, so there is no baseline to
    A/B against yet.
-3. **FLUX.2-klein-4B** — the first concrete answer to the open image-editing
-   gap, but that gap's own decision sequence applies first: try a ComfyUI
-   img2img/inpaint graph over the Z-Image Turbo checkpoint already on disk, and
-   only pin a dedicated editor if that fails. Image generation has not been
-   gated yet.
-4. **WeMM-Embedding-2B** — resolve the Apache-2.0-vs-`other` licence
-   discrepancy, then decide whether multimodal retrieval is wanted enough to
-   maintain a second, separate index.
+3. **FLUX.2-klein-4B** — phase four installs the root checkpoint plus the
+   official encoder, tokenizer, and VAE while excluding the duplicate Diffusers
+   transformer packaging. It still requires a real ComfyUI generation/edit gate.
+4. **WeMM-Embedding-2B** — the explicit Apache-2.0 license is resolved at the
+   refreshed pin. Qualification must use a separate multimodal index and audit
+   the pinned remote-code implementation before execution.
 5. **Gemma-4-12B Heretic** — smallest and cheapest trial. Needs a
    Gemma-4-capable llama.cpp build and per-modality validation. Low-privilege
    preset only.
-6. **Qwen3-ASR-1.7B** — only after a WER/RTF comparison on real audio.
+6. **Qwen3-ASR-1.7B** — already downloaded and verified at this reviewed
+   revision by phase one; only functional comparison remains.
 
 ## Standing rules this sweep reinforces
 

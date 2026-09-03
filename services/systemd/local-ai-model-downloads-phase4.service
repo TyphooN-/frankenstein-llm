@@ -1,0 +1,24 @@
+[Unit]
+Description=Download and verify phase-four researched candidate artifacts
+After=network-online.target local-ai-model-downloads-phase3.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/run_download_phase4.py
+Restart=on-failure
+RestartSec=60
+TimeoutStartSec=infinity
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/typhoon/git/frankenstein-llm/models /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation
+Environment=HERMES_DOWNLOAD_WORKERS=16
+Environment=HERMES_DOWNLOAD_CONNECTION_BUDGET=64
+
+[Install]
+WantedBy=default.target

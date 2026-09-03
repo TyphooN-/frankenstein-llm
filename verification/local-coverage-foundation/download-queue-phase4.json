@@ -1,0 +1,388 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-03T18:01:01-0400",
+  "source_of_truth": "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/research/hf",
+  "policy": {
+    "single_writer": true,
+    "resume": "aria2 bounded multi-range continuation with its piece map; curl fallback",
+    "promotion": "fsync content, replace, and fsync parent only after exact size and SHA-256 when published",
+    "hash_available": "LFS files use publisher SHA-256; small runtime files are exact-size gated",
+    "selection": "one useful runtime artifact per reviewed backlog candidate; no redundant quant families"
+  },
+  "already_satisfied": [
+    {
+      "key": "asr-qwen3-1.7b-hf",
+      "repository": "Qwen/Qwen3-ASR-1.7B-hf",
+      "revision": "bcd2b5b7f32b480ab5790554cfa8347f246a14f3",
+      "source_queue": "download-queue.json"
+    }
+  ],
+  "total_bytes": 98653778996,
+  "artifacts": [
+    {
+      "key": "repository-agent-qwen3-coder-next-q4km",
+      "capability": "repository-agent",
+      "repository": "Qwen/Qwen3-Coder-Next-GGUF",
+      "revision": "b82fb7382639d97b38fa7672e526c760c2fb358e",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-03T17:58:07-0400",
+      "notes": "Official Q4_K_M GGUF. Highest official quant that can use the aggregate GPU pool with bounded host/display spill; Qwen2.5 Coder remains the FIM model.",
+      "total_bytes": 48410992032,
+      "files": [
+        {
+          "repo_path": "Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/repository-agent/Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf",
+          "size": 15524827040,
+          "sha256": "6bcfc9f9c37901eeb92172e2ab871224dab36a453d263bcb2547f737409534da"
+        },
+        {
+          "repo_path": "Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00002-of-00004.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/repository-agent/Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00002-of-00004.gguf",
+          "size": 14872168352,
+          "sha256": "817def0691ee9d08bf3dc4444be7aed29c9e52091e8fa9d97901ce7e7f6f01d3"
+        },
+        {
+          "repo_path": "Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00003-of-00004.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/repository-agent/Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00003-of-00004.gguf",
+          "size": 14503294496,
+          "sha256": "23aa634d47dca9b4ca3ea249384e6f01951b24c83cdc076f37f6f43d6c99883f"
+        },
+        {
+          "repo_path": "Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00004-of-00004.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/repository-agent/Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00004-of-00004.gguf",
+          "size": 3510702144,
+          "sha256": "249c768cc5f130dc731567d6edcbdacc48e14dec9e02c5dbe2b2185d2c5bdb2b"
+        }
+      ]
+    },
+    {
+      "key": "uncensored-multimodal-gemma4-heretic-q6k",
+      "capability": "uncensored-multimodal",
+      "repository": "SC117/Gemma-4-12B-it-heretic-GGUF",
+      "revision": "efa14611b0b04ab1ab1e38356596ac8d673a619a",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-03T17:58:07-0400",
+      "notes": "Q6_K text weights plus the publisher's BF16 multimodal projector. Low-privilege serving only; modality support must be qualified independently.",
+      "total_bytes": 9961136320,
+      "files": [
+        {
+          "repo_path": "Gemma-4-12B-it-heretic-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/gemma4-heretic/Gemma-4-12B-it-heretic-Q6_K.gguf",
+          "size": 9786020480,
+          "sha256": "792ebdaa79993baf2030e35dd0a107eb88ade8e7ebccdf7bbe4f63cd4e114354"
+        },
+        {
+          "repo_path": "mmproj-Gemma-4-12B-it-BF16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/gemma4-heretic/mmproj-Gemma-4-12B-it-BF16.gguf",
+          "size": 175115840,
+          "sha256": "2e269f906eb15169ee9ce880ea649bd6d42d4964c21f8ede10d0d0efc738bcbb"
+        }
+      ]
+    },
+    {
+      "key": "computer-use-ui-mate-9b",
+      "capability": "computer-use-grounding",
+      "repository": "tencent/UI-Mate-9B",
+      "revision": "05dd5f2975195a5bb03d4363e8767f12158c8421",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-03T17:58:55-0400",
+      "notes": "Complete pinned runtime snapshot for an A/B against UI-TARS after the existing grounding baseline. No privileged control before grounding passes.",
+      "total_bytes": 18839790177,
+      "files": [
+        {
+          "repo_path": "chat_template.jinja",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/chat_template.jinja",
+          "size": 7756,
+          "sha256": null
+        },
+        {
+          "repo_path": "config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/config.json",
+          "size": 2926,
+          "sha256": null
+        },
+        {
+          "repo_path": "generation_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/generation_config.json",
+          "size": 137,
+          "sha256": null
+        },
+        {
+          "repo_path": "model-00001-of-00004.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/model-00001-of-00004.safetensors",
+          "size": 4942706088,
+          "sha256": "7d780977f586ac758bdfa595f7371a947855d75296bc403decda2c709657bb94"
+        },
+        {
+          "repo_path": "model-00002-of-00004.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/model-00002-of-00004.safetensors",
+          "size": 4987757896,
+          "sha256": "24c4b31a2e2d0348fabaf87f75a89429152561595c1773c6c43797105857d01b"
+        },
+        {
+          "repo_path": "model-00003-of-00004.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/model-00003-of-00004.safetensors",
+          "size": 4954810208,
+          "sha256": "651c1e90413756eff1d8ecfedc64cd186f4c4e505c55c47fffd6741a3636b627"
+        },
+        {
+          "repo_path": "model-00004-of-00004.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/model-00004-of-00004.safetensors",
+          "size": 3934446808,
+          "sha256": "5e2837d6ca82df7fd224d46daa937e1f9b4b4a0476dc5511c2b659f4a4990c36"
+        },
+        {
+          "repo_path": "model.safetensors.index.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/model.safetensors.index.json",
+          "size": 66190,
+          "sha256": null
+        },
+        {
+          "repo_path": "preprocessor_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/preprocessor_config.json",
+          "size": 390,
+          "sha256": null
+        },
+        {
+          "repo_path": "processor_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/processor_config.json",
+          "size": 1296,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/tokenizer.json",
+          "size": 19989343,
+          "sha256": "87a7830d63fcf43bf241c3c5242e96e62dd3fdc29224ca26fed8ea333db72de4"
+        },
+        {
+          "repo_path": "tokenizer_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/computer-use/UI-Mate-9B/tokenizer_config.json",
+          "size": 1139,
+          "sha256": null
+        }
+      ]
+    },
+    {
+      "key": "multimodal-embedding-wemm-2b",
+      "capability": "multimodal-embeddings",
+      "repository": "tencent/WeMM-Embedding-2B",
+      "revision": "bbd6cd4bf52cfc6716f752a2df80b2706720bd95",
+      "license": "apache-2.0 (repository LICENSE)",
+      "gated": false,
+      "metadata_collected_at": "2026-09-03T17:58:55-0400",
+      "notes": "Complete pinned runtime snapshot including remote model code. The current LICENSE explicitly grants Apache-2.0 despite the Hub's generic 'other' tag. Use a separate multimodal vector index.",
+      "total_bytes": 5461733295,
+      "files": [
+        {
+          "repo_path": "LICENSE",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/LICENSE",
+          "size": 24546,
+          "sha256": null
+        },
+        {
+          "repo_path": "additional_chat_templates/sentence_transformers.jinja",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/additional_chat_templates/sentence_transformers.jinja",
+          "size": 1452,
+          "sha256": null
+        },
+        {
+          "repo_path": "chat_template.jinja",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/chat_template.jinja",
+          "size": 7755,
+          "sha256": null
+        },
+        {
+          "repo_path": "config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/config.json",
+          "size": 2853,
+          "sha256": null
+        },
+        {
+          "repo_path": "config_sentence_transformers.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/config_sentence_transformers.json",
+          "size": 245,
+          "sha256": null
+        },
+        {
+          "repo_path": "embedding_chat_template.jinja",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/embedding_chat_template.jinja",
+          "size": 1086,
+          "sha256": null
+        },
+        {
+          "repo_path": "model.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/model.safetensors",
+          "size": 5441695216,
+          "sha256": "e1a1ad752808c26965aa97d37bf4a9bca71d838513f41e83790cb1e71cac6e59"
+        },
+        {
+          "repo_path": "modeling_st_wemm.py",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/modeling_st_wemm.py",
+          "size": 3180,
+          "sha256": null
+        },
+        {
+          "repo_path": "modeling_wemm_embedding.py",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/modeling_wemm_embedding.py",
+          "size": 1205,
+          "sha256": null
+        },
+        {
+          "repo_path": "modules.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/modules.json",
+          "size": 106,
+          "sha256": null
+        },
+        {
+          "repo_path": "patch_sglang_video.py",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/patch_sglang_video.py",
+          "size": 1983,
+          "sha256": null
+        },
+        {
+          "repo_path": "processor_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/processor_config.json",
+          "size": 1192,
+          "sha256": null
+        },
+        {
+          "repo_path": "sentence_bert_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/sentence_bert_config.json",
+          "size": 950,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/tokenizer.json",
+          "size": 19990378,
+          "sha256": "40e444c744512f423da4c8443c47c21e22ff76056ba4e9796a81c04c13a9daf0"
+        },
+        {
+          "repo_path": "tokenizer_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/embedding/WeMM-Embedding-2B/tokenizer_config.json",
+          "size": 1148,
+          "sha256": null
+        }
+      ]
+    },
+    {
+      "key": "image-edit-flux2-klein-4b",
+      "capability": "image-generation-editing",
+      "repository": "black-forest-labs/FLUX.2-klein-4B",
+      "revision": "e7b7dc27f91deacad38e78976d1f2b499d76a294",
+      "license": "apache-2.0",
+      "gated": false,
+      "metadata_collected_at": "2026-09-03T17:58:55-0400",
+      "notes": "Root ComfyUI checkpoint plus official text encoder, tokenizer and VAE. The duplicate Diffusers transformer copy and sample images are excluded.",
+      "total_bytes": 15980127172,
+      "files": [
+        {
+          "repo_path": "flux-2-klein-4b.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/flux-2-klein-4b.safetensors",
+          "size": 7751105712,
+          "sha256": "ec3d4e733a771f61c052fb4856c48b336c55eaf2c65487c2a1faeb9bbda7a343"
+        },
+        {
+          "repo_path": "model_index.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/model_index.json",
+          "size": 446,
+          "sha256": null
+        },
+        {
+          "repo_path": "scheduler/scheduler_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/scheduler/scheduler_config.json",
+          "size": 486,
+          "sha256": null
+        },
+        {
+          "repo_path": "text_encoder/config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/text_encoder/config.json",
+          "size": 1536,
+          "sha256": null
+        },
+        {
+          "repo_path": "text_encoder/generation_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/text_encoder/generation_config.json",
+          "size": 214,
+          "sha256": null
+        },
+        {
+          "repo_path": "text_encoder/model-00001-of-00002.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/text_encoder/model-00001-of-00002.safetensors",
+          "size": 4967215360,
+          "sha256": "8c0506e7f4936fa7e26183a4fd8da4e2bdbc5990ba64ae441f965d51228f36ea"
+        },
+        {
+          "repo_path": "text_encoder/model-00002-of-00002.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/text_encoder/model-00002-of-00002.safetensors",
+          "size": 3077766632,
+          "sha256": "82f2bd839378541b0557bfabaf37c7d3d637071fdcb73302dedd7cf61162ce07"
+        },
+        {
+          "repo_path": "text_encoder/model.safetensors.index.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/text_encoder/model.safetensors.index.json",
+          "size": 32855,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer/added_tokens.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/tokenizer/added_tokens.json",
+          "size": 707,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer/chat_template.jinja",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/tokenizer/chat_template.jinja",
+          "size": 4168,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer/merges.txt",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/tokenizer/merges.txt",
+          "size": 1671853,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer/special_tokens_map.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/tokenizer/special_tokens_map.json",
+          "size": 613,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer/tokenizer.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/tokenizer/tokenizer.json",
+          "size": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "repo_path": "tokenizer/tokenizer_config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/tokenizer/tokenizer_config.json",
+          "size": 5404,
+          "sha256": null
+        },
+        {
+          "repo_path": "tokenizer/vocab.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/tokenizer/vocab.json",
+          "size": 2776833,
+          "sha256": null
+        },
+        {
+          "repo_path": "vae/config.json",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/vae/config.json",
+          "size": 821,
+          "sha256": null
+        },
+        {
+          "repo_path": "vae/diffusion_pytorch_model.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/flux2-klein-4b/vae/diffusion_pytorch_model.safetensors",
+          "size": 168120878,
+          "sha256": "ca70d2202afe6415bdbcb8793ba8cd99fd159cfe6192381504d6c4d3036e0f04"
+        }
+      ]
+    }
+  ]
+}
