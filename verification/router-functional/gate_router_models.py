@@ -99,6 +99,14 @@ def model_states() -> dict[str, str]:
     return {item["id"]: item.get("status", {}).get("value", "unknown") for item in data}
 
 
+def model_metadata(model: str) -> dict:
+    """Return one model from the router's supported collection endpoint."""
+    for item in http_json("/models").get("data", []):
+        if item.get("id") == model:
+            return item
+    raise KeyError(f"router did not list model {model!r}")
+
+
 def wait_state(model: str, wanted: set[str], timeout: int = 300) -> str:
     deadline = time.monotonic() + timeout
     last = "missing"
@@ -226,7 +234,7 @@ def check_model(model: str) -> dict:
                 args = None
             valid_call = fn.get("name") == "lookup_ticket" and args == {"ticket_id": 4172}
         result["checks"]["tool_call"] = {"pass": valid_call, "tool_calls": calls}
-        result["metadata"] = http_json(f"/models/{model}")
+        result["metadata"] = model_metadata(model)
         result["loaded"] = sample("loaded")
     except Exception as error:  # noqa: BLE001 - every model must leave evidence
         result["problems"].append(f"functional error: {type(error).__name__}: {error}"[:500])
@@ -263,7 +271,7 @@ def check_vision_model() -> dict:
         )
         text = (response["message"].get("content") or "").strip()
         result["checks"]["vision_grounding"] = {"pass": text == "Run Gate", "content": text}
-        result["metadata"] = http_json(f"/models/{model}")
+        result["metadata"] = model_metadata(model)
         result["loaded"] = sample("loaded")
     except Exception as error:  # noqa: BLE001 - every model must leave evidence
         result["problems"].append(f"functional error: {type(error).__name__}: {error}"[:500])

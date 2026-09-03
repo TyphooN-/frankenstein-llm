@@ -14,6 +14,17 @@ spec.loader.exec_module(module)
 
 
 class RouterFunctionalGateTests(unittest.TestCase):
+    def test_model_metadata_uses_supported_collection_endpoint(self) -> None:
+        payload = {"data": [{"id": "ridge", "status": {"value": "loaded"}}]}
+        with patch.object(module, "http_json", return_value=payload) as request:
+            self.assertEqual(payload["data"][0], module.model_metadata("ridge"))
+        request.assert_called_once_with("/models")
+
+    def test_model_metadata_fails_when_model_is_absent(self) -> None:
+        with patch.object(module, "http_json", return_value={"data": []}):
+            with self.assertRaises(KeyError):
+                module.model_metadata("missing")
+
     def test_chat_discards_timing_and_usage_metadata(self) -> None:
         raw = {
             "choices": [{"message": {"role": "assistant", "content": "PONG"}}],
@@ -42,7 +53,9 @@ class RouterFunctionalGateTests(unittest.TestCase):
             patch.object(module, "sample", side_effect=samples),
             patch.object(module, "blocked_workloads", return_value=[]),
             patch.object(module, "chat", side_effect=fake_chat),
-            patch.object(module, "http_json", return_value={"id": module.VISION_MODEL}),
+            patch.object(module, "http_json", return_value={
+                "data": [{"id": module.VISION_MODEL}],
+            }),
             patch.object(module, "unload") as unload,
         ):
             result = module.check_vision_model()
