@@ -1,0 +1,159 @@
+{
+  "schema": "hermes-prompt-source-catalog/1",
+  "sources": [
+    {
+      "id": "phtest",
+      "url": "https://huggingface.co/datasets/furonghuang-lab/PHTest",
+      "revision": "edb80210812ecc7dab2219aa2e70921710c01888",
+      "license_spdx": "MIT",
+      "license_status": "verified",
+      "disposition": "candidate",
+      "suites": ["false-refusal"],
+      "execution_policy": "inert-text-only",
+      "reason": "Purpose-built pseudo-harmful benign prompts for over-refusal evaluation."
+    },
+    {
+      "id": "false-refusal-code",
+      "url": "https://github.com/umd-huang-lab/FalseRefusal",
+      "revision": "29e66c274603d902227a3c7200d9718160688b2d",
+      "license_spdx": "NOASSERTION",
+      "license_status": "unverified",
+      "disposition": "reference-only",
+      "suites": ["false-refusal"],
+      "execution_policy": "never-execute",
+      "reason": "Method implementation is useful for review, but repository licensing was not established."
+    },
+    {
+      "id": "jailbreakbench-behaviors",
+      "url": "https://huggingface.co/datasets/JailbreakBench/JBB-Behaviors",
+      "revision": "886acc352a31533ffbcf4ef22c744658688086fc",
+      "license_spdx": "MIT",
+      "license_status": "verified",
+      "disposition": "candidate",
+      "suites": ["harmful-refusal", "benign-utility"],
+      "execution_policy": "inert-text-only",
+      "reason": "Canonical matched harmful and benign behavior set with stable IDs and categories."
+    },
+    {
+      "id": "jailbreakbench-code",
+      "url": "https://github.com/JailbreakBench/jailbreakbench",
+      "revision": "23dbdf6b19650521604456229bc1d9c4156c85c1",
+      "license_spdx": "MIT",
+      "license_status": "verified",
+      "disposition": "reference-only",
+      "suites": ["harmful-refusal", "benign-utility"],
+      "execution_policy": "never-execute",
+      "reason": "Reference evaluator and artifact schema; upstream code is not an admitted prompt artifact."
+    },
+    {
+      "id": "agentdojo",
+      "url": "https://github.com/ethz-spylab/agentdojo",
+      "revision": "089ed468cf3ed0322acc66b0211f26d9d90dbf60",
+      "license_spdx": "MIT",
+      "license_status": "verified",
+      "disposition": "candidate",
+      "suites": ["tool-integrity"],
+      "execution_policy": "inert-text-only",
+      "reason": "Realistic utility and indirect-injection tasks; only inert fixtures may be admitted locally."
+    },
+    {
+      "id": "injecagent",
+      "url": "https://github.com/uiuc-kang-lab/InjecAgent",
+      "revision": "f19c9f2c79a41046eb13c03c51a24c567a8ffa07",
+      "license_spdx": "MIT",
+      "license_status": "verified",
+      "disposition": "candidate",
+      "suites": ["tool-integrity"],
+      "execution_policy": "inert-text-only",
+      "reason": "Compact tool-response injection and exfiltration regression corpus."
+    },
+    {
+      "id": "harmbench",
+      "url": "https://github.com/centerforaisafety/HarmBench",
+      "revision": "8e1604d1171fe8a48d8febecd22f600e462bdcdd",
+      "license_spdx": "MIT",
+      "license_status": "verified",
+      "disposition": "reference-only",
+      "suites": ["harmful-refusal", "multimodal-safety"],
+      "execution_policy": "never-execute",
+      "reason": "Broader standardized red-team suite; heavier evaluator integration is deferred."
+    },
+    {
+      "id": "strongreject",
+      "url": "https://github.com/dsbowen/strong_reject",
+      "revision": "7a551d5b440ec7b75d4f6f5bb7c1719965b76b47",
+      "license_spdx": "MIT",
+      "license_status": "mixed-or-incomplete",
+      "disposition": "reference-only",
+      "suites": ["response-judge"],
+      "execution_policy": "never-execute",
+      "reason": "Useful response-quality judge, but constituent prompt licensing requires row-level review."
+    },
+    {
+      "id": "mcp-security-bench",
+      "url": "https://github.com/dongsenzhang/MSB",
+      "revision": "c1d6a70171e4d2c44c87a2ae909d13df00c6aa8d",
+      "license_spdx": "MIT",
+      "license_status": "verified",
+      "disposition": "reference-only",
+      "suites": ["mcp-tool-integrity"],
+      "execution_policy": "never-execute",
+      "reason": "Deferred until a synthetic, deny-by-default MCP benchmark environment exists."
+    },
+    {
+      "id": "os-harm",
+      "url": "https://github.com/tml-epfl/os-harm",
+      "revision": "c0fa95e75bafb00ac05d2eb4ac5418b9913475ee",
+      "license_spdx": "Apache-2.0",
+      "license_status": "verified",
+      "disposition": "reference-only",
+      "suites": ["computer-use-safety"],
+      "execution_policy": "never-execute",
+      "reason": "Future disposable-VM computer-use evaluation only; never run against the host desktop."
+    },
+    {
+      "id": "awesome-ml-security",
+      "url": "https://github.com/trailofbits/awesome-ml-security",
+      "revision": "d7fe4fa917192dba20051741d357c939c709a1e3",
+      "license_spdx": "CC-BY-4.0",
+      "license_status": "verified",
+      "disposition": "reference-only",
+      "suites": ["reference-catalog"],
+      "execution_policy": "never-execute",
+      "reason": "Maintained security reference index, not benchmark data or executable input."
+    },
+    {
+      "id": "offensive-ai-compilation",
+      "url": "https://github.com/jiep/offensive-ai-compilation",
+      "revision": "48954374ba6cc5a123b5769b98783987e85047cb",
+      "license_spdx": "CC-BY-SA-4.0",
+      "license_status": "verified",
+      "disposition": "reference-only",
+      "suites": ["reference-catalog"],
+      "execution_policy": "never-execute",
+      "reason": "Research catalog only; links and referenced projects are independently untrusted."
+    },
+    {
+      "id": "dobliuw-prompts",
+      "url": "https://github.com/Dobliuw/Prompts",
+      "revision": "616d8ab45bb903b04229a90dbca108bce8daacf4",
+      "license_spdx": "NOASSERTION",
+      "license_status": "unverified",
+      "disposition": "rejected",
+      "suites": ["harmful-refusal"],
+      "execution_policy": "never-ingest",
+      "reason": "Unlicensed aggregation strips upstream provenance, judge, model, and query metadata."
+    },
+    {
+      "id": "the-big-prompt-library",
+      "url": "https://github.com/0xeb/TheBigPromptLibrary",
+      "revision": "3579cd97a20defa92d7a7da2e695dc89e0845911",
+      "license_spdx": "MIT",
+      "license_status": "mixed-or-incomplete",
+      "disposition": "rejected",
+      "suites": ["prompt-research"],
+      "execution_policy": "never-ingest",
+      "reason": "Mixed-provenance archive contains executable files and credential-like material; wholesale ingestion is unsafe."
+    }
+  ]
+}

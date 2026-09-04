@@ -12,6 +12,7 @@ This repository tracks source, configuration, verification, and documentation. I
 - `scripts/` — download and verification helpers
 - `services/` — sidecar env files and systemd unit copies
 - `verification/` — functional gates; no tokens/sec measurements
+- `verification/prompt-corpus-admission/` — pinned, inert safety-corpus policy
 - `docs/` — strategy and operating notes
 - `docs/decisions/` — architecture decision records
 - `models/` — local weights only; gitignored
@@ -34,6 +35,7 @@ See:
 - `docs/decisions/0001-git-tracked-workspace-without-weights.md`
 - `docs/decisions/0002-serialized-functional-qualification.md`
 - `docs/decisions/0003-hardware-allocation-and-memory-policy.md`
+- `docs/decisions/0004-prompt-corpus-admission.md`
 - `docs/LOCAL-AI-MODEL-STRATEGY.md`
 - `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — 2026-09-02 research snapshot
 - `docs/CANDIDATE-STATUS-2026-09-03.md` — current download/policy/runtime/functional state

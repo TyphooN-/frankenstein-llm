@@ -44,6 +44,7 @@ __pycache__/
 /verification/**/download-state*.json
 /verification/**/mission-state.json
 /verification/**/lane.json
+/verification/prompt-corpus-admission/corpora/
 /verification/qwen38-obliterated-functional/*.json
 /verification/qwen38-obliterated-functional/*.txt
 /verification/glm53flash-local/gate-glm32.json
