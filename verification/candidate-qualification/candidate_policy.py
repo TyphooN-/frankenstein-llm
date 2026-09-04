@@ -364,3 +364,18 @@ def candidate_for_preset(preset: str) -> str | None:
         if preset in candidate["presets"]:
             return name
     return None
+
+
+def router_preset_names(path: Path = ROOT / "llama-models.ini") -> tuple[str, ...]:
+    """Named aliases in the live router INI, excluding the shared [*] section."""
+    names = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]") and stripped != "[*]":
+            names.append(stripped[1:-1])
+    return tuple(names)
+
+
+def uncovered_router_presets(path: Path = ROOT / "llama-models.ini") -> list[str]:
+    """Aliases that would otherwise inherit tools by falling through."""
+    return [name for name in router_preset_names(path) if privilege_for_preset(name) is None]

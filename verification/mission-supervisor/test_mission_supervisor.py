@@ -316,6 +316,13 @@ class MissionPolicyTests(SupervisorTestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, source)
 
+    def test_candidate_policy_precedes_wemm_and_model_loads(self):
+        names = [name for name, _command in self.supervisor.STEPS]
+        self.assertEqual("candidate-policy", names[0])
+        self.assertIn("wemm-embeddings", names)
+        self.assertLess(names.index("candidate-policy"), names.index("wemm-embeddings"))
+        self.assertLess(names.index("wemm-embeddings"), names.index("router-models"))
+
 
 if __name__ == "__main__":
     unittest.main()

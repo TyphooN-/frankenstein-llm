@@ -48,6 +48,12 @@ class CandidatePolicyTests(unittest.TestCase):
             with self.subTest(preset=preset):
                 self.assertFalse(policy.tool_grant_allowed_for_preset(preset))
 
+    def test_every_live_router_alias_has_an_explicit_privilege(self):
+        names = policy.router_preset_names()
+        self.assertIn("ridge", names)
+        self.assertIn("gemma4-heretic-vision", names)
+        self.assertEqual([], policy.uncovered_router_presets())
+
     def test_actors_cannot_be_abliterated(self):
         self.assertFalse(policy.abliteration_allowed("qwen3-coder-next"))
         self.assertFalse(policy.abliteration_allowed("ui-mate-9b"))

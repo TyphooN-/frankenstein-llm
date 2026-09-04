@@ -63,6 +63,8 @@ UPSTREAM = (
 STEPS = (
     ("candidate-policy", [sys.executable, str(
         ROOT / "verification/candidate-qualification/gate_candidate_policy.py")]),
+    ("wemm-embeddings", ["/usr/bin/bash", str(
+        ROOT / "verification/candidate-qualification/run_wemm.sh")]),
     ("router-reload-presets", ["/usr/bin/systemctl", "--user", "restart", "llama-router.service"]),
     ("router-models", [sys.executable, str(ROOT / "verification/router-functional/gate_router_models.py")]),
     ("embeddings", [sys.executable, str(FOUNDATION / "validators/gate_embeddings.py")]),
