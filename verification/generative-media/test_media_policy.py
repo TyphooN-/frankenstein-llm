@@ -129,10 +129,12 @@ class WorkflowClaimTests(unittest.TestCase):
             with self.subTest(workflow=name):
                 self.assertFalse(claim["functionally_proven"])
 
-    def test_image_editing_is_not_claimed_as_covered(self):
+    def test_image_editing_weights_are_declared_but_not_functionally_proven(self):
         claim = policy.WORKFLOW_CLAIMS["image-editing"]
-        self.assertFalse(claim["artifacts_present"])
-        self.assertEqual([], claim["artifacts"])
+        self.assertTrue(claim["artifacts_present"])
+        self.assertFalse(claim["functionally_proven"])
+        self.assertIn("qwen-image-edit-unet", claim["artifacts"])
+        self.assertIn("flux2-klein-unet", claim["artifacts"])
 
     def test_image_generation_artifacts_are_declared_and_inventoried(self):
         claim = policy.WORKFLOW_CLAIMS["image-generation"]
@@ -147,6 +149,12 @@ class WorkflowClaimTests(unittest.TestCase):
             for key in claim["artifacts"]:
                 with self.subTest(workflow=name, artifact=key):
                     self.assertIn(key, policy.ARTIFACTS)
+
+    def test_extra_paths_include_flux2_klein_layout(self):
+        text = policy.EXTRA_PATHS.read_text()
+        self.assertIn("flux2-klein-4b", text)
+        self.assertIn("flux2-klein-4b/vae", text)
+        self.assertIn("flux2-klein-4b/tokenizer", text)
 
 
 if __name__ == "__main__":

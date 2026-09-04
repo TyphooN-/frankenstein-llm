@@ -32,6 +32,13 @@ class RepoAgentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             gate.execute_tool(self.root, "write_file", {"path": "secret.txt", "content": "x"})
 
+    def test_util_module_is_writable_for_multi_file_repairs(self):
+        result = gate.execute_tool(
+            self.root, "write_file",
+            {"path": "util.py", "content": "def identity(value): return value\n"},
+        )
+        self.assertEqual("util.py", result["path"])
+
     def test_oracle_is_not_writable(self):
         """The candidate may not edit the tests it is being judged by."""
         with self.assertRaises(ValueError):

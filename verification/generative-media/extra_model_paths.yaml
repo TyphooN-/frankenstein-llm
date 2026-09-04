@@ -20,3 +20,4 @@ frankenstein:
         vae
         flux2-klein-4b/vae
     loras: loras
+    configs: flux2-klein-4b/tokenizer

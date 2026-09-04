@@ -22,6 +22,11 @@ ARTIFACTS = {
     "z-image-clip": ROOT / "models/comfy/text_encoders/qwen_3_4b.safetensors",
     "z-image-vae": ROOT / "models/comfy/vae/ae.safetensors",
     "ace-step-1.5-aio": ROOT / "models/comfy/checkpoints/ace_step_1.5_turbo_aio.safetensors",
+    "qwen-image-edit-unet": ROOT / "models/comfy/diffusion_models/qwen_image_edit_2511_int8_convrot.safetensors",
+    "qwen-image-edit-clip": ROOT / "models/comfy/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+    "qwen-image-edit-vae": ROOT / "models/comfy/vae/qwen_image_vae.safetensors",
+    "qwen-image-edit-lora": ROOT / "models/comfy/loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+    "flux2-klein-unet": ROOT / "models/comfy/flux2-klein-4b/flux-2-klein-4b.safetensors",
 }
 
 REQUIRED_BYTES = {
@@ -29,22 +34,21 @@ REQUIRED_BYTES = {
     "z-image-clip": 8044982048,
     "z-image-vae": 335304388,
     "ace-step-1.5-aio": 10025478736,
+    "qwen-image-edit-unet": 20499083824,
+    "qwen-image-edit-clip": 9384670680,
+    "qwen-image-edit-vae": 253806246,
+    "qwen-image-edit-lora": 849608296,
+    "flux2-klein-unet": 7751105712,
 }
 
 # Workflow coverage claims, stated as data so a passing preflight cannot be read
 # as covering more than it does.
 #
-# Z-Image Turbo is a text-to-image *generation* checkpoint. Nothing installed
-# here is a dedicated instruction-following image *editor*, and the base
-# Comfy-Org/z_image repository is another generation checkpoint, not an edit
-# model. ComfyUI can build img2img/inpaint graphs on top of a generation
-# checkpoint, but that is a different capability with its own quality question
-# and it has not been demonstrated on this host, so it is claimed as unproven
-# rather than as covered.
+# Z-Image Turbo is a text-to-image generation checkpoint. Instruction-following
+# editors are inventoried separately below; they are on disk and still unproven.
 #
 # artifacts_present answers "is the weight on disk"; functionally_proven answers
-# "did a gate observe it working". Only the second is admission, and every value
-# below is False because no generation has been run on this host.
+# "did a gate observe it working". Only the second is admission.
 WORKFLOW_CLAIMS = {
     "image-generation": {
         "artifacts_present": True,
@@ -53,12 +57,17 @@ WORKFLOW_CLAIMS = {
         "note": "Z-Image Turbo BF16 text-to-image; static preflight only",
     },
     "image-editing": {
-        "artifacts_present": False,
-        "artifacts": [],
+        "artifacts_present": True,
+        "artifacts": [
+            "qwen-image-edit-unet",
+            "qwen-image-edit-clip",
+            "qwen-image-edit-vae",
+            "qwen-image-edit-lora",
+            "flux2-klein-unet",
+        ],
         "functionally_proven": False,
-        "note": "no dedicated instruction-following image editor is installed; "
-                "img2img/inpaint over the generation checkpoint is a distinct, "
-                "untested path and is not claimed here",
+        "note": "Qwen Image Edit 2511 INT8 + Lightning LoRA and FLUX.2 Klein 4B "
+                "are on disk; no live ComfyUI run has been admitted",
     },
     "music-generation": {
         "artifacts_present": True,

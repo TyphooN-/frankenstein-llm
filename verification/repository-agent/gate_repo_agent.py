@@ -43,7 +43,7 @@ EVIDENCE = Path(__file__).resolve().parent / "evidence"
 # implementation file is writable, and run_tests re-checks the oracle digest
 # before a zero exit code is allowed to count as evidence of a repair.
 ORACLE_FILENAME = "test_calculator.py"
-WRITABLE_FILENAMES = frozenset({"calculator.py"})
+WRITABLE_FILENAMES = frozenset({"calculator.py", "util.py"})
 
 TOOLS = [
     {"type": "function", "function": {"name": "read_file", "description": "Read a UTF-8 file in the disposable repository.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"], "additionalProperties": False}}},
