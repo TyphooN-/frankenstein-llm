@@ -2,13 +2,24 @@
 
 ## Everyday use
 
-1. Start Hermes Desktop:
+The local router is already running. Cloud remains the Hermes default. To use a local model, pick it in Desktop or type `/model heretic` in a new chat. The first reply after a switch waits for the GGUF to load; later replies do not.
+
+Do not wait for the full qualification mission. Chat, writing, and local coding through the router are ready. Grounding, ComfyUI, TTS, and WeMM image retrieval are not required for that.
+
+1. Confirm the backend:
+
+```bash
+systemctl --user is-active llama-router.service
+/home/typhoon/git/frankenstein-llm/scripts/local-model-status.sh
+```
+
+2. Start Hermes Desktop:
 
 ```bash
 hermes desktop --skip-build
 ```
 
-2. Open the model picker or type one of these in a chat:
+3. Open the model picker or type one of these in a chat:
 
 ```text
 /model heretic
@@ -16,9 +27,11 @@ hermes desktop --skip-build
 /model ridge
 /model fable
 /model phr00ty
+/model qwen3-coder-next
+/model gemma4-heretic
 ```
 
-3. Start a fresh chat after switching model families.
+4. Start a fresh chat after switching model families.
 
 ## Which model to pick
 
@@ -27,6 +40,8 @@ hermes desktop --skip-build
 - `ridge`: compact 3.7-bpw option. Fastest and smallest, but not the quality-first choice on this hardware.
 - `fable`: unrestricted Qwen3.6 27B Q6_K fantasy-writing generalist. Prefer it for plot logic, continuity, instruction following, and explicit prose.
 - `phr00ty`: unrestricted Phr00tyMix v4 32B Q6_K prose/RP specialist. Prefer it when voice, scene texture, and spicy roleplay matter most.
+- `qwen3-coder-next`: official 80B-A3B repository-agent candidate. Use for local coding/tool work. Keep Qwen2.5 Coder for FIM.
+- `gemma4-heretic`: low-privilege multimodal reader. Do not grant it executable tools.
 
 `fable` and `phr00ty` use 65,536-token router presets. Phr00ty's GGUF declares a 131,072-token native training context but has no MTP tensors; its preset therefore omits draft-MTP intentionally.
 
