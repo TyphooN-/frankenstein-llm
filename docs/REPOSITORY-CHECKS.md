@@ -1,8 +1,10 @@
 # Repository checks
 
-Undated operating note. These are the checks that run without loading a model,
-starting a service, touching a GPU, downloading anything, or measuring
-throughput. They are safe on a busy host, including during a kernel build.
+Undated operating note. These checks do not load a model, start a service, touch
+a GPU, download anything, or measure throughput. The repository-agent tests do
+create private Linux namespaces through Bubblewrap, so run the complete suite
+only after active builds and other host pressure have drained; a busy or
+RCU-stalled host is not a valid sandbox test environment.
 
 None of them is a functional verdict. Every one of them answers "is this
 workspace internally consistent", and consistency is what makes a live gate
@@ -16,11 +18,53 @@ python3 -m pytest
 ```
 
 `pytest.ini` scopes collection to `verification/`. It excludes the untracked
-upstream ComfyUI checkout under `tools/`, the local virtualenvs, and
-`verification/repository-agent/fixture/` -- whose three failing tests are the
-*oracle* for the repository-agent gate and are defective on purpose. The gate
-copies that fixture to a temporary directory and runs it with `unittest`, so it
-is unaffected by this configuration.
+upstream ComfyUI checkout under `tools/`, the local virtualenvs, the gate
+evidence directories, and `verification/repository-agent/fixture/` -- whose
+three failing tests are the *oracle* for the repository-agent gate and are
+defective on purpose. The gate copies that fixture to a temporary directory and
+runs it with `unittest` inside Bubblewrap. It is unaffected by this pytest
+configuration.
+
+The sandbox is the whole reason that gate is safe to run: `run_tests` executes
+candidate-written Python, and import-time code in a "repair" runs before any
+assertion does. It gets a read-only `/usr`, a private PID namespace, a private
+network namespace so the router on host loopback is unreachable, a size-capped
+private `/tmp`, all capabilities dropped, a cleared environment, no ability to
+nest a further user namespace, and one writable bind: the disposable fixture.
+
+Two rules make that fail closed rather than best-effort. There is no unisolated
+fallback -- if `bwrap` is missing the gate refuses to start. And a sandbox that
+cannot start, cannot be executed, or does not finish aborts the qualification
+instead of returning a retryable tool error, because a host-side failure
+reported as a red suite is a false verdict about the candidate.
+
+The oracle is read-only for the same reason: "make the tests pass" is trivially
+satisfiable by deleting the assertions. `run_tests` re-checks the suite's
+SHA-256 after every run, a rewritten or removed suite is recorded as tampering,
+and a completed `write_file` invalidates an earlier green result -- a passing
+run describes one exact generation of the workspace and nothing later.
+
+## Mission supervisor contracts
+
+```
+python3 -m pytest verification/mission-supervisor/test_mission_supervisor.py
+```
+
+The supervisor decides when a serialized gate may start, and that decision is
+made from `/proc`. It never reads `/proc/<pid>/cmdline`: Linux serves that file
+through `access_remote_vm`, so a task holding its own mmap write lock can wedge
+anything that merely tries to inspect it -- which is exactly how a
+command-line sweep of the host gets stuck behind a browser. Only `comm`, the
+`cwd` symlink and `cgroup` are read, all three tolerate the task exiting
+underneath them, and the proc root is injectable so the classification is tested
+against fixtures rather than against whatever the host happens to be running.
+
+Classification is deliberately coarse and errs towards reporting: a build, a
+transfer or a second model server is named on the strength of its task name
+alone. `comm` is truncated to 15 characters by the kernel, so long names are
+matched the way they actually arrive. The one exclusion is the managed
+`llama-router.service`, and it is excused by its cgroup rather than its name --
+`llama-server` started by hand is still a conflict.
 
 ## Static generative-media preflight
 

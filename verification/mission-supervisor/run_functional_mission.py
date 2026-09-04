@@ -100,7 +100,14 @@ def mission_inputs_fingerprint() -> str:
     for state_path, stamp_path, _expected in UPSTREAM:
         for path in (state_path, stamp_path):
             digest.update(str(path).encode())
-            digest.update(path.read_bytes())
+            try:
+                digest.update(path.read_bytes())
+            except OSError:
+                # Not promoted yet. wait_for_inputs is what blocks on that; this
+                # only has to change when the bytes do, and "absent" is a state
+                # it can fingerprint rather than a reason to abort the mission
+                # before it can report what it is waiting for.
+                digest.update(b"\0absent\0")
     for queue_path in sorted(FOUNDATION.glob("download-queue*.json")):
         digest.update(queue_path.read_bytes())
         document = json.loads(queue_path.read_text(encoding="utf-8"))
@@ -131,15 +138,22 @@ def log(message: str) -> None:
 def atomic_json(value: dict) -> None:
     """Publish mission state durably; a resumed run reads it to skip passed steps."""
     temp = STATE.with_suffix(f".tmp.{os.getpid()}")
-    with temp.open("w", encoding="utf-8") as handle:
-        handle.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(temp, STATE)
-    directory = os.open(str(STATE.parent), os.O_RDONLY)
+    try:
+        with temp.open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp, STATE)
+    finally:
+        # A write that failed part-way must not leave a partial document behind
+        # for the next run's temp file to be confused with.
+        temp.unlink(missing_ok=True)
+    directory = os.open(str(STATE.parent), os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(directory)
     except OSError:
+        # Some filesystems refuse to sync a directory. The rename already
+        # happened, so the state on disk is whole either way.
         pass
     finally:
         os.close(directory)
@@ -167,35 +181,140 @@ def mem_available() -> int:
     return 0
 
 
-def command_of(proc: Path) -> tuple[str, str]:
+# Kernel task names as they appear in /proc/<pid>/comm. The kernel truncates
+# that field to 15 characters, so a longer name is written here the way it
+# actually arrives: "git-remote-https" is read back as "git-remote-http".
+BUILD_COMMANDS = frozenset({
+    "make", "gmake", "makepkg", "cmake", "ninja", "samu", "meson", "scons",
+    "ccache", "sccache", "cc", "c++", "gcc", "g++", "clang", "clang++",
+    "cc1", "cc1plus", "lto1", "collect2", "as", "ar", "ranlib", "strip",
+    "objtool", "ld", "ld.bfd", "ld.gold", "ld.lld", "lld", "mold",
+    "cargo", "rustc", "go", "nvcc", "cicc", "ptxas", "hipcc",
+    "pacman", "paru", "yay", "dkms",
+})
+TRANSFER_COMMANDS = frozenset({
+    "aria2c", "curl", "wget", "axel", "lftp", "rsync", "scp", "sftp",
+    "git-lfs", "git-remote-http", "huggingface-cli", "hf",
+})
+# Anything that loads weights outside the router this mission manages itself.
+INFERENCE_COMMANDS = frozenset({
+    "ollama", "vllm", "sglang", "koboldcpp", "whisper-cli", "whisper-server",
+    "sd-server", "stable-diffusio",
+})
+# Every llama.cpp binary shares this prefix, and the prefix survives truncation
+# where the full names ("llama-perplexity", "llama-quantize") do not.
+INFERENCE_PREFIX = "llama-"
+# The one inference service the gates call rather than collide with. It is a
+# systemd unit, so its cgroup path names it; llama-server run by hand does not.
+ROUTER_UNIT = "llama-router.service"
+KERNEL_TREE = "/linux-tkg"
+DELETED_SUFFIX = " (deleted)"
+
+
+def printable(raw: bytes | str) -> str:
+    """Force kernel-supplied text to valid UTF-8.
+
+    A task name is whatever bytes the process chose for it. Left alone, an
+    undecodable one raises where it is least welcome -- not here, but later,
+    when the reason the host is busy is written to the UTF-8 mission log.
+    """
+    if isinstance(raw, str):
+        raw = raw.encode("utf-8", "surrogateescape")
+    return raw.decode("utf-8", "replace")
+
+
+def process_metadata(proc: Path) -> tuple[str, str, str]:
+    """Read conflict metadata without touching another task's address space.
+
+    Linux implements ``/proc/<pid>/cmdline`` through ``access_remote_vm``. A
+    task holding its mmap write lock can therefore wedge a supervisor that
+    merely tries to inspect it. ``comm`` and ``cgroup`` are kernel metadata and
+    ``cwd`` is read with ``readlink``; none of the three reads the target
+    process's memory, and nothing here opens ``cmdline`` at all.
+
+    Every read tolerates the task exiting underneath it. An empty command is the
+    caller's signal that there was nothing left to classify.
+    """
     try:
-        command = (proc / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+        command = printable((proc / "comm").read_bytes()).strip()
     except OSError:
-        return "", ""
+        return "", "", ""
     try:
-        cwd = str((proc / "cwd").resolve())
+        cwd = printable(os.readlink(proc / "cwd"))
     except OSError:
         cwd = ""
-    return command, cwd
+    if cwd.endswith(DELETED_SUFFIX):
+        # A cwd whose directory was removed reads back as "<path> (deleted)".
+        # Left attached, the suffix hides a build still running in a tree that
+        # was deleted out from under it.
+        cwd = cwd[: -len(DELETED_SUFFIX)]
+    try:
+        cgroup = printable((proc / "cgroup").read_bytes())
+    except OSError:
+        cgroup = ""
+    return command, cwd, cgroup
 
 
-def conflicts() -> list[dict[str, object]]:
-    found = []
-    for proc in Path("/proc").glob("[0-9]*"):
-        command, cwd = command_of(proc)
-        if not command:
+def under(path: str, root: str) -> bool:
+    """True when ``path`` is ``root`` itself or something inside it."""
+    return bool(path) and (path == root or path.startswith(f"{root}/"))
+
+
+def conflict_reason(command: str, cwd: str, cgroup: str) -> str | None:
+    """Why this process collides with a serialized gate, or None if it does not.
+
+    Classification is from kernel metadata only, so it is deliberately coarse
+    and errs towards reporting: a build, a transfer or a second model server is
+    named on the evidence of its task name alone, without confirming what it is
+    working on. Waiting out a process that turned out to be harmless costs one
+    poll; running a GPU gate next to a real one costs the gate.
+
+    The managed router is the single exception, and it is excused by its cgroup
+    rather than by its name: llama-server started by hand is still a conflict.
+    """
+    managed_router = ROUTER_UNIT in cgroup
+    if KERNEL_TREE in cwd:
+        return "kernel-build"
+    if command in BUILD_COMMANDS:
+        return "build"
+    if command in TRANSFER_COMMANDS:
+        return "transfer"
+    if command.startswith(INFERENCE_PREFIX) or command in INFERENCE_COMMANDS:
+        return None if managed_router else "inference"
+    if command.startswith("python") and under(cwd, str(ROOT)):
+        # A gate, a downloader or a test run out of this workspace. Which one it
+        # is cannot be told from comm, and every one of them is a conflict.
+        return None if managed_router else "workspace-python"
+    return None
+
+
+def conflicts(proc_root: Path = Path("/proc")) -> list[dict[str, object]]:
+    """Every process whose work would collide with a serialized gate.
+
+    ``proc_root`` is injectable so the classification can be exercised without
+    inventing host processes. A proc root that is not there raises instead of
+    returning nothing: "no conflicts" and "nowhere to look" are the same empty
+    list, and only one of them means the host is quiet.
+    """
+    if not proc_root.is_dir():
+        raise RuntimeError(
+            f"process table {proc_root} is not readable; refusing to read an "
+            "unreadable host as a quiet one")
+    self_pid = os.getpid()
+    found: list[dict[str, object]] = []
+    pids = sorted(int(entry.name) for entry in proc_root.glob("[0-9]*")
+                  if entry.name.isdigit())
+    for pid in pids:
+        if pid == self_pid:
             continue
-        kernel = ("makepkg" in command or "/linux-tkg" in cwd) and proc.name != str(os.getpid())
-        build = any(token in command for token in ("cmake --build", "ninja ", "cargo build", "cargo test"))
-        transfer = "download_queue.py" in command
-        inference = (
-            ("llama-server" in command and "--models-preset" not in command)
-            or ("tools/ComfyUI/main.py" in command)
-            or ("gate_computer_use.py" in command)
-            or ("gate_tts.py" in command)
-        )
-        if kernel or build or transfer or inference:
-            found.append({"pid": int(proc.name), "command": command[:500], "cwd": cwd[:300]})
+        command, cwd, cgroup = process_metadata(proc_root / str(pid))
+        if not command:
+            # The task exited between listing the table and reading it.
+            continue
+        reason = conflict_reason(command, cwd, cgroup)
+        if reason is not None:
+            found.append({"pid": pid, "reason": reason, "command": command[:500],
+                          "cwd": cwd[:300], "cgroup": cgroup.strip()[:300]})
     return found
 
 
@@ -268,11 +387,15 @@ def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
             # Report the blockers observed in this poll, not "unknown": the whole
             # point of bounding the wait is to say what the host was busy with.
             if time.monotonic() >= deadline:
-                state.update({"status": "failed", "updated_at": now()})
-                atomic_json(state)
-                raise RuntimeError(
+                failure = (
                     f"host did not become quiet within {timeout}s; still blocked by: "
                     f"{'; '.join(reasons) or 'two consecutive quiet polls not yet observed'}")
+                # Record the explanation before raising. The unit dies on this
+                # exception and the outer handler may not get to run, so the
+                # durable state has to already say why it gave up.
+                state.update({"status": "failed", "error": failure, "updated_at": now()})
+                atomic_json(state)
+                raise RuntimeError(failure)
             time.sleep(POLL_SECONDS)
 
 

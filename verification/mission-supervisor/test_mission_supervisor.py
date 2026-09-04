@@ -19,6 +19,7 @@ Run: python3 -m unittest discover -s . -p 'test_*.py' -v
 from __future__ import annotations
 
 import importlib.util
+import itertools
 import json
 import os
 from pathlib import Path
@@ -28,6 +29,11 @@ from unittest import mock
 import warnings
 
 SOURCE = Path(__file__).resolve().parent / "run_functional_mission.py"
+
+# One conflict entry in the shape conflicts() actually produces. Shared so the
+# wait tests and the discovery tests cannot drift apart on what an entry is.
+BUSY = [{"pid": 4242, "reason": "inference", "command": "llama-server",
+         "cwd": "/tmp", "cgroup": "0::/user.slice/hand.scope"}]
 
 
 def load_supervisor(sandbox: Path):
@@ -110,23 +116,21 @@ class QuietWaitTests(SupervisorTestCase):
     def test_a_busy_poll_resets_the_quiet_counter(self):
         # One quiet poll is not enough: a gate that has just released the GPU can
         # look quiet for a moment while the next one is still starting.
-        busy = [{"pid": 1, "command": "llama-server", "cwd": ""}]
-        self.run_wait([[], busy, [], []], timeout=3600)
+        self.run_wait([[], BUSY, [], []], timeout=3600)
         self.assertEqual(3, len(self.slept))
 
     def test_a_permanently_busy_host_fails_instead_of_waiting_forever(self):
-        busy = [{"pid": 4242, "command": "llama-server --model heretic", "cwd": ""}]
         with self.assertRaises(RuntimeError) as caught:
-            self.run_wait([busy] * 40, timeout=120)
+            self.run_wait([BUSY] * 40, timeout=120)
         self.assertIn("did not become quiet within 120s", str(caught.exception))
 
     def test_the_failure_names_what_the_host_was_busy_with(self):
-        busy = [{"pid": 4242, "command": "llama-server --model heretic", "cwd": ""}]
         with self.assertRaises(RuntimeError) as caught:
-            self.run_wait([busy] * 40, timeout=60)
+            self.run_wait([BUSY] * 40, timeout=60)
         message = str(caught.exception)
         self.assertIn("conflicts=", message)
         self.assertIn("4242", message)
+        self.assertIn("inference", message)
         self.assertNotIn("unknown", message)
 
     def test_low_memory_and_high_load_are_reported_as_the_blockers(self):
@@ -140,11 +144,164 @@ class QuietWaitTests(SupervisorTestCase):
         # The unit dies on this exception, so the durable record of why has to be
         # written first; otherwise the state file still says "waiting-safe-host".
         state = {"steps": {}}
-        busy = [{"pid": 7, "command": "cmake --build .", "cwd": ""}]
         with self.assertRaises(RuntimeError):
-            self.run_wait([busy] * 40, timeout=60, state=state)
+            self.run_wait([BUSY] * 40, timeout=60, state=state)
         self.assertEqual("failed", state["status"])
-        self.assertEqual("failed", json.loads(self.supervisor.STATE.read_text())["status"])
+        published = json.loads(self.supervisor.STATE.read_text())
+        self.assertEqual("failed", published["status"])
+        self.assertIn("did not become quiet", published["error"])
+
+
+class ConflictDiscoveryTests(SupervisorTestCase):
+    """Conflict discovery must never read another process's address space.
+
+    Every case runs against an injected proc root, so the classification is
+    exercised without needing the host to be busy in any particular way -- and
+    without the suite depending on which processes happen to be running.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.proc = self.sandbox / "proc"
+        self.proc.mkdir()
+        # Fake PIDs start above this process's own, which conflicts() skips.
+        # Reusing it by accident would silently defeat half of these tests.
+        self.pids = itertools.count(os.getpid() + 1)
+
+    def process(self, comm: str, cwd="/tmp", cgroup="0::/user.slice/test.scope\n",
+                argv: str = "sleep\x0060\x00", pid: int | None = None) -> int:
+        """Write one fake /proc entry and return its pid.
+
+        ``argv`` is what ``/proc/<pid>/cmdline`` would have said, and it always
+        disagrees with ``comm``. That disagreement is the point: a regression
+        back to reading cmdline changes the verdict and fails a test here,
+        rather than hiding behind a blocking read that never returns.
+        """
+        pid = next(self.pids) if pid is None else pid
+        entry = self.proc / str(pid)
+        entry.mkdir()
+        (entry / "comm").write_text(f"{comm}\n")
+        (entry / "cgroup").write_text(cgroup)
+        (entry / "cwd").symlink_to(str(cwd))
+        (entry / "cmdline").write_text(argv)
+        return pid
+
+    def found(self) -> list[dict]:
+        return self.supervisor.conflicts(self.proc)
+
+    def pids_found(self) -> list[int]:
+        return [entry["pid"] for entry in self.found()]
+
+    def test_the_reported_command_is_the_kernel_task_name_not_the_cmdline(self):
+        pid = self.process("cc1plus", cwd="/tmp/build", argv="sleep\x0060\x00")
+        found = self.found()
+        self.assertEqual([pid], [entry["pid"] for entry in found])
+        self.assertEqual("cc1plus", found[0]["command"])
+        self.assertEqual("build", found[0]["reason"])
+
+    def test_a_quiet_task_name_is_not_rescued_by_a_busy_cmdline(self):
+        # The deterministic other half: reading cmdline would report this one.
+        self.process("sleep", cwd="/tmp", argv="cc1plus\x00-O2\x00")
+        self.assertEqual([], self.pids_found())
+
+    def test_managed_router_is_excluded_but_direct_server_is_a_conflict(self):
+        self.process("llama-server", cgroup="0::/user.slice/llama-router.service\n")
+        direct = self.process("llama-server")
+        self.assertEqual([direct], self.pids_found())
+
+    def test_llama_helpers_are_conflicts_under_their_truncated_task_names(self):
+        # /proc/<pid>/comm is 15 characters, so "llama-perplexity" never arrives
+        # whole. Matching the family prefix is what survives that.
+        for comm in ("llama-bench", "llama-cli", "llama-perplexi", "llama-embedding"):
+            with self.subTest(comm=comm):
+                pid = self.process(comm)
+                self.assertIn(pid, self.pids_found())
+
+    def test_builds_and_transfers_are_detected_by_task_name_alone(self):
+        for comm, reason in (("gcc", "build"), ("g++", "build"), ("cc1", "build"),
+                             ("ld.lld", "build"), ("makepkg", "build"),
+                             ("ninja", "build"), ("rustc", "build"),
+                             ("aria2c", "transfer"), ("rsync", "transfer"),
+                             ("huggingface-cli", "transfer"),
+                             ("git-remote-http", "transfer")):
+            with self.subTest(comm=comm):
+                pid = self.process(comm)
+                match = [entry for entry in self.found() if entry["pid"] == pid]
+                self.assertEqual([reason], [entry["reason"] for entry in match])
+
+    def test_a_kernel_tree_build_is_a_conflict_whatever_the_task_name(self):
+        # The kernel tree is recognised wherever it is checked out, and by the
+        # directory rather than the task name: most of a kernel build is shells,
+        # and the ones that are not are already gone by the next poll.
+        pid = self.process("bash", cwd=f"/home/typhoon/git{self.supervisor.KERNEL_TREE}/src")
+        self.assertEqual([pid], self.pids_found())
+        self.assertEqual("kernel-build", self.found()[0]["reason"])
+
+    def test_python_in_repository_is_a_fail_closed_conflict(self):
+        inside = self.process("python3", cwd=self.supervisor.ROOT / "verification")
+        self.process("python3", cwd="/tmp/unrelated")
+        self.assertEqual([inside], self.pids_found())
+
+    def test_a_deleted_working_directory_still_places_the_process(self):
+        # /proc reports a removed cwd as "<path> (deleted)". A build that just
+        # had its tree rm -rf'd out from under it is still running.
+        pid = self.process("python3", cwd="/tmp/gone")
+        (self.proc / str(pid) / "cwd").unlink()
+        (self.proc / str(pid) / "cwd").symlink_to(
+            f"{self.supervisor.ROOT}/verification (deleted)")
+        self.assertEqual([pid], self.pids_found())
+
+    def test_an_idle_host_reports_nothing(self):
+        for comm in ("systemd", "firefox", "sshd", "kworker/0:1", "sleep"):
+            self.process(comm, cwd="/home/typhoon")
+        self.assertEqual([], self.pids_found())
+
+    def test_the_supervisor_does_not_report_itself(self):
+        self.process("python3", cwd=self.supervisor.ROOT, pid=os.getpid())
+        self.assertEqual([], self.pids_found())
+
+    def test_a_task_that_exits_mid_scan_is_skipped_rather_than_raising(self):
+        vanished = self.proc / str(next(self.pids))
+        vanished.mkdir()  # listed by the scan, with nothing left to read
+        busy = self.process("cc1plus")
+        self.assertEqual([busy], self.pids_found())
+
+    def test_an_unreadable_working_directory_does_not_lose_the_process(self):
+        pid = self.process("aria2c")
+        (self.proc / str(pid) / "cwd").unlink()
+        self.assertEqual([pid], self.pids_found())
+        self.assertEqual("", self.found()[0]["cwd"])
+
+    def test_a_task_name_that_is_not_utf8_does_not_crash_the_scan(self):
+        # comm is whatever bytes the process chose. An undecodable one used to
+        # raise out of the poll, which is a wedged mission rather than a report.
+        odd = self.proc / str(next(self.pids))
+        odd.mkdir()
+        (odd / "comm").write_bytes(b"\xff\xfe-broken\n")
+        (odd / "cgroup").write_text("0::/user.slice/test.scope\n")
+        (odd / "cwd").symlink_to("/tmp")
+        busy = self.process("cc1plus")
+        self.assertEqual([busy], self.pids_found())
+
+    def test_a_non_numeric_proc_entry_is_ignored(self):
+        odd = self.proc / "9nvidia"
+        odd.mkdir()
+        (odd / "comm").write_text("cc1plus\n")
+        self.assertEqual([], self.pids_found())
+
+    def test_an_unreadable_process_table_is_not_a_quiet_host(self):
+        # Returning [] here would report "the host is idle" on the strength of
+        # having been unable to look at it.
+        with self.assertRaises(RuntimeError):
+            self.supervisor.conflicts(self.sandbox / "no-such-proc")
+
+    def test_reported_entries_carry_the_metadata_the_operator_needs(self):
+        pid = self.process("llama-server", cwd="/tmp", cgroup="0::/user.slice/hand.scope\n")
+        entry = self.found()[0]
+        self.assertEqual(
+            {"pid": pid, "reason": "inference", "command": "llama-server",
+             "cwd": "/tmp", "cgroup": "0::/user.slice/hand.scope"},
+            entry)
 
 
 class DurableStateTests(SupervisorTestCase):
@@ -174,12 +331,45 @@ class DurableStateTests(SupervisorTestCase):
             second = self.supervisor.mission_inputs_fingerprint()
         self.assertNotEqual(first, second)
 
+    def test_upstream_artifacts_that_have_not_landed_yet_are_fingerprintable(self):
+        # main() fingerprints before wait_for_inputs, so a queue that has not
+        # promoted anything yet must not crash the run that exists to wait for
+        # it. Absent still has to be distinguishable from present.
+        foundation = self.sandbox / "foundation"
+        foundation.mkdir()
+        state_path = foundation / "download-state.json"
+        stamp_path = foundation / "complete.ok"
+        completed = mock.Mock(stdout=b"source-generation")
+        with mock.patch.object(self.supervisor, "ROOT", self.sandbox), \
+             mock.patch.object(self.supervisor, "FOUNDATION", foundation), \
+             mock.patch.object(self.supervisor, "UPSTREAM", ((state_path, stamp_path, "4"),)), \
+             mock.patch.object(self.supervisor, "STEPS", (("step", ["/bin/true"]),)), \
+             mock.patch.object(self.supervisor.subprocess, "run", return_value=completed):
+            absent = self.supervisor.mission_inputs_fingerprint()
+            state_path.write_text('{"status":"complete"}')
+            stamp_path.write_text("4")
+            present = self.supervisor.mission_inputs_fingerprint()
+        self.assertNotEqual(absent, present)
+
     def test_state_round_trips_and_leaves_no_temp_file(self):
         self.supervisor.atomic_json({"status": "running", "steps": {}})
         self.assertEqual({"status": "running", "steps": {}},
                          json.loads(self.supervisor.STATE.read_text()))
         self.assertEqual(["mission-state.json"],
                          sorted(p.name for p in self.sandbox.iterdir()))
+
+    def test_a_failed_publish_leaves_no_half_written_document_behind(self):
+        # The next run's temp file must not be able to inherit a partial one, and
+        # nothing must be left that looks like state to a human reading the dir.
+        self.supervisor.atomic_json({"status": "running", "steps": {}})
+        with mock.patch.object(self.supervisor.os, "replace",
+                               side_effect=OSError("no space left on device")):
+            with self.assertRaises(OSError):
+                self.supervisor.atomic_json({"status": "complete"})
+        self.assertEqual(["mission-state.json"],
+                         sorted(p.name for p in self.sandbox.iterdir()))
+        self.assertEqual("running",
+                         json.loads(self.supervisor.STATE.read_text())["status"])
 
     def test_the_write_is_fsynced_before_the_rename(self):
         # A rename is atomic but not durable. Without the fsync a power loss can
@@ -359,13 +549,6 @@ class MissionPolicyTests(SupervisorTestCase):
         state = self.supervisor.load_state()
         self.assertFalse(state["benchmarking_performed"])
         self.assertFalse(state["throughput_measured"])
-
-    def test_an_active_transfer_or_build_counts_as_a_conflict(self):
-        markers = ("download_queue.py", "cmake --build", "llama-server")
-        source = SOURCE.read_text()
-        for marker in markers:
-            with self.subTest(marker=marker):
-                self.assertIn(marker, source)
 
     def test_candidate_policy_precedes_wemm_and_model_loads(self):
         names = [name for name, _command in self.supervisor.STEPS]
