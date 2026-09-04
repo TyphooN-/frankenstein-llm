@@ -40,3 +40,10 @@ Run lightweight checks:
     python3 verification/candidate-qualification/gate_candidate_policy.py
 
 The second command publishes ignored runtime evidence under `evidence/`.
+
+UI-Mate and WeMM use Qwen3.5 classes unavailable in the older UI-TARS runtime.
+`requirements.in` and the hash-locked `requirements.lock` define their isolated
+`venvs/candidates` environment. The lock is resolved with uv's CPU Torch backend
+but omits Torch itself: `setup_runtime.sh` reuses the host ROCm Torch through
+`--system-site-packages` and refuses a non-ROCm build. This avoids allowing a
+resolver to install NVIDIA CUDA or Triton packages alongside the AMD runtime.

@@ -118,6 +118,23 @@ class RemoteCodeReviewTests(unittest.TestCase):
                 self.assertEqual(["surprise.py"], report["unreviewed_executable_files"])
 
 
+class CandidateRuntimeLockTests(unittest.TestCase):
+    def test_lock_pins_required_candidate_packages_without_cuda_stack(self):
+        lock = (HERE / "requirements.lock").read_text()
+        self.assertIn("transformers==5.5.4", lock)
+        self.assertIn("qwen-vl-utils==0.0.14", lock)
+        self.assertIn("accelerate==1.14.0", lock)
+        for forbidden in ("nvidia-", "cuda-bindings==", "cuda-toolkit==", "triton=="):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, lock)
+
+    def test_setup_reuses_host_rocm_torch(self):
+        script = (HERE / "setup_runtime.sh").read_text()
+        self.assertIn("--system-site-packages", script)
+        self.assertNotIn("pip install torch", script)
+        self.assertIn("torch.version.hip", script)
+
+
 class CandidateGateTests(unittest.TestCase):
     def test_evaluate_aggregates_failures(self):
         inventory = {"pass": False, "problems": ["wrong size"], "artifacts": {}}

@@ -1,0 +1,7 @@
+# Candidate multimodal runtime. Torch comes from the host ROCm installation via
+# --system-site-packages and must not be resolved or replaced here.
+transformers==5.5.4
+accelerate==1.14.0
+qwen-vl-utils[decord]==0.0.14
+pillow==12.3.0
+safetensors==0.8.0
