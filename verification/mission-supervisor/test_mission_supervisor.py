@@ -276,14 +276,25 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
         self.assertEqual(["step-0", "step-1", "step-2"], calls,
                          "one functional failure hid independent gate results")
 
-    def test_multiple_functional_failures_are_aggregated(self):
-        code, state, calls = self.drive([2, 0, 4])
+    def test_multiple_functional_failures_are_aggregated_after_policy_passes(self):
+        code, state, calls = self.drive([0, 2, 4])
         self.assertEqual(1, code)
         self.assertEqual(
-            [{"name": "step-0", "exit_code": 2}, {"name": "step-2", "exit_code": 4}],
+            [{"name": "step-1", "exit_code": 2}, {"name": "step-2", "exit_code": 4}],
             state["failed_steps"],
         )
         self.assertEqual(["step-0", "step-1", "step-2"], calls)
+
+    def test_policy_failure_blocks_every_later_command(self):
+        code, state, calls = self.drive([7, 0, 0])
+        self.assertEqual(1, code)
+        self.assertEqual("blocked-policy", state["status"])
+        self.assertEqual(["step-0"], calls)
+        self.assertEqual([{"name": "step-0", "exit_code": 7}], state["failed_steps"])
+        for name in ("step-1", "step-2"):
+            with self.subTest(name=name):
+                self.assertEqual("blocked-policy", state["steps"][name]["status"])
+                self.assertEqual("step-0", state["steps"][name]["blocked_by"])
 
     def test_a_forwarded_signal_is_an_interruption_not_a_step_failure(self):
         # SIGTERM to the supervisor is forwarded to the child, so the child exits
@@ -362,6 +373,23 @@ class MissionPolicyTests(SupervisorTestCase):
         self.assertIn("wemm-embeddings", names)
         self.assertLess(names.index("candidate-policy"), names.index("wemm-embeddings"))
         self.assertLess(names.index("wemm-embeddings"), names.index("router-models"))
+
+    def test_dedicated_asr_gate_precedes_tts_roundtrip(self):
+        steps = dict(self.supervisor.STEPS)
+        names = list(steps)
+        self.assertIn("asr", steps)
+        self.assertTrue(steps["asr"][-1].endswith("validators/gate_asr.py"))
+        self.assertLess(names.index("asr"), names.index("tts-asr-roundtrip"))
+
+        ledger_source = (self.supervisor.FOUNDATION / "build_capability_ledger.py")
+        spec = importlib.util.spec_from_file_location("capability_ledger_under_test", ledger_source)
+        assert spec is not None and spec.loader is not None
+        ledger = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ledger)
+        self.assertEqual((ledger.EVIDENCE / "gate-asr.json",),
+                         ledger.CAPABILITY_EVIDENCE["asr"])
+        self.assertEqual("asr", ledger.EXPECTED_EVIDENCE_GATES[
+            ledger.EVIDENCE / "gate-asr.json"])
 
 
 if __name__ == "__main__":

@@ -2,8 +2,10 @@
 """Reboot-resumable, fail-closed functional qualification supervisor.
 
 This mission deliberately records no token rate or comparative benchmark data.
-Independent gates continue after a functional failure so one capability cannot
-hide the status of every later one; the aggregate mission still fails closed.
+The candidate-policy gate is a blocking prerequisite: no model-backed gate may
+run unless it passes. Independent functional gates then continue after a failure
+so one capability cannot hide the status of every later one; the aggregate
+mission still fails closed.
 """
 from __future__ import annotations
 
@@ -71,6 +73,7 @@ STEPS = (
     ("embeddings", [sys.executable, str(FOUNDATION / "validators/gate_embeddings.py")]),
     ("reranker", [sys.executable, str(FOUNDATION / "validators/gate_reranker.py")]),
     ("fim", [sys.executable, str(FOUNDATION / "validators/gate_fim.py")]),
+    ("asr", [sys.executable, str(FOUNDATION / "validators/gate_asr.py")]),
     ("computer-use-grounding", ["/usr/bin/bash", str(ROOT / "verification/computer-use-grounding/run_when_idle.sh")]),
     ("tts-asr-roundtrip", ["/usr/bin/bash", str(ROOT / "verification/tts-local/run_serialized.sh")]),
     ("repository-agent", ["/usr/bin/bash", str(ROOT / "verification/repository-agent/run_serialized.sh")]),
@@ -339,8 +342,52 @@ def main() -> int:
     })
     atomic_json(state)
     wait_for_inputs(state)
+
+    policy_name, policy_command = STEPS[0]
+    previous = state["steps"].get(policy_name, {})
+    if (previous.get("status") == "passed"
+            and previous.get("input_fingerprint") == input_fingerprint):
+        log(f"step already passed; skipping name={policy_name}")
+        policy_rc = 0
+    else:
+        if previous.get("status") == "passed":
+            log(f"passed step inputs changed; rerunning name={policy_name}")
+        policy_rc = run_step(policy_name, policy_command, state)
+    if stop_signal is not None:
+        if policy_rc != 0:
+            state["steps"][policy_name]["status"] = "interrupted"
+        state.update({"status": "interrupted", "signal": stop_signal,
+                      "interrupted_step": policy_name, "step_exit_code": policy_rc,
+                      "step_status": state["steps"][policy_name]["status"],
+                      "updated_at": now()})
+        atomic_json(state)
+        return 128 + stop_signal
+    if policy_rc != 0:
+        for name, command in STEPS[1:]:
+            state["steps"][name] = {
+                "command": command,
+                "input_fingerprint": input_fingerprint,
+                "status": "blocked-policy",
+                "blocked_by": policy_name,
+                "updated_at": now(),
+                "benchmarking_performed": False,
+                "throughput_measured": False,
+            }
+        failure = {"name": policy_name, "exit_code": policy_rc}
+        state.update({
+            "status": "blocked-policy",
+            "current_step": None,
+            "failed_steps": [failure],
+            "exit_code": 1,
+            "remaining": [name for name, _command in STEPS[1:]],
+            "updated_at": now(),
+        })
+        atomic_json(state)
+        log(f"candidate policy blocked model-backed gates rc={policy_rc}")
+        return 1
+
     failures = []
-    for name, command in STEPS:
+    for name, command in STEPS[1:]:
         previous = state["steps"].get(name, {})
         if (previous.get("status") == "passed"
                 and previous.get("input_fingerprint") == input_fingerprint):
