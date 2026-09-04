@@ -167,6 +167,21 @@ CANDIDATES: dict[str, dict] = {
 ACTING_CAPABILITIES = frozenset({"computer-use-grounding", "computer-use-end-to-end",
                                  "repository-agent"})
 
+# Every llama.cpp router alias, including incumbents that are not phase-four
+# candidates. Unknown aliases are absent here on purpose: privilege_for_preset
+# returns None and tools are refused. Embedding/rerank/FIM are not chat actors.
+INCUMBENT_PRESETS: dict[str, str] = {
+    "ridge": PRIVILEGE_TOOL_USING,
+    "heretic": PRIVILEGE_TOOL_USING,
+    "obliterated": PRIVILEGE_TOOL_USING,
+    "obliterated-vision": PRIVILEGE_TOOL_USING,
+    "fable": PRIVILEGE_TOOL_USING,
+    "phr00ty": PRIVILEGE_TOOL_USING,
+    "qwen3-embedding-8b": PRIVILEGE_READ_ONLY,
+    "qwen3-reranker-8b": PRIVILEGE_READ_ONLY,
+    "qwen25-coder-7b-fim": PRIVILEGE_READ_ONLY,
+}
+
 
 def load_queue(path: Path = QUEUE_PATH) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -195,6 +210,19 @@ def tool_grant_allowed(name: str) -> bool:
     if candidate is None:
         return False
     return candidate["privilege"] == PRIVILEGE_TOOL_USING
+
+
+def privilege_for_preset(preset: str) -> str | None:
+    """Privilege of a router alias. None means unknown, which is not a grant."""
+    candidate = candidate_for_preset(preset)
+    if candidate is not None:
+        return CANDIDATES[candidate]["privilege"]
+    return INCUMBENT_PRESETS.get(preset)
+
+
+def tool_grant_allowed_for_preset(preset: str) -> bool:
+    """May this router alias receive a tools payload? Unknown aliases may not."""
+    return privilege_for_preset(preset) == PRIVILEGE_TOOL_USING
 
 
 def abliteration_allowed(name: str) -> bool:

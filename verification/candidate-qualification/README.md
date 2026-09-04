@@ -29,8 +29,10 @@ Not yet claimed:
 
 - UI-Mate has no functional verdict and must be tested against the same sandboxed
   grounding/action fixtures as UI-TARS before any bounded control integration.
-- WeMM has no multimodal retrieval verdict or built index. Its reviewed remote
-  code may be imported only after the digest gate passes in the same run.
+- WeMM has a text-only functional verdict (2048-D, L2, paraphrase>related>noise)
+  on the V620. Image/video retrieval is not claimed: AutoProcessor needs
+  torchvision, which is not in the ROCm candidate runtime. No vectors were
+  written into the Qwen3 text index.
 - No candidate is considered admitted merely because this static gate passes.
 - No throughput, latency, token-rate, or comparative benchmark is performed here.
 

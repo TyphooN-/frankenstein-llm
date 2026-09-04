@@ -70,6 +70,8 @@ pass `--python 3.14`; a 3.11 venv cannot install the hashed lock.
 
 - UI-TARS grounding (interrupted historically); UI-Mate A/B after that
 - WeMM live embeddings and a separate 2048-D index
+  Text-only WeMM gate passed 2026-09-03 on cuda:1 (2048-D, semantic order).
+  Image/video not claimed (no ROCm torchvision). Index file not built yet.
 - ComfyUI: Z-Image, ACE-Step, Qwen Image Edit, FLUX.2
 - TTS -> ASR intelligibility
 - GLM-5.3-Flash 32K on the isolated binary

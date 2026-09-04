@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
-from candidate_policy import candidate_for_preset, tool_grant_allowed  # noqa: E402
+from candidate_policy import tool_grant_allowed_for_preset  # noqa: E402
 
 BASE = "http://127.0.0.1:8080"
 CHAT_MODELS = ["ridge", "heretic", "obliterated", "fable", "phr00ty",
@@ -45,8 +45,7 @@ BLOCKED_WORKLOAD_MARKERS = (
 
 def checks_for(model: str) -> tuple[str, ...]:
     """The checks a preset must satisfy, and therefore whether it is offered tools."""
-    candidate = candidate_for_preset(model)
-    if candidate is not None and not tool_grant_allowed(candidate):
+    if not tool_grant_allowed_for_preset(model):
         return READER_CHECKS
     return CORE_CHECKS
 

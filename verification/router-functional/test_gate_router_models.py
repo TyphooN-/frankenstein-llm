@@ -82,6 +82,11 @@ class PrivilegeProfileTests(unittest.TestCase):
                 self.assertEqual(module.READER_CHECKS, module.checks_for(model))
                 self.assertNotIn("tool_call", module.checks_for(model))
 
+    def test_unknown_and_non_chat_presets_are_not_offered_tools(self):
+        for model in ("unknown-alias", "qwen3-embedding-8b", "qwen25-coder-7b-fim"):
+            with self.subTest(model=model):
+                self.assertEqual(module.READER_CHECKS, module.checks_for(model))
+
     def test_a_reader_run_sends_no_tools_and_claims_no_tool_capability(self):
         samples = [
             {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0, "vram_used_bytes": {"card0": 0}},

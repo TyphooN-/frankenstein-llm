@@ -37,6 +37,17 @@ class CandidatePolicyTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(policy.tool_grant_allowed(name))
 
+    def test_preset_privilege_covers_the_router_ini_and_fails_closed(self):
+        for preset in ("ridge", "heretic", "obliterated", "obliterated-vision",
+                       "fable", "phr00ty", "qwen3-coder-next"):
+            with self.subTest(preset=preset):
+                self.assertTrue(policy.tool_grant_allowed_for_preset(preset))
+        for preset in ("gemma4-heretic", "gemma4-heretic-vision",
+                       "qwen3-embedding-8b", "qwen3-reranker-8b",
+                       "qwen25-coder-7b-fim", "unknown-alias"):
+            with self.subTest(preset=preset):
+                self.assertFalse(policy.tool_grant_allowed_for_preset(preset))
+
     def test_actors_cannot_be_abliterated(self):
         self.assertFalse(policy.abliteration_allowed("qwen3-coder-next"))
         self.assertFalse(policy.abliteration_allowed("ui-mate-9b"))
