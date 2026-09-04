@@ -8,8 +8,15 @@ VENV=$ROOT/venvs/candidates
 command -v uv >/dev/null || { printf 'uv is required\n' >&2; exit 1; }
 [ -s "$DIR/requirements.lock" ] || { printf 'missing requirements.lock\n' >&2; exit 1; }
 
+if [ -x "$VENV/bin/python" ]; then
+  observed=$("$VENV/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+  if [ "$observed" != "3.14" ]; then
+    printf 'recreating %s: python %s, need 3.14\n' "$VENV" "$observed"
+    rm -rf "$VENV"
+  fi
+fi
 if [ ! -x "$VENV/bin/python" ]; then
-  uv venv --system-site-packages "$VENV"
+  uv venv --python 3.14 --system-site-packages "$VENV"
 fi
 uv pip sync --python "$VENV/bin/python" "$DIR/requirements.lock"
 

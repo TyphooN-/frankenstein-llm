@@ -133,6 +133,8 @@ class CandidateRuntimeLockTests(unittest.TestCase):
         self.assertIn("--system-site-packages", script)
         self.assertNotIn("pip install torch", script)
         self.assertIn("torch.version.hip", script)
+        self.assertIn("uv venv --python 3.14 --system-site-packages", script)
+        self.assertIn('need 3.14', script)
 
 
 class CandidateGateTests(unittest.TestCase):
