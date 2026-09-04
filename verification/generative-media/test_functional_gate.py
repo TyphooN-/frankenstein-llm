@@ -41,6 +41,14 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("red square", workflow["9"]["inputs"]["prompt"])
         self.assert_no_performance_fields(workflow)
 
+    def test_flux2_klein_graph_uses_installed_native_checkpoint(self) -> None:
+        workflow = functional_gate.flux2_klein_workflow()
+        self.assertEqual(workflow["1"]["inputs"]["unet_name"], "flux-2-klein-4b.safetensors")
+        self.assertEqual(workflow["2"]["inputs"]["clip_name"], "qwen_3_4b.safetensors")
+        self.assertEqual(workflow["2"]["inputs"]["type"], "flux2")
+        self.assertEqual(workflow["9"]["class_type"], "SaveImage")
+        self.assert_no_performance_fields(workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

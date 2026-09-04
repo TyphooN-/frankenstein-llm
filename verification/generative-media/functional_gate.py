@@ -147,6 +147,25 @@ def z_image_workflow() -> dict:
     }
 
 
+def flux2_klein_workflow() -> dict:
+    """API graph for the installed FLUX.2 Klein 4B native ComfyUI checkpoint.
+
+    Not executed by main() until a live ComfyUI run is admitted. The VAE file is
+    the publisher Diffusers name under extra_model_paths vae/.
+    """
+    return {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": "flux-2-klein-4b.safetensors", "weight_dtype": "default"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen_3_4b.safetensors", "type": "flux2", "device": "default"}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["2", 0], "text": "A blue ceramic robot beside a yellow sunflower, clean studio lighting, detailed photograph"}},
+        "4": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["3", 0]}},
+        "5": {"class_type": "EmptySD3LatentImage", "inputs": {"width": 512, "height": 512, "batch_size": 1}},
+        "6": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "positive": ["3", 0], "negative": ["4", 0], "latent_image": ["5", 0], "seed": 4242, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}},
+        "7": {"class_type": "VAELoader", "inputs": {"vae_name": "diffusion_pytorch_model.safetensors"}},
+        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["6", 0], "vae": ["7", 0]}},
+        "9": {"class_type": "SaveImage", "inputs": {"images": ["8", 0], "filename_prefix": "functional/flux2-klein"}},
+    }
+
+
 def music_workflow() -> dict:
     return {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ace_step_1.5_turbo_aio.safetensors"}},

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
@@ -38,6 +39,9 @@ MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_CONTEXT_CHARS = 12000
 MAX_CONTEXT_CHUNKS = 12
 EMBED_BATCH = 8
+DEFAULT_INGEST_PATTERNS = ("*.md", "*.txt", "*.html", "*.htm")
+TEXT_SUFFIXES = {".md", ".txt", ".rst"}
+HTML_SUFFIXES = {".html", ".htm"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
@@ -77,6 +81,42 @@ def connect(db_path: Path = DEFAULT_DB) -> sqlite3.Connection:
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+class _VisibleHTMLText(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+        self._skip = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        if tag in {"script", "style", "noscript"}:
+            self._skip += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in {"script", "style", "noscript"} and self._skip:
+            self._skip -= 1
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self.parts.append(data)
+
+
+def extract_text(path: Path, data: bytes) -> str | None:
+    """Return visible text, or None when the file must not enter the index.
+
+    Unknown binary types are skipped rather than UTF-8-replaced into garbage
+    chunks that would later be cited as documents.
+    """
+    suffix = path.suffix.lower()
+    if suffix in TEXT_SUFFIXES:
+        return data.decode("utf-8", errors="replace")
+    if suffix in HTML_SUFFIXES:
+        parser = _VisibleHTMLText()
+        parser.feed(data.decode("utf-8", errors="replace"))
+        text = " ".join(part.strip() for part in parser.parts if part.strip())
+        return text or None
+    return None
 
 
 def chunk_text(text: str) -> list[tuple[int, int, str]]:
@@ -141,7 +181,9 @@ def ingest_file(connection: sqlite3.Connection, path: Path) -> dict:
     if row and row["content_sha256"] == digest and row["deleted_at"] is None:
         return {"path": resolved, "action": "unchanged", "doc_id": row["doc_id"]}
 
-    text = data.decode("utf-8", errors="replace")
+    text = extract_text(path, data)
+    if text is None:
+        return {"path": resolved, "action": "skipped", "reason": "unsupported or non-text file"}
     spans = chunk_text(text)
     if not spans:
         return {"path": resolved, "action": "skipped", "reason": "no extractable text"}
@@ -195,7 +237,8 @@ def delete_document(connection: sqlite3.Connection, path: Path) -> dict:
     return {"path": resolved, "action": "deleted", "doc_id": row["doc_id"]}
 
 
-def sync_directory(connection: sqlite3.Connection, root: Path, patterns: tuple[str, ...] = ("*.md", "*.txt")) -> dict:
+def sync_directory(connection: sqlite3.Connection, root: Path,
+                   patterns: tuple[str, ...] = DEFAULT_INGEST_PATTERNS) -> dict:
     """Ingest new/changed files under root and delete records whose file is gone."""
     seen: set[str] = set()
     results = []
