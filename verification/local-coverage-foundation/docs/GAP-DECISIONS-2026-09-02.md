@@ -1,5 +1,10 @@
 # Gap decisions and phase-3 verdict — 2026-09-02
 
+**Historical.** After this snapshot, phase three installed Qwen Image Edit and
+phase four installed FLUX.2-klein-4B, UI-Mate-9B, WeMM, Coder-Next, and Gemma-4
+Heretic. Image editing is no longer a missing-weight gap; it is an unproven
+workflow. Current status: `docs/CANDIDATE-STATUS-2026-09-03.md`.
+
 ## Verdict
 
 **No phase-3 download queue was created.** The precondition was that existing

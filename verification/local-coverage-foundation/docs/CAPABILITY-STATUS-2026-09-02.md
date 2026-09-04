@@ -1,8 +1,13 @@
 # Local capability status — 2026-09-02 static recovery
 
-Machine-readable source of truth: `../evidence/capability-ledger.json`
+**Historical.** This pass froze phases 1–2 after an outage. Current operational
+status is `docs/CANDIDATE-STATUS-2026-09-03.md`. The ignored
+`../evidence/capability-ledger.json` snapshot is also 2026-09-02 and still
+omits phases 3–4.
+
+Machine-readable source of truth *for this snapshot*: `../evidence/capability-ledger.json`
 (`schema: hermes-local-capability-ledger/1`). This document is the prose reading
-of that file. Where the two disagree, the ledger is correct.
+of that file. Where the two disagree, the ledger is correct for 2026-09-02 only.
 
 Scope of this pass: static and control-plane only. No model was loaded, no GPU
 was used, no service was started or stopped, and no download was started.

@@ -35,7 +35,8 @@ See:
 - `docs/decisions/0002-serialized-functional-qualification.md`
 - `docs/decisions/0003-hardware-allocation-and-memory-policy.md`
 - `docs/LOCAL-AI-MODEL-STRATEGY.md`
-- `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — reviewed candidate selection and qualification backlog
+- `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — 2026-09-02 research snapshot
+- `docs/CANDIDATE-STATUS-2026-09-03.md` — current download/policy/runtime/functional state
 
 ## Downloads
 

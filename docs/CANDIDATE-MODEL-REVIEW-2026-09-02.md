@@ -1,8 +1,9 @@
 # Candidate model review — 2026-09-02
 
-Status: **research only.** Nothing in this document has been downloaded, pinned
-into a download queue, converted, served, or qualified. No bytes were fetched to
-produce it, and no admission gate has run against any model named here.
+Status: **historical research snapshot from 2026-09-02.** Keep the matrix and
+pins. Do not read the original “nothing downloaded” banner as current state.
+
+Current operational status: `docs/CANDIDATE-STATUS-2026-09-03.md`.
 
 This is the decision/backlog record for the 2026-09-02 candidate sweep. It sits
 under `docs/LOCAL-AI-MODEL-STRATEGY.md`, which remains the portfolio decision
@@ -65,9 +66,9 @@ Links are pinned to the Hugging Face commit observed on 2026-09-02.
 4. **WeMM-Embedding-2B** — the explicit Apache-2.0 license is resolved at the
    refreshed pin. Qualification must use a separate multimodal index and audit
    the pinned remote-code implementation before execution.
-5. **Gemma-4-12B Heretic** — smallest and cheapest trial. Needs a
-   Gemma-4-capable llama.cpp build and per-modality validation. Low-privilege
-   preset only.
+5. **Gemma-4-12B Heretic** — production `50f068f` already loads the text and
+   vision presets. Remaining work is audio/video, quiet-host memory-fit, and
+   keeping it low-privilege. Do not rebuild llama.cpp for this candidate.
 6. **Qwen3-ASR-1.7B** — already downloaded and verified at this reviewed
    revision by phase one; only functional comparison remains.
 
