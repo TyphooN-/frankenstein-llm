@@ -150,6 +150,30 @@ class QuietWaitTests(SupervisorTestCase):
 class DurableStateTests(SupervisorTestCase):
     """A resumed mission skips passed steps based on this file."""
 
+    def test_input_fingerprint_changes_when_a_promoted_artifact_changes(self):
+        foundation = self.sandbox / "foundation"
+        foundation.mkdir()
+        state_path = foundation / "download-state.json"
+        stamp_path = foundation / "complete.ok"
+        state_path.write_text('{"status":"complete"}')
+        stamp_path.write_text("4")
+        weight = self.sandbox / "weight.bin"
+        weight.write_bytes(b"1234")
+        queue = foundation / "download-queue.json"
+        queue.write_text(json.dumps({"artifacts": [{"files": [{
+            "destination": str(weight), "size": 4}]}]}))
+        completed = mock.Mock(stdout=b"source-generation")
+        with mock.patch.object(self.supervisor, "ROOT", self.sandbox), \
+             mock.patch.object(self.supervisor, "FOUNDATION", foundation), \
+             mock.patch.object(self.supervisor, "UPSTREAM", ((state_path, stamp_path, "4"),)), \
+             mock.patch.object(self.supervisor, "STEPS", (("step", ["/bin/true"]),)), \
+             mock.patch.object(self.supervisor.subprocess, "run", return_value=completed):
+            first = self.supervisor.mission_inputs_fingerprint()
+            stat = weight.stat()
+            os.utime(weight, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
+            second = self.supervisor.mission_inputs_fingerprint()
+        self.assertNotEqual(first, second)
+
     def test_state_round_trips_and_leaves_no_temp_file(self):
         self.supervisor.atomic_json({"status": "running", "steps": {}})
         self.assertEqual({"status": "running", "steps": {}},
@@ -196,7 +220,7 @@ class DurableStateTests(SupervisorTestCase):
 class InterruptedStepClassificationTests(SupervisorTestCase):
     """An operator stop is not a step verdict."""
 
-    def drive(self, exit_codes, signal_after=None):
+    def drive(self, exit_codes, signal_after=None, fingerprint="fixture-v1"):
         """Run main() over fake steps, raising ``signal_after`` steps' worth of work.
 
         ``exit_codes`` is one code per step. Setting ``signal_after`` to an index
@@ -217,7 +241,7 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
             rc = exit_codes[index]
             state["steps"][name] = {
                 "command": command, "status": "passed" if rc == 0 else "failed",
-                "exit_code": rc,
+                "exit_code": rc, "input_fingerprint": state["input_fingerprint"],
             }
             if signal_after == index:
                 self.supervisor.stop_signal = 15
@@ -225,6 +249,8 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
 
         with mock.patch.object(self.supervisor, "STEPS", steps), \
              mock.patch.object(self.supervisor, "run_step", fake_run_step), \
+             mock.patch.object(self.supervisor, "mission_inputs_fingerprint",
+                               return_value=fingerprint), \
              mock.patch.object(self.supervisor, "wait_for_inputs"), \
              mock.patch.object(self.supervisor, "log"), \
              mock.patch.object(self.supervisor.fcntl, "flock"), \
@@ -289,6 +315,20 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
         self.assertEqual(0, code)
         self.assertEqual(["step-1"], calls, "resume did not skip the passed step")
         self.assertEqual("functional-foundation-complete", second["status"])
+
+    def test_passed_steps_are_retried_when_source_or_artifact_inputs_change(self):
+        code, _, calls = self.drive([0, 0], fingerprint="generation-a")
+        self.assertEqual(0, code)
+        self.assertEqual(["step-0", "step-1"], calls)
+
+        code, state, calls = self.drive([0, 0], fingerprint="generation-b")
+        self.assertEqual(0, code)
+        self.assertEqual(["step-0", "step-1"], calls)
+        self.assertEqual("generation-b", state["input_fingerprint"])
+        self.assertTrue(all(
+            step["input_fingerprint"] == "generation-b"
+            for step in state["steps"].values()
+        ))
 
     def test_a_resumed_run_clears_the_previous_interruption_markers(self):
         # Stale "interrupted_step"/"signal" keys on a mission that later completes

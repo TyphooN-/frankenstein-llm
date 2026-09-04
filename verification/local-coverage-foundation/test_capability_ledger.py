@@ -106,6 +106,25 @@ class EvidenceReadingTests(unittest.TestCase):
             path.write_text(json.dumps({"pass": "yes", "recorded_at": RECENT}))
             self.assertFalse(ledger.read_evidence(path)["pass"])
 
+    def test_gate_identity_is_bound_to_the_declared_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "gate.json"
+            path.write_text(json.dumps({
+                "gate": "unrelated-gate", "pass": True, "recorded_at": RECENT}))
+            record = ledger.read_evidence(path, expected_gate="asr")
+        self.assertFalse(record["pass"])
+        self.assertIn("gate identity mismatch", record["error"])
+
+    def test_missing_sections_override_a_top_level_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "gate.json"
+            path.write_text(json.dumps({
+                "gate": "asr", "pass": True, "recorded_at": RECENT,
+                "sections_missing": ["unload"]}))
+            record = ledger.read_evidence(path, expected_gate="asr")
+        self.assertFalse(record["pass"])
+        self.assertIn("missing required sections", record["error"])
+
     def test_timestamp_parsing_accepts_the_gate_format_and_rejects_junk(self):
         self.assertIsNotNone(ledger.parse_recorded_at("2026-09-01T12:57:07-0400"))
         for junk in (None, "", "yesterday", 17):
@@ -243,6 +262,10 @@ class TrackedMappingTests(unittest.TestCase):
         for path in ledger.QUEUES:
             with self.subTest(queue=path.name):
                 self.assertTrue(path.is_file())
+
+    def test_every_declared_evidence_path_has_an_expected_gate_identity(self):
+        declared = {path for paths in ledger.CAPABILITY_EVIDENCE.values() for path in paths}
+        self.assertEqual(declared, set(ledger.EXPECTED_EVIDENCE_GATES))
 
     def test_flux2_and_gemma_heretic_declare_no_evidence_yet(self):
         """Neither has a gate that writes a durable artifact, so neither may pass.

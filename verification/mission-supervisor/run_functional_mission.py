@@ -8,6 +8,7 @@ hide the status of every later one; the aggregate mission still fails closed.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -77,6 +78,40 @@ STEPS = (
 )
 child: subprocess.Popen | None = None
 stop_signal: int | None = None
+
+
+def mission_inputs_fingerprint() -> str:
+    """Fingerprint source and promoted artifacts without re-hashing model weights."""
+    digest = hashlib.sha256()
+    source_paths = ("verification", "llama-models.ini", "scripts")
+    for command in (
+        ["git", "ls-files", "-s", "--", *source_paths],
+        ["git", "diff", "--binary", "HEAD", "--", *source_paths],
+    ):
+        result = subprocess.run(
+            command, cwd=ROOT, check=True, capture_output=True, timeout=30)
+        digest.update(result.stdout)
+
+    # Promotion records are durable; file metadata additionally catches restored
+    # or replaced bytes whose queue state was not rewritten.
+    for state_path, stamp_path, _expected in UPSTREAM:
+        for path in (state_path, stamp_path):
+            digest.update(str(path).encode())
+            digest.update(path.read_bytes())
+    for queue_path in sorted(FOUNDATION.glob("download-queue*.json")):
+        digest.update(queue_path.read_bytes())
+        document = json.loads(queue_path.read_text(encoding="utf-8"))
+        for artifact in document.get("artifacts", []):
+            for entry in artifact.get("files", []):
+                path = Path(entry["destination"])
+                try:
+                    stat = path.stat()
+                    identity = (str(path), stat.st_size, stat.st_mtime_ns)
+                except OSError:
+                    identity = (str(path), None, None)
+                digest.update(json.dumps(identity, separators=(",", ":")).encode())
+    digest.update(json.dumps(STEPS, separators=(",", ":")).encode())
+    return digest.hexdigest()
 
 
 def now() -> str:
@@ -259,6 +294,7 @@ def run_step(name: str, command: list[str], state: dict) -> int:
     wait_for_quiet(state)
     step = {
         "command": command,
+        "input_fingerprint": state["input_fingerprint"],
         "started_at": now(),
         "status": "running",
         "benchmarking_performed": False,
@@ -289,6 +325,7 @@ def main() -> int:
         log("another mission supervisor owns the lock")
         return 75
     state = load_state()
+    input_fingerprint = mission_inputs_fingerprint()
     for stale in ("signal", "error", "failed_step", "failed_steps", "exit_code",
                   "interrupted_step", "step_exit_code", "step_status"):
         state.pop(stale, None)
@@ -297,15 +334,20 @@ def main() -> int:
         "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
         "kernel_release": os.uname().release,
         "kernel_build_signature": Path("/proc/version").read_text().strip(),
+        "input_fingerprint": input_fingerprint,
         "updated_at": now(),
     })
     atomic_json(state)
     wait_for_inputs(state)
     failures = []
     for name, command in STEPS:
-        if state["steps"].get(name, {}).get("status") == "passed":
+        previous = state["steps"].get(name, {})
+        if (previous.get("status") == "passed"
+                and previous.get("input_fingerprint") == input_fingerprint):
             log(f"step already passed; skipping name={name}")
             continue
+        if previous.get("status") == "passed":
+            log(f"passed step inputs changed; rerunning name={name}")
         rc = run_step(name, command, state)
         # Order matters. A SIGTERM to this supervisor is forwarded to the running
         # step, which then exits non-zero -- so testing rc first recorded every

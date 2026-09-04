@@ -11,6 +11,8 @@ Do not wait for the full qualification mission. Chat, writing, and local coding 
 ```bash
 systemctl --user is-active llama-router.service
 /home/typhoon/git/frankenstein-llm/scripts/local-model-status.sh
+# Machine-readable bounded summary (never dumps router launch arguments):
+/home/typhoon/git/frankenstein-llm/scripts/local-model-status.sh --json
 ```
 
 2. Start Hermes Desktop:

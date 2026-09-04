@@ -96,6 +96,33 @@ CAPABILITY_EVIDENCE: dict[str, tuple[Path, ...]] = {
     # Both therefore report "no evidence artifact is declared", which is true.
 }
 
+# A pass bit is meaningful only when the artifact identifies the gate that wrote
+# it. Without this binding, copying any passing JSON file onto a declared path
+# could qualify an unrelated capability.
+EXPECTED_EVIDENCE_GATES: dict[Path, str] = {
+    EVIDENCE / "gate-asr.json": "asr",
+    EVIDENCE / "gate-embeddings.json": "embeddings",
+    EVIDENCE / "gate-fim.json": "fim",
+    EVIDENCE / "gate-ocr.json": "ocr",
+    EVIDENCE / "gate-reranker.json": "reranker",
+    EVIDENCE / "gate-rag-structural.json": "rag-structural",
+    EVIDENCE / "gate-rag-behavioural.json": "rag-behavioural",
+    EVIDENCE / "gate-rag-live.json": "rag-live",
+    EVIDENCE / "gate-native-tool-use.json": "native-tool-use",
+    EVIDENCE / "gate-vision-grounding.json": "vision-grounding",
+    ROOT / "verification/computer-use-grounding/evidence/computer-use-grounding.json":
+        "computer-use-grounding",
+    ROOT / "verification/candidate-qualification/evidence/wemm-functional.json":
+        "wemm-functional",
+    ROOT / "verification/repository-agent/evidence/gate-repo-agent-heretic.json":
+        "local-repository-agent",
+    ROOT / "verification/repository-agent/evidence/gate-repo-agent-qwen3-coder-next.json":
+        "local-repository-agent",
+    ROOT / "verification/tts-local/evidence/gate-tts.json": "tts-local",
+    ROOT / "verification/generative-media/evidence/media-functional.json":
+        "generative-media-functional",
+}
+
 # Capabilities that own no downloaded artifact of their own. Listing them keeps
 # them visible in the ledger rather than silently absent.
 COMPOSED_CAPABILITIES = ("rag", "native-tool-use", "vision-grounding")
@@ -162,7 +189,7 @@ def parse_recorded_at(value: str | None) -> float | None:
         return None
 
 
-def read_evidence(path: Path) -> dict:
+def read_evidence(path: Path, expected_gate: str | None = None) -> dict:
     """Read one gate artifact. Unreadable and absent are both 'no verdict'."""
     record = {"path": str(path), "present": path.is_file(), "pass": False,
               "interrupted": False, "recorded_at": None, "error": None,
@@ -180,6 +207,13 @@ def read_evidence(path: Path) -> dict:
     record["recorded_at"] = document.get("recorded_at") or document.get("finished_at")
     record["sections_missing"] = document.get("sections_missing")
     record["gate"] = document.get("gate")
+    if expected_gate is not None and record["gate"] != expected_gate:
+        record["pass"] = False
+        record["error"] = (
+            f"gate identity mismatch: expected {expected_gate!r}, got {record['gate']!r}")
+    elif record["sections_missing"]:
+        record["pass"] = False
+        record["error"] = "evidence reports missing required sections"
     if document.get("error"):
         record["error"] = str(document["error"])[:400]
     # This workspace forbids throughput measurement. An artifact claiming to hold
@@ -237,7 +271,10 @@ def build_ledger(queues=QUEUES, evidence_map=None) -> dict:
     problems = []
     for name in names:
         artifacts = [inspect_artifact(artifact) for artifact in by_capability.get(name, [])]
-        evidence = [read_evidence(path) for path in evidence_map.get(name, ())]
+        evidence = [
+            read_evidence(path, EXPECTED_EVIDENCE_GATES.get(path))
+            for path in evidence_map.get(name, ())
+        ]
         state, reasons = classify(artifacts, evidence)
         if any(item["throughput_measured"] for item in evidence):
             problems.append(f"{name}: an evidence artifact reports measured throughput")
