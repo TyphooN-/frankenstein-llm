@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import functional_gate
 import media_policy as policy
 import preflight
 
@@ -33,6 +34,11 @@ def healthy_probe(blockers=()):
              "missing_node_ids": [], "pass": True}
             for name, path in policy.REQUIRED_NODE_FILES.items()
         ],
+        "graph_resolution": policy.resolve_graphs(
+            functional_gate.workflow_graphs(),
+            paths=policy.search_paths(),
+            exists=lambda path: str(path) in {str(p) for p in policy.ARTIFACTS.values()},
+        ),
         "blockers": list(blockers),
         "comfy_python_present": True,
         "comfy_main_present": True,
@@ -150,11 +156,119 @@ class WorkflowClaimTests(unittest.TestCase):
                 with self.subTest(workflow=name, artifact=key):
                     self.assertIn(key, policy.ARTIFACTS)
 
-    def test_extra_paths_include_flux2_klein_layout(self):
-        text = policy.EXTRA_PATHS.read_text()
-        self.assertIn("flux2-klein-4b", text)
-        self.assertIn("flux2-klein-4b/vae", text)
-        self.assertIn("flux2-klein-4b/tokenizer", text)
+    def test_extra_paths_register_the_flux2_klein_subfolders(self):
+        """The publisher layout is only usable if each subfolder joins its category."""
+        paths = {category: [str(path) for path in entries]
+                 for category, entries in policy.search_paths().items()}
+        base = str(policy.ROOT / "models/comfy")
+        self.assertIn(f"{base}/flux2-klein-4b", paths["diffusion_models"])
+        self.assertIn(f"{base}/flux2-klein-4b/text_encoder", paths["text_encoders"])
+        self.assertIn(f"{base}/flux2-klein-4b/vae", paths["vae"])
+        # The flat tree stays first so the pre-existing lanes keep resolving.
+        self.assertEqual(f"{base}/vae", paths["vae"][0])
+
+
+def declared_only(path) -> bool:
+    """Existence oracle in which exactly the inventoried artifacts are installed."""
+    return str(path) in {str(known) for known in policy.ARTIFACTS.values()}
+
+
+class GraphResolutionTests(unittest.TestCase):
+    """A pinned graph names bare filenames; ComfyUI turns those into paths.
+
+    These run against the tracked search paths and the tracked inventory rather
+    than against this host's disk, so they keep working on a checkout with no
+    weights in it -- which is every checkout except this one.
+    """
+
+    def resolve(self, graphs=None):
+        return policy.resolve_graphs(
+            functional_gate.workflow_graphs() if graphs is None else graphs,
+            paths=policy.search_paths(), exists=declared_only)
+
+    def test_every_pinned_graph_reference_is_a_declared_artifact(self):
+        self.assertEqual([], policy.graph_problems(self.resolve()))
+
+    def test_flux2_graph_reuses_the_shared_qwen3_encoder(self):
+        """The editing lane really does depend on a generation-lane artifact."""
+        flux2 = [entry for entry in self.resolve() if entry["graph"] == "flux2-klein"]
+        self.assertEqual(1, len(flux2))
+        by_input = {reference["input"]: reference for reference in flux2[0]["references"]}
+        self.assertEqual("z-image-clip", by_input["clip_name"]["artifact_key"])
+        self.assertEqual("flux2-klein-vae", by_input["vae_name"]["artifact_key"])
+        self.assertIn("z-image-clip", policy.WORKFLOW_CLAIMS["image-editing"]["artifacts"])
+
+    def test_graph_references_cover_every_loader_input(self):
+        graph = {
+            "1": {"class_type": "UNETLoader", "inputs": {"unet_name": "u.safetensors"}},
+            "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "c.safetensors"}},
+            "3": {"class_type": "VAELoader", "inputs": {"vae_name": "v.safetensors"}},
+            "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "k.safetensors"}},
+            "5": {"class_type": "LoraLoaderModelOnly", "inputs": {"lora_name": "l.safetensors"}},
+            "6": {"class_type": "SaveImage", "inputs": {"filename_prefix": "out"}},
+        }
+        references = policy.graph_references(graph)
+        self.assertEqual(
+            ["diffusion_models", "text_encoders", "vae", "checkpoints", "loras"],
+            [reference["category"] for reference in references])
+
+    def test_missing_file_is_reported_not_ignored(self):
+        graph = {"1": {"class_type": "UNETLoader",
+                       "inputs": {"unet_name": "never_downloaded.safetensors"}}}
+        problems = policy.graph_problems(
+            self.resolve({"image-generation": {"synthetic": graph}}))
+        self.assertEqual(1, len(problems))
+        self.assertIn("not found under diffusion_models", problems[0])
+
+    def test_uninventoried_file_is_reported(self):
+        """A file ComfyUI can load but nothing verified is not admissible input."""
+        stray = policy.ROOT / "models/comfy/vae/unverified.safetensors"
+        graph = {"1": {"class_type": "VAELoader",
+                       "inputs": {"vae_name": "unverified.safetensors"}}}
+        resolution = policy.resolve_graphs(
+            {"image-generation": {"synthetic": graph}}, paths=policy.search_paths(),
+            exists=lambda path: str(path) == str(stray))
+        problems = policy.graph_problems(resolution)
+        self.assertEqual(1, len(problems))
+        self.assertIn("resolves to an uninventoried file", problems[0])
+
+    def test_undeclared_artifact_is_reported(self):
+        """Regression guard: a claim may not load weights it does not declare."""
+        graph = {"1": {"class_type": "CheckpointLoaderSimple",
+                       "inputs": {"ckpt_name": "ace_step_1.5_turbo_aio.safetensors"}}}
+        problems = policy.graph_problems(
+            self.resolve({"image-generation": {"synthetic": graph}}))
+        self.assertEqual(
+            ["image-generation: graph loads undeclared artifacts ['ace-step-1.5-aio']"],
+            problems)
+
+    def test_same_basename_in_two_search_paths_is_ambiguous(self):
+        """ComfyUI takes the first hit; a second hit is a silent coin flip."""
+        base = policy.ROOT / "models/comfy"
+        both = {str(base / "vae/ae.safetensors"),
+                str(base / "flux2-klein-4b/vae/ae.safetensors")}
+        graph = {"1": {"class_type": "VAELoader", "inputs": {"vae_name": "ae.safetensors"}}}
+        resolution = policy.resolve_graphs(
+            {"image-generation": {"synthetic": graph}}, paths=policy.search_paths(),
+            exists=lambda path: str(path) in both)
+        self.assertTrue(resolution[0]["references"][0]["ambiguous"])
+        self.assertIn("resolves to 2 files", policy.graph_problems(resolution)[0])
+
+    def test_unresolvable_graph_fails_the_static_preflight(self):
+        probe = healthy_probe()
+        probe["graph_resolution"] = self.resolve(
+            {"image-generation": {"synthetic": {"1": {
+                "class_type": "UNETLoader",
+                "inputs": {"unet_name": "never_downloaded.safetensors"}}}}})
+        report = preflight.build_report(probe)
+        self.assertFalse(report["pass"])
+        self.assertFalse(report["functional_gate_ready_now"])
+
+    def test_resolution_is_not_functional_proof(self):
+        report = preflight.build_report(healthy_probe())
+        self.assertTrue(report["pass"])
+        self.assertEqual([], report["workflows_functionally_proven"])
+        self.assertTrue(report["static_readiness_is_not_functional_qualification"])
 
 
 if __name__ == "__main__":

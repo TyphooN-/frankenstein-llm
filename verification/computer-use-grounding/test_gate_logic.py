@@ -287,6 +287,37 @@ class TestScoring(unittest.TestCase):
         # Both frames are close here, so assert only that a full-marks convention won.
         self.assertIn(convention, {"raw", "rescaled"})
 
+    def test_scorer_reads_the_action_space_it_is_given(self):
+        """The same scorer must grade the tool-calling challenger fairly.
+
+        UI-Mate answers with a tool call, not with ``Action:``. Scored under its
+        own action space the hit is a hit; scored under the default UI-TARS
+        grammar the identical, correctly grounded action reads as a refusal --
+        which is why the parameter exists rather than an assumed default.
+        """
+        cx, cy = self.control["center"]
+        raw = ("<think>\nThe Run Gate button.\n</think>\n<tool_call>\n<function=click>\n"
+               f"<parameter=coordinate>\n[{cx}, {cy}]\n</parameter>\n</function>\n</tool_call>")
+        scored = score_target(raw, self.control, (1280, 800), (1280, 800),
+                              "native", action_space="tool-call-xml")
+        self.assertEqual("click", scored["verb"])
+        self.assertTrue(scored["inside_raw"])
+        self.assertEqual("tool-call-xml", scored["action_space"])
+
+        misread = score_target(raw, self.control, (1280, 800), (1280, 800), "native")
+        self.assertEqual("uitars-text", misread["action_space"])
+        self.assertIsNone(misread["verb"])
+        self.assertFalse(misread["inside_raw"])
+
+    def test_default_action_space_is_unchanged(self):
+        cx, cy = self.control["center"]
+        raw = f"Action: click(start_box='<|box_start|>({cx},{cy})<|box_end|>')"
+        explicit = score_target(raw, self.control, (1280, 800), (1288, 812),
+                                "native", action_space="uitars-text")
+        self.assertEqual(
+            score_target(raw, self.control, (1280, 800), (1288, 812), "native"), explicit)
+        self.assertEqual("click", explicit["verb"])
+
     def test_json_mode_scoring(self):
         cx, cy = self.control["center"]
         result = score_target(json.dumps({"x": cx, "y": cy}), self.control,

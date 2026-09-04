@@ -29,12 +29,17 @@ def probe_environment() -> dict:
     built from a synthetic environment in tests. The gate still calls this for
     real; injection is for describing a host, not for inventing a verdict.
     """
+    # Imported here rather than at module scope so ``import preflight`` stays
+    # free of the imaging dependencies the executing gate needs.
+    import functional_gate
+
     return {
         "inventory": policy.artifact_inventory(),
         "nodes": [
             inspect_node_contract(name, path, policy.REQUIRED_NODE_IDS[name])
             for name, path in policy.REQUIRED_NODE_FILES.items()
         ],
+        "graph_resolution": policy.resolve_graphs(functional_gate.workflow_graphs()),
         "blockers": policy.host_exclusive_blockers(),
         "comfy_python_present": policy.COMFY_PYTHON.is_file(),
         "comfy_main_present": (policy.COMFY_ROOT / "main.py").is_file(),
@@ -46,10 +51,11 @@ def build_report(probe: dict | None = None) -> dict:
     probe = probe_environment() if probe is None else probe
     inventory = probe["inventory"]
     nodes = probe["nodes"]
+    resolution = probe["graph_resolution"]
     blockers = probe["blockers"]
     argv = policy.comfy_argv()
     env = policy.comfy_env()
-    problems = list(inventory["problems"])
+    problems = list(inventory["problems"]) + policy.graph_problems(resolution)
     if not probe["comfy_python_present"]:
         problems.append("ComfyUI venv interpreter missing")
     if not probe["comfy_main_present"]:
@@ -69,6 +75,7 @@ def build_report(probe: dict | None = None) -> dict:
         "throughput_measured": False,
         "artifacts": inventory,
         "node_contracts": nodes,
+        "graph_resolution": resolution,
         "gpu_roles": policy.GPU_ROLES,
         "visible_compute_devices": policy.VISIBLE_COMPUTE,
         "display_gpu_excluded": "2" not in env["HIP_VISIBLE_DEVICES"].split(","),

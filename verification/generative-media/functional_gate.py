@@ -226,6 +226,28 @@ def edit_workflow(image_name: str) -> dict:
     }
 
 
+def workflow_graphs() -> dict[str, dict[str, dict]]:
+    """Every pinned graph, keyed by the workflow claim that owns it.
+
+    The static preflight resolves these against the real ComfyUI search paths, so
+    they are exported from the module that actually submits them. A second copy
+    of a graph would let the checked one and the executed one drift apart, which
+    is the failure the check exists to catch.
+
+    ``edit_workflow`` needs an uploaded input name that only exists during a live
+    run; the placeholder below is never a weight reference, so it does not affect
+    resolution.
+    """
+    return {
+        "image-generation": {"z-image": z_image_workflow()},
+        "music-generation": {"ace-step": music_workflow()},
+        "image-editing": {
+            "qwen-image-edit": edit_workflow("static-resolution-placeholder.png"),
+            "flux2-klein": flux2_klein_workflow(),
+        },
+    }
+
+
 def atomic_write(report: dict) -> None:
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     temp = ARTIFACT.with_suffix(f".tmp.{os.getpid()}")

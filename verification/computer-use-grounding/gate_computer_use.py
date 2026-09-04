@@ -45,6 +45,7 @@ from culib import (  # noqa: E402
     rescale_point, smart_resize, unload_verdict, vram_used,
 )
 from gpu_telemetry import GpuTelemetry, summarize_records  # noqa: E402
+from groundlib import ACTION_SPACES  # noqa: E402
 from sandbox import SandboxScreen  # noqa: E402
 
 INPUT_DEVICE = 0  # headless RX 6900 XT; embeddings and vision encoder live here
@@ -349,10 +350,17 @@ def candidate_points(point, resized_size, original_size) -> dict:
     return {"raw": raw, "rescaled": rescale_point(point, resized_size, original_size)}
 
 
-def score_target(raw_text, control, original_size, resized_size, mode="native") -> dict:
-    """Grade one grounding response against a control's true rectangle."""
+def score_target(raw_text, control, original_size, resized_size, mode="native",
+                 action_space="uitars-text") -> dict:
+    """Grade one grounding response against a control's true rectangle.
+
+    ``action_space`` selects the grammar the answer is read with. It defaults to
+    the UI-TARS text form this gate was built for; the candidate that challenges
+    it answers in a tool-call form instead, and scoring that with the wrong
+    grammar would report a grounding miss for a correctly grounded action.
+    """
     if mode == "native":
-        parsed = parse_action(raw_text)
+        parsed = ACTION_SPACES[action_space]["parse"](raw_text)
         point, verb = parsed["point"], parsed["verb"]
         spelling, thought = parsed["spelling"], parsed["thought"]
     else:
@@ -364,6 +372,7 @@ def score_target(raw_text, control, original_size, resized_size, mode="native") 
         "label": control["label"],
         "box": control["box"],
         "mode": mode,
+        "action_space": action_space if mode == "native" else None,
         "raw": (raw_text or "").strip()[:400],
         "verb": verb,
         "spelling": spelling,

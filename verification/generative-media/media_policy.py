@@ -27,6 +27,7 @@ ARTIFACTS = {
     "qwen-image-edit-vae": ROOT / "models/comfy/vae/qwen_image_vae.safetensors",
     "qwen-image-edit-lora": ROOT / "models/comfy/loras/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
     "flux2-klein-unet": ROOT / "models/comfy/flux2-klein-4b/flux-2-klein-4b.safetensors",
+    "flux2-klein-vae": ROOT / "models/comfy/flux2-klein-4b/vae/diffusion_pytorch_model.safetensors",
 }
 
 REQUIRED_BYTES = {
@@ -39,6 +40,7 @@ REQUIRED_BYTES = {
     "qwen-image-edit-vae": 253806246,
     "qwen-image-edit-lora": 849608296,
     "flux2-klein-unet": 7751105712,
+    "flux2-klein-vae": 168120878,
 }
 
 # Workflow coverage claims, stated as data so a passing preflight cannot be read
@@ -58,12 +60,19 @@ WORKFLOW_CLAIMS = {
     },
     "image-editing": {
         "artifacts_present": True,
+        # Every file the pinned graphs load, not only the headline weights. The
+        # FLUX.2 Klein graph reuses the Z-Image Qwen3-4B text encoder rather than
+        # the publisher's sharded copy, so the editing lane really does depend on
+        # a file the generation lane owns; leaving that undeclared would let the
+        # preflight report the lane complete after the encoder was removed.
         "artifacts": [
             "qwen-image-edit-unet",
             "qwen-image-edit-clip",
             "qwen-image-edit-vae",
             "qwen-image-edit-lora",
             "flux2-klein-unet",
+            "flux2-klein-vae",
+            "z-image-clip",
         ],
         "functionally_proven": False,
         "note": "Qwen Image Edit 2511 INT8 + Lightning LoRA and FLUX.2 Klein 4B "
@@ -163,3 +172,143 @@ def artifact_inventory() -> dict:
         if not ok:
             problems.append(f"{key}: missing or wrong size")
     return {"files": files, "problems": problems, "pass": not problems}
+
+
+# ---------------------------------------------------------------------------
+# Static workflow resolution
+# ---------------------------------------------------------------------------
+# A pinned API graph names weights by bare filename. ComfyUI turns that name into
+# a path by searching the folders registered for the node's category, so a graph
+# and an inventory can agree on every number and still disagree about reality:
+# the graph can name a file that is not installed, extra_model_paths can leave
+# the folder a file lives in out of the category that needs it, or a claim can
+# list fewer artifacts than its own graph loads. None of that is visible from
+# file sizes, and all of it only surfaces as a node error during a live run --
+# which is exactly the run this host is not allowed to spend.
+#
+# Resolving the graphs against the real search paths is still static evidence. It
+# says the graph *could* load; it says nothing about whether the workflow works.
+GRAPH_FILE_INPUTS = {
+    "ckpt_name": "checkpoints",
+    "clip_name": "text_encoders",
+    "lora_name": "loras",
+    "unet_name": "diffusion_models",
+    "vae_name": "vae",
+}
+
+
+def search_paths() -> dict[str, list[Path]]:
+    """Model folders per category, as ComfyUI reads ``extra_model_paths.yaml``.
+
+    Each category value may hold several newline-separated relative paths; every
+    one of them is searched, so all of them are returned in declaration order.
+    """
+    import yaml
+
+    document = yaml.safe_load(EXTRA_PATHS.read_text()) or {}
+    paths: dict[str, list[Path]] = {}
+    for section in document.values():
+        if not isinstance(section, dict):
+            continue
+        base = Path(section.get("base_path", ""))
+        for category, value in section.items():
+            if category in ("base_path", "is_default") or not isinstance(value, str):
+                continue
+            for entry in value.split("\n"):
+                entry = entry.strip()
+                if entry:
+                    paths.setdefault(category, []).append(base / entry)
+    return paths
+
+
+def graph_references(graph: dict) -> list[dict]:
+    """Every weight file a graph names, with the category ComfyUI searches for it."""
+    references = []
+    for node_id, node in sorted(graph.items()):
+        for field, category in GRAPH_FILE_INPUTS.items():
+            filename = (node.get("inputs") or {}).get(field)
+            if isinstance(filename, str) and filename:
+                references.append({"node": node_id, "class_type": node.get("class_type"),
+                                   "input": field, "category": category,
+                                   "filename": filename})
+    return references
+
+
+def artifact_key_for(path: Path | str) -> str | None:
+    """Reverse-lookup an inventoried artifact key for a resolved path."""
+    resolved = str(path)
+    for key, known in ARTIFACTS.items():
+        if str(known) == resolved:
+            return key
+    return None
+
+
+def resolve_reference(reference: dict, paths: dict[str, list[Path]],
+                      exists=Path.is_file) -> dict:
+    """Locate one graph reference on disk and name the artifact it lands on.
+
+    ``exists`` is injectable for the same reason ``probe_environment`` is: the
+    question "do the pinned graphs, the search paths and the declared artifacts
+    agree" is answerable without 60 GB of weights, and a check that can only run
+    on this one populated host is a check that stops running.
+    """
+    candidates = [directory / reference["filename"]
+                  for directory in paths.get(reference["category"], [])]
+    matches = [candidate for candidate in candidates if exists(candidate)]
+    resolved = matches[0] if matches else None
+    return {
+        **reference,
+        "searched": [str(directory) for directory in paths.get(reference["category"], [])],
+        "matches": [str(match) for match in matches],
+        # ComfyUI takes the first hit, so a second hit is a silent coin flip
+        # between two different checkpoints with the same basename.
+        "ambiguous": len(matches) > 1,
+        "resolved": str(resolved) if resolved else None,
+        "artifact_key": artifact_key_for(resolved) if resolved else None,
+    }
+
+
+def resolve_graphs(graphs: dict[str, dict[str, dict]],
+                   paths: dict[str, list[Path]] | None = None,
+                   exists=Path.is_file) -> list[dict]:
+    """Resolve every pinned graph, grouped by the workflow claim that owns it."""
+    paths = search_paths() if paths is None else paths
+    resolved = []
+    for workflow, named in sorted(graphs.items()):
+        for label, graph in sorted(named.items()):
+            resolved.append({
+                "workflow": workflow,
+                "graph": label,
+                "references": [resolve_reference(reference, paths, exists)
+                               for reference in graph_references(graph)],
+            })
+    return resolved
+
+
+def graph_problems(resolutions: list[dict]) -> list[str]:
+    """Fail-closed reading of a graph resolution: unresolved, unknown, undeclared."""
+    problems = []
+    required: dict[str, set[str]] = {}
+    for entry in resolutions:
+        where = f"{entry['workflow']}/{entry['graph']}"
+        for reference in entry["references"]:
+            name = f"{where} node {reference['node']} {reference['input']}={reference['filename']}"
+            if reference["resolved"] is None:
+                problems.append(f"{name}: not found under {reference['category']} search paths")
+                continue
+            if reference["ambiguous"]:
+                problems.append(f"{name}: resolves to {len(reference['matches'])} files")
+            if reference["artifact_key"] is None:
+                problems.append(f"{name}: resolves to an uninventoried file")
+            else:
+                required.setdefault(entry["workflow"], set()).add(reference["artifact_key"])
+    for workflow, keys in sorted(required.items()):
+        claim = WORKFLOW_CLAIMS.get(workflow)
+        if claim is None:
+            problems.append(f"{workflow}: graph has no workflow claim")
+            continue
+        undeclared = sorted(keys - set(claim["artifacts"]))
+        if undeclared:
+            problems.append(
+                f"{workflow}: graph loads undeclared artifacts {undeclared}")
+    return problems
