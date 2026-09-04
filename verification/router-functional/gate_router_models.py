@@ -6,14 +6,28 @@ import base64
 import json
 import os
 from pathlib import Path
+import sys
 import time
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
+from candidate_policy import candidate_for_preset, tool_grant_allowed  # noqa: E402
+
 BASE = "http://127.0.0.1:8080"
-MODELS = ["ridge", "heretic", "obliterated", "fable", "phr00ty"]
-VISION_MODEL = "obliterated-vision"
+CHAT_MODELS = ["ridge", "heretic", "obliterated", "fable", "phr00ty",
+               "qwen3-coder-next", "gemma4-heretic"]
+VISION_MODELS = ["obliterated-vision", "gemma4-heretic-vision"]
 VISION_FIXTURE = Path("/home/typhoon/git/frankenstein-llm/verification/computer-use-grounding/fixtures/screen-app.png")
+
+# Not every preset is judged on the same contract. A preset the candidate policy
+# refuses tools to must not be sent a tools payload at all: demanding a tool call
+# from a reader either fails a model that is behaving correctly, or normalises
+# handing executable functions to weights that policy says never receive them.
+# The set is derived from the policy rather than restated, so a privilege change
+# cannot leave a stale check list behind.
+CORE_CHECKS = ("coherence", "structured_output", "tool_call")
+READER_CHECKS = ("coherence", "structured_output")
 OUT = Path(__file__).resolve().parent / "evidence"
 ARTIFACT = OUT / "router-functional.json"
 VRAM_TOLERANCE = 768 << 20
@@ -27,6 +41,14 @@ BLOCKED_WORKLOAD_MARKERS = (
     " cargo build",
     " cargo test",
 )
+
+
+def checks_for(model: str) -> tuple[str, ...]:
+    """The checks a preset must satisfy, and therefore whether it is offered tools."""
+    candidate = candidate_for_preset(model)
+    if candidate is not None and not tool_grant_allowed(candidate):
+        return READER_CHECKS
+    return CORE_CHECKS
 
 
 def http_json(path: str, payload: dict | None = None, timeout: int = 900) -> dict:
@@ -179,8 +201,11 @@ def record_release(result: dict, before: dict) -> None:
 
 
 def check_model(model: str) -> dict:
+    required = checks_for(model)
     before = sample("before")
-    result: dict = {"model": model, "before": before, "checks": {}, "problems": []}
+    result: dict = {"model": model, "before": before, "checks": {}, "problems": [],
+                    "required_checks": list(required),
+                    "tools_offered": "tool_call" in required}
     try:
         conflicts = blocked_workloads()
         if conflicts:
@@ -210,30 +235,35 @@ def check_model(model: str) -> dict:
             "parsed": parsed,
         }
 
-        tools = [{
-            "type": "function",
-            "function": {
-                "name": "lookup_ticket",
-                "description": "Look up one ticket by integer ID.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"ticket_id": {"type": "integer"}},
-                    "required": ["ticket_id"],
-                    "additionalProperties": False,
+        if "tool_call" in required:
+            tools = [{
+                "type": "function",
+                "function": {
+                    "name": "lookup_ticket",
+                    "description": "Look up one ticket by integer ID.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"ticket_id": {"type": "integer"}},
+                        "required": ["ticket_id"],
+                        "additionalProperties": False,
+                    },
                 },
-            },
-        }]
-        tool = chat(model, "Look up ticket 4172. Do not answer without using the tool.", tools=tools)
-        calls = tool["message"].get("tool_calls") or []
-        valid_call = False
-        if len(calls) == 1:
-            fn = calls[0].get("function", {})
-            try:
-                args = json.loads(fn.get("arguments", "{}"))
-            except json.JSONDecodeError:
-                args = None
-            valid_call = fn.get("name") == "lookup_ticket" and args == {"ticket_id": 4172}
-        result["checks"]["tool_call"] = {"pass": valid_call, "tool_calls": calls}
+            }]
+            tool = chat(model, "Look up ticket 4172. Do not answer without using the tool.", tools=tools)
+            calls = tool["message"].get("tool_calls") or []
+            valid_call = False
+            if len(calls) == 1:
+                fn = calls[0].get("function", {})
+                try:
+                    args = json.loads(fn.get("arguments", "{}"))
+                except json.JSONDecodeError:
+                    args = None
+                valid_call = fn.get("name") == "lookup_ticket" and args == {"ticket_id": 4172}
+            result["checks"]["tool_call"] = {"pass": valid_call, "tool_calls": calls}
+        else:
+            result["tool_policy"] = (
+                "low-privilege candidate: no tools payload was sent, so no tool-call "
+                "capability is claimed for this preset")
         result["metadata"] = model_metadata(model)
         result["loaded"] = sample("loaded")
     except Exception as error:  # noqa: BLE001 - every model must leave evidence
@@ -244,14 +274,15 @@ def check_model(model: str) -> dict:
         except Exception as error:  # noqa: BLE001
             result["problems"].append(f"unload error: {type(error).__name__}: {error}"[:500])
         record_release(result, before)
+    # A check that never ran is not a check that passed: the required set has to
+    # match exactly, so a section skipped by an early exception fails the model.
     result["pass"] = not result["problems"] and all(
         check.get("pass") is True for check in result["checks"].values()
-    ) and set(result["checks"]) == {"coherence", "structured_output", "tool_call"}
+    ) and set(result["checks"]) == set(required)
     return result
 
 
-def check_vision_model() -> dict:
-    model = VISION_MODEL
+def check_vision_model(model: str) -> dict:
     before = sample("before")
     result: dict = {"model": model, "before": before, "checks": {}, "problems": []}
     try:
@@ -307,15 +338,16 @@ def main() -> int:
         "models": [],
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
-    for model in MODELS:
+    for model in CHAT_MODELS:
         item = check_model(model)
         summary["models"].append(item)
         write_atomic(summary)
         print(f"{model}: {'PASS' if item['pass'] else 'FAIL'}", flush=True)
-    vision_item = check_vision_model()
-    summary["models"].append(vision_item)
-    write_atomic(summary)
-    print(f"{VISION_MODEL}: {'PASS' if vision_item['pass'] else 'FAIL'}", flush=True)
+    for model in VISION_MODELS:
+        vision_item = check_vision_model(model)
+        summary["models"].append(vision_item)
+        write_atomic(summary)
+        print(f"{model}: {'PASS' if vision_item['pass'] else 'FAIL'}", flush=True)
     summary["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
     summary["pass"] = all(item["pass"] for item in summary["models"])
     write_atomic(summary)

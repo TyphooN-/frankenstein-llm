@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # Run the bounded local repository-agent gate after GPU-heavy TTS completes.
+#
+# The lane is an A/B: the incumbent preset and the reviewed Qwen3-Coder-Next
+# candidate answer the same fixture under the same read-only oracle. They run one
+# after another because the router keeps a single model resident, and both run
+# even if the first fails -- a failing incumbent must not hide the candidate's
+# result, which is the whole point of qualifying the candidate.
 set -uo pipefail
 ROOT=/home/typhoon/git/frankenstein-llm
 GATE=$ROOT/verification/repository-agent/gate_repo_agent.py
 LOG=$ROOT/verification/repository-agent/evidence/repo-agent-runner.log
+MODELS=(heretic qwen3-coder-next)
 mkdir -p "$(dirname "$LOG")"
 exec >>"$LOG" 2>&1
 printf 'runner start %s\n' "$(date -Is)"
@@ -19,10 +26,16 @@ fi
 systemctl --user start llama-router.service
 for _ in $(seq 1 60); do
   if curl -fsS --max-time 5 http://127.0.0.1:8080/v1/models >/dev/null; then
-    python3 "$GATE"
-    rc=$?
-    printf 'runner end rc=%s %s\n' "$rc" "$(date -Is)"
-    exit "$rc"
+    worst=0
+    for model in "${MODELS[@]}"; do
+      printf 'repository agent model=%s start %s\n' "$model" "$(date -Is)"
+      python3 "$GATE" --model "$model"
+      rc=$?
+      printf 'repository agent model=%s rc=%s %s\n' "$model" "$rc" "$(date -Is)"
+      if [ "$rc" -ne 0 ]; then worst=$rc; fi
+    done
+    printf 'runner end rc=%s %s\n' "$worst" "$(date -Is)"
+    exit "$worst"
   fi
   sleep 2
 done

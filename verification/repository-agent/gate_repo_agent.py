@@ -18,11 +18,20 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import urllib.request
 
+sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
+from candidate_policy import candidate_for_preset, tool_grant_allowed  # noqa: E402
+
 ROUTER = "http://127.0.0.1:8080/v1/chat/completions"
-MODEL = "heretic"
+# The incumbent preset and the reviewed repository-agent candidate. The A/B runs
+# them one after another through the same fixture and the same oracle; the router
+# keeps a single model resident, so they never overlap.
+DEFAULT_MODEL = "heretic"
+CANDIDATE_MODEL = "qwen3-coder-next"
+ALLOWED_MODELS = (DEFAULT_MODEL, CANDIDATE_MODEL)
 MAX_TURNS = 8
 MAX_FILE_BYTES = 64 * 1024
 SOURCE_FIXTURE = Path(__file__).resolve().parent / "fixture"
@@ -88,9 +97,32 @@ def execute_tool(root: Path, name: str, arguments: dict,
     raise ValueError(f"unknown tool: {name}")
 
 
-def router_call(messages: list[dict]) -> dict:
+def resolve_model(model: str) -> str:
+    """Refuse any preset that is not an admitted repository-agent lane.
+
+    Two independent refusals, both fail-closed, and the privilege rule is checked
+    first so it is the reason that gets reported. A model admitted elsewhere as a
+    low-privilege reader -- Gemma-4 Heretic, for instance -- is refused *because
+    of its privilege tier*, which stays true even if someone later widens the
+    allowlist. Anything else outside the allowlist is refused as unreviewed:
+    this gate hands out ``write_file`` and ``run_tests``, and a preset with no
+    privilege decision behind it does not get them by default.
+    """
+    candidate = candidate_for_preset(model)
+    if candidate is not None and not tool_grant_allowed(candidate):
+        raise SystemExit(
+            f"{model!r} is a low-privilege candidate; this gate grants executable "
+            "tools and must never be pointed at one")
+    if model not in ALLOWED_MODELS:
+        raise SystemExit(
+            f"{model!r} is not an admitted repository-agent preset; expected one of "
+            f"{list(ALLOWED_MODELS)}")
+    return model
+
+
+def router_call(messages: list[dict], model: str = DEFAULT_MODEL) -> dict:
     payload = {
-        "model": MODEL,
+        "model": model,
         "messages": messages,
         "tools": TOOLS,
         "tool_choice": "auto",
@@ -146,7 +178,10 @@ def run_agent(root: Path, call=router_call) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--workspace", help="existing disposable workspace; otherwise create a temporary copy")
+    parser.add_argument("--model", default=DEFAULT_MODEL,
+                        help=f"router preset to qualify; one of {list(ALLOWED_MODELS)}")
     args = parser.parse_args()
+    model = resolve_model(args.model)
     temporary = None
     if args.workspace:
         root = Path(args.workspace).resolve()
@@ -156,10 +191,12 @@ def main() -> int:
         temporary = tempfile.TemporaryDirectory(prefix="hermes-repo-agent-")
         root = Path(temporary.name) / "fixture"
         shutil.copytree(SOURCE_FIXTURE, root)
-    result = run_agent(root)
-    result.update({"gate": "local-repository-agent", "model": MODEL, "router": ROUTER, "workspace": str(root), "throughput_measured": False})
+    result = run_agent(root, lambda messages: router_call(messages, model))
+    result.update({"gate": "local-repository-agent", "model": model, "router": ROUTER, "workspace": str(root), "throughput_measured": False})
     EVIDENCE.mkdir(parents=True, exist_ok=True)
-    (EVIDENCE / "gate-repo-agent.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    # One artifact per preset: an A/B that overwrites its own baseline proves
+    # nothing about which model produced the repair.
+    (EVIDENCE / f"gate-repo-agent-{model}.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["pass"] else 1
 

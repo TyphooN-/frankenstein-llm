@@ -61,6 +61,8 @@ UPSTREAM = (
     (FOUNDATION / "download-state-phase4.json", FOUNDATION / "downloads-phase4-complete.ok", "98653778996"),
 )
 STEPS = (
+    ("candidate-policy", [sys.executable, str(
+        ROOT / "verification/candidate-qualification/gate_candidate_policy.py")]),
     ("router-reload-presets", ["/usr/bin/systemctl", "--user", "restart", "llama-router.service"]),
     ("router-models", [sys.executable, str(ROOT / "verification/router-functional/gate_router_models.py")]),
     ("embeddings", [sys.executable, str(FOUNDATION / "validators/gate_embeddings.py")]),

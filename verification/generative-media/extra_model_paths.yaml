@@ -1,10 +1,22 @@
 # Local ComfyUI extra paths. Not installed into the ComfyUI git checkout.
 # Pass with --extra-model-paths-config. Loopback gates only; no downloads.
+#
+# FLUX.2-klein-4B is installed in the publisher's own layout: a native ComfyUI
+# transformer at the repository root plus Diffusers subfolders for the encoder,
+# tokenizer and VAE. Rather than copying files into the flat ComfyUI tree, the
+# subfolders are added as additional search paths for the categories they belong
+# to. ComfyUI splits each value on newlines and searches every entry.
 frankenstein:
     base_path: /home/typhoon/git/frankenstein-llm/models/comfy
     is_default: true
     checkpoints: checkpoints
-    diffusion_models: diffusion_models
-    text_encoders: text_encoders
-    vae: vae
+    diffusion_models: |
+        diffusion_models
+        flux2-klein-4b
+    text_encoders: |
+        text_encoders
+        flux2-klein-4b/text_encoder
+    vae: |
+        vae
+        flux2-klein-4b/vae
     loras: loras

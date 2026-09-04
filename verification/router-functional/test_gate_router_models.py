@@ -54,15 +54,103 @@ class RouterFunctionalGateTests(unittest.TestCase):
             patch.object(module, "blocked_workloads", return_value=[]),
             patch.object(module, "chat", side_effect=fake_chat),
             patch.object(module, "http_json", return_value={
-                "data": [{"id": module.VISION_MODEL}],
+                "data": [{"id": module.VISION_MODELS[0]}],
             }),
             patch.object(module, "unload") as unload,
         ):
-            result = module.check_vision_model()
+            result = module.check_vision_model(module.VISION_MODELS[0])
 
         self.assertTrue(result["pass"])
         self.assertTrue(captured[0]["image_url"]["url"].startswith("data:image/png;base64,"))
-        unload.assert_called_once_with(module.VISION_MODEL)
+        unload.assert_called_once_with(module.VISION_MODELS[0])
+
+
+class PrivilegeProfileTests(unittest.TestCase):
+    """A preset policy refuses tools to must never be sent a tools payload."""
+
+    def test_incumbent_chat_presets_are_still_judged_on_tool_use(self):
+        for model in ("ridge", "heretic", "obliterated", "fable", "phr00ty"):
+            with self.subTest(model=model):
+                self.assertEqual(module.CORE_CHECKS, module.checks_for(model))
+
+    def test_the_repository_agent_candidate_keeps_the_tool_contract(self):
+        self.assertIn("tool_call", module.checks_for("qwen3-coder-next"))
+
+    def test_the_low_privilege_candidate_is_never_offered_tools(self):
+        for model in ("gemma4-heretic", "gemma4-heretic-vision"):
+            with self.subTest(model=model):
+                self.assertEqual(module.READER_CHECKS, module.checks_for(model))
+                self.assertNotIn("tool_call", module.checks_for(model))
+
+    def test_a_reader_run_sends_no_tools_and_claims_no_tool_capability(self):
+        samples = [
+            {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0, "vram_used_bytes": {"card0": 0}},
+            {"mem_available_bytes": 40 << 30, "swap_used_bytes": 0, "vram_used_bytes": {"card0": 4 << 30}},
+            {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0, "vram_used_bytes": {"card0": 0}},
+        ]
+        offered: list[object] = []
+
+        def fake_chat(model, prompt, *, schema=None, tools=None):
+            offered.append(tools)
+            content = "PONG" if schema is None else '{"status": "ready", "count": 3}'
+            return {"message": {"content": content}}
+
+        with (
+            patch.object(module, "sample", side_effect=samples),
+            patch.object(module, "blocked_workloads", return_value=[]),
+            patch.object(module, "chat", side_effect=fake_chat),
+            patch.object(module, "http_json", return_value={"data": [{"id": "gemma4-heretic"}]}),
+            patch.object(module, "unload"),
+        ):
+            result = module.check_model("gemma4-heretic")
+
+        self.assertTrue(result["pass"])
+        self.assertFalse(result["tools_offered"])
+        self.assertEqual([None, None], offered, "a tools payload reached a low-privilege preset")
+        self.assertNotIn("tool_call", result["checks"])
+        self.assertIn("tool_policy", result)
+
+    def test_a_missing_required_check_still_fails_the_model(self):
+        # The required set is compared exactly, so a section that never ran
+        # cannot be mistaken for one that passed.
+        samples = [
+            {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0, "vram_used_bytes": {"card0": 0}},
+            {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0, "vram_used_bytes": {"card0": 0}},
+        ]
+
+        def fake_chat(model, prompt, *, schema=None, tools=None):
+            if schema is not None:
+                raise RuntimeError("router dropped the request")
+            return {"message": {"content": "PONG"}}
+
+        with (
+            patch.object(module, "sample", side_effect=samples),
+            patch.object(module, "blocked_workloads", return_value=[]),
+            patch.object(module, "chat", side_effect=fake_chat),
+            patch.object(module, "http_json", return_value={"data": [{"id": "gemma4-heretic"}]}),
+            patch.object(module, "unload"),
+        ):
+            result = module.check_model("gemma4-heretic")
+
+        self.assertFalse(result["pass"])
+        self.assertNotIn("structured_output", result["checks"])
+
+
+class ModelCoverageTests(unittest.TestCase):
+    """The presets this gate qualifies must exist in the router preset file."""
+
+    PRESETS = Path("/home/typhoon/git/frankenstein-llm/llama-models.ini").read_text()
+
+    def test_every_gated_preset_is_declared(self):
+        for model in list(module.CHAT_MODELS) + list(module.VISION_MODELS):
+            with self.subTest(model=model):
+                self.assertIn(f"[{model}]", self.PRESETS)
+
+    def test_the_fim_preset_is_not_displaced_by_the_coder_candidate(self):
+        # Qwen3-Coder-Next is a repository-agent candidate, not a completion
+        # model. Losing the FIM preset would silently remove /infill coverage.
+        self.assertIn("[qwen25-coder-7b-fim]", self.PRESETS)
+        self.assertIn("[qwen3-coder-next]", self.PRESETS)
 
 
 class ReleaseAccountingTests(unittest.TestCase):

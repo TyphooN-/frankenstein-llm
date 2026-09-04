@@ -57,7 +57,14 @@ Q4_K_M, Gemma-4 Heretic Q6_K with its projector, UI-Mate-9B, WeMM-Embedding-2B,
 and the non-duplicated FLUX.2-klein-4B runtime files. Qwen3-ASR-1.7B is not
 duplicated because the same pinned revision was already verified by phase one.
 The mission supervisor treats successful phase-four completion as a prerequisite
-for subsequent serialized functional qualification.
+for subsequent serialized functional qualification. It then runs the non-inference
+candidate policy gate before loading anything. That gate verifies manifest-backed
+inventory, the phase-one ASR deduplication claim, distinct text/multimodal vector
+spaces, privilege boundaries, and the exact reviewed WeMM remote-code digests.
+See `verification/candidate-qualification/README.md`. A passing policy gate is
+not a functional model verdict: UI-Mate grounding, WeMM retrieval, FLUX.2
+workflows, and all candidate load/behavior/unload checks still require their live
+serialized gates.
 
 ## Runtime
 

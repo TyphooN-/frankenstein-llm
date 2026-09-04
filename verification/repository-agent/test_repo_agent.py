@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import unittest.mock
 
 import gate_repo_agent as gate
 
@@ -107,6 +108,52 @@ class RepoAgentTests(unittest.TestCase):
         self.assertTrue(result["pass"])
         self.assertFalse(result["oracle_tampered"])
         self.assertEqual(gate.oracle_digest(self.root), result["oracle_sha256"])
+
+
+class ModelSelectionTests(unittest.TestCase):
+    """This gate hands out executable tools, so it is picky about who gets them."""
+
+    def test_the_incumbent_and_the_reviewed_candidate_are_both_admitted(self):
+        for model in ("heretic", "qwen3-coder-next"):
+            with self.subTest(model=model):
+                self.assertEqual(model, gate.resolve_model(model))
+
+    def test_an_unlisted_preset_is_refused(self):
+        for model in ("ridge", "phr00ty", "", "../heretic"):
+            with self.subTest(model=model):
+                with self.assertRaises(SystemExit):
+                    gate.resolve_model(model)
+
+    def test_a_low_privilege_candidate_can_never_be_selected(self):
+        # Gemma-4 Heretic is admitted elsewhere as a multimodal reader. Routing
+        # it here would hand ablated weights write_file and run_tests.
+        for model in ("gemma4-heretic", "gemma4-heretic-vision"):
+            with self.subTest(model=model):
+                with self.assertRaises(SystemExit) as refused:
+                    gate.resolve_model(model)
+                self.assertIn("low-privilege", str(refused.exception))
+
+    def test_the_selected_model_reaches_the_router_payload(self):
+        captured: dict = {}
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self):
+                return json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
+
+        def fake_urlopen(request, timeout=None):
+            captured["payload"] = json.loads(request.data)
+            return FakeResponse()
+
+        with unittest.mock.patch.object(gate.urllib.request, "urlopen", fake_urlopen):
+            gate.router_call([{"role": "user", "content": "hi"}], "qwen3-coder-next")
+        self.assertEqual("qwen3-coder-next", captured["payload"]["model"])
+        self.assertEqual(gate.TOOLS, captured["payload"]["tools"])
 
 
 if __name__ == "__main__":
