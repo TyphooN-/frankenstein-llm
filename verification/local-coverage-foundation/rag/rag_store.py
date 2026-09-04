@@ -16,14 +16,19 @@ Deliberate constraints:
 from __future__ import annotations
 
 import argparse
+from fnmatch import fnmatchcase
 import hashlib
 from html.parser import HTMLParser
+from io import BytesIO
+import importlib
 import json
 import os
 from pathlib import Path
 import sqlite3
 import time
 import urllib.request
+from xml.etree import ElementTree
+import zipfile
 
 import numpy as np
 
@@ -39,9 +44,66 @@ MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_CONTEXT_CHARS = 12000
 MAX_CONTEXT_CHUNKS = 12
 EMBED_BATCH = 8
-DEFAULT_INGEST_PATTERNS = ("*.md", "*.txt", "*.html", "*.htm")
+# A zip container states its own uncompressed sizes, so an 8 MB .docx can claim
+# to hold gigabytes. Extraction is capped independently of MAX_FILE_BYTES and the
+# claim is checked before any member is read.
+MAX_EXPANDED_BYTES = 64 * 1024 * 1024
+MAX_ARCHIVE_MEMBERS = 4096
+# Bytes that decode to U+FFFD are the signature of something that is not UTF-8
+# text. One stray byte in a long note is tolerable; a file made of them is a
+# binary that would otherwise be embedded and later cited as a document.
+MAX_REPLACEMENT_RATIO = 0.01
+
 TEXT_SUFFIXES = {".md", ".txt", ".rst"}
 HTML_SUFFIXES = {".html", ".htm"}
+
+# Office Open XML containers this module extracts with the standard library
+# alone: the part whose text is wanted, and the tag that holds the runs. No
+# third-party dependency, so these are extractable on any host that can run the
+# store at all.
+OOXML_PARTS = {
+    ".docx": ("word/document.xml", "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"),
+    ".pptx": ("ppt/slides/slide*.xml", "{http://schemas.openxmlformats.org/drawingml/2006/main}t"),
+    # Cells hold indices into a shared string table; formulas and numbers are not
+    # document text and are deliberately not reconstructed here.
+    ".xlsx": ("xl/sharedStrings.xml", "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t"),
+}
+
+# Formats a caller may reasonably hand this store that need something that is not
+# installed here. Declaring them is not a claim that they can be indexed: the
+# extractor is resolved by actually importing it, and an entry that does not
+# import is refused. The table exists because "no PDF extractor is installed" and
+# "a PNG is not a document" are different answers, and only the first is
+# actionable by whoever is looking at the skip.
+OPTIONAL_EXTRACTORS = {
+    ".pdf": "pypdf",
+}
+
+# Image formats the workspace can read only through the local OCR sidecar. No
+# in-process adapter exists, so they are refused with the reason named rather
+# than being silently lumped in with "unsupported". Wiring OCR ingestion would
+# mean a running service and a live gate, which is not something this module may
+# assume; until then the honest answer is that the text is not available here.
+OCR_SUFFIXES = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
+
+# Swept by default: every suffix this module can extract without a service. The
+# tuple is derived rather than restated so a new extractor cannot land with the
+# sweep still ignoring its files. OCR image types stay out -- a sweep that
+# reported one skip per screenshot would bury the results that matter.
+DEFAULT_INGEST_PATTERNS = tuple(
+    f"*{suffix}" for suffix in sorted(
+        TEXT_SUFFIXES | HTML_SUFFIXES | set(OOXML_PARTS) | set(OPTIONAL_EXTRACTORS))
+)
+
+# Machine-readable reasons a file did not enter the index. ``ingest_file`` reports
+# these verbatim so a sweep result can be triaged without re-reading the file.
+SKIP_UNSUPPORTED = "unsupported file type"
+SKIP_BINARY = "binary content in a text-typed file"
+SKIP_EMPTY = "no extractable text"
+SKIP_OVERSIZED_ARCHIVE = "archive expands beyond the extraction cap"
+SKIP_CORRUPT_ARCHIVE = "container could not be opened"
+SKIP_OPTIONAL_UNAVAILABLE = "optional extractor unavailable"
+SKIP_OCR_REQUIRED = "OCR sidecar required"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS documents (
@@ -102,21 +164,90 @@ class _VisibleHTMLText(HTMLParser):
             self.parts.append(data)
 
 
-def extract_text(path: Path, data: bytes) -> str | None:
-    """Return visible text, or None when the file must not enter the index.
+def _decoded_text(data: bytes) -> tuple[str | None, str | None]:
+    text = data.decode("utf-8", errors="replace")
+    if text.count("\ufffd") / max(1, len(text)) > MAX_REPLACEMENT_RATIO:
+        return None, SKIP_BINARY
+    return text, None
 
-    Unknown binary types are skipped rather than UTF-8-replaced into garbage
-    chunks that would later be cited as documents.
-    """
+
+def _ooxml_text(suffix: str, data: bytes) -> tuple[str | None, str | None]:
+    pattern, text_tag = OOXML_PARTS[suffix]
+    try:
+        with zipfile.ZipFile(BytesIO(data)) as archive:
+            infos = archive.infolist()
+            if len(infos) > MAX_ARCHIVE_MEMBERS or sum(info.file_size for info in infos) > MAX_EXPANDED_BYTES:
+                return None, SKIP_OVERSIZED_ARCHIVE
+            names = sorted(
+                info.filename for info in infos
+                if info.filename == pattern or fnmatchcase(info.filename, pattern)
+            )
+            if not names:
+                return None, SKIP_EMPTY
+            parts: list[str] = []
+            for name in names:
+                payload = archive.read(name)
+                # ElementTree does not fetch external entities, but rejecting
+                # declarations also bounds internal entity expansion.
+                upper = payload[:4096].upper()
+                if b"<!DOCTYPE" in upper or b"<!ENTITY" in upper:
+                    return None, SKIP_CORRUPT_ARCHIVE
+                root = ElementTree.fromstring(payload)
+                parts.extend(
+                    node.text.strip() for node in root.iter(text_tag)
+                    if node.text and node.text.strip()
+                )
+    except (OSError, RuntimeError, zipfile.BadZipFile, KeyError, ElementTree.ParseError):
+        return None, SKIP_CORRUPT_ARCHIVE
+    text = " ".join(parts)
+    return (text, None) if text else (None, SKIP_EMPTY)
+
+
+def _pdf_text(data: bytes) -> tuple[str | None, str | None]:
+    try:
+        pypdf = importlib.import_module(OPTIONAL_EXTRACTORS[".pdf"])
+    except ImportError:
+        return None, f"{SKIP_OPTIONAL_UNAVAILABLE}: pypdf"
+    try:
+        reader = pypdf.PdfReader(BytesIO(data), strict=False)
+        parts = [text for page in reader.pages if (text := page.extract_text())]
+    except Exception:  # pypdf exposes backend/version-specific parse exceptions
+        return None, SKIP_CORRUPT_ARCHIVE
+    text = "\n".join(parts).strip()
+    return (text, None) if text else (None, SKIP_EMPTY)
+
+
+def extract_text_with_reason(path: Path, data: bytes) -> tuple[str | None, str | None]:
+    """Return extracted text and a stable reason when extraction is refused."""
     suffix = path.suffix.lower()
     if suffix in TEXT_SUFFIXES:
-        return data.decode("utf-8", errors="replace")
+        text, reason = _decoded_text(data)
+        if reason:
+            return None, reason
+        assert text is not None
+        stripped = text.strip()
+        return (stripped, None) if stripped else (None, SKIP_EMPTY)
     if suffix in HTML_SUFFIXES:
+        decoded, reason = _decoded_text(data)
+        if reason:
+            return None, reason
+        assert decoded is not None
         parser = _VisibleHTMLText()
-        parser.feed(data.decode("utf-8", errors="replace"))
+        parser.feed(decoded)
         text = " ".join(part.strip() for part in parser.parts if part.strip())
-        return text or None
-    return None
+        return (text, None) if text else (None, SKIP_EMPTY)
+    if suffix in OOXML_PARTS:
+        return _ooxml_text(suffix, data)
+    if suffix == ".pdf":
+        return _pdf_text(data)
+    if suffix in OCR_SUFFIXES:
+        return None, SKIP_OCR_REQUIRED
+    return None, SKIP_UNSUPPORTED
+
+
+def extract_text(path: Path, data: bytes) -> str | None:
+    """Compatibility wrapper returning only visible text."""
+    return extract_text_with_reason(path, data)[0]
 
 
 def chunk_text(text: str) -> list[tuple[int, int, str]]:
@@ -170,8 +301,6 @@ def ingest_file(connection: sqlite3.Connection, path: Path) -> dict:
     """Insert or update one document. Returns what actually changed."""
     resolved = str(path.resolve())
     data = path.read_bytes()
-    if len(data) > MAX_FILE_BYTES:
-        return {"path": resolved, "action": "skipped", "reason": f"exceeds {MAX_FILE_BYTES} bytes"}
     digest = sha256_bytes(data)
     stat = path.stat()
 
@@ -181,9 +310,21 @@ def ingest_file(connection: sqlite3.Connection, path: Path) -> dict:
     if row and row["content_sha256"] == digest and row["deleted_at"] is None:
         return {"path": resolved, "action": "unchanged", "doc_id": row["doc_id"]}
 
-    text = extract_text(path, data)
+    reason = f"exceeds {MAX_FILE_BYTES} bytes" if len(data) > MAX_FILE_BYTES else None
+    text = None
+    if reason is None:
+        text, reason = extract_text_with_reason(path, data)
     if text is None:
-        return {"path": resolved, "action": "skipped", "reason": "unsupported or non-text file"}
+        result = {"path": resolved, "action": "skipped", "reason": reason or SKIP_EMPTY}
+        if row and row["deleted_at"] is None:
+            with connection:
+                connection.execute("DELETE FROM chunks WHERE doc_id = ?", (row["doc_id"],))
+                connection.execute(
+                    "UPDATE documents SET deleted_at = ? WHERE doc_id = ?",
+                    (time.strftime("%Y-%m-%dT%H:%M:%S%z"), row["doc_id"]),
+                )
+            result["retired_doc_id"] = row["doc_id"]
+        return result
     spans = chunk_text(text)
     if not spans:
         return {"path": resolved, "action": "skipped", "reason": "no extractable text"}
