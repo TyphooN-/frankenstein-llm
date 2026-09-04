@@ -42,9 +42,9 @@ class PromptCorpusAdmissionTests(unittest.TestCase):
         data = self.artifact.read_bytes()
         return {
             "schema": admit.ARTIFACT_SCHEMA,
-            "source_id": "phtest",
-            "revision": "edb80210812ecc7dab2219aa2e70921710c01888",
-            "suite": "false-refusal",
+            "source_id": "jailbreakbench-behaviors",
+            "revision": "886acc352a31533ffbcf4ef22c744658688086fc",
+            "suite": "benign-utility",
             "artifact_path": self.artifact.name,
             "format": "jsonl",
             "bytes": len(data),
@@ -61,7 +61,10 @@ class PromptCorpusAdmissionTests(unittest.TestCase):
 
     def test_tracked_catalog_is_valid_and_has_expected_dispositions(self) -> None:
         sources = admit.load_catalog()
-        self.assertEqual(sources["phtest"]["disposition"], "candidate")
+        self.assertEqual(sources["phtest"]["disposition"], "reference-only")
+        self.assertEqual(sources["phtest"]["license_status"], "missing")
+        self.assertEqual(sources["jailbreakbench-behaviors"]["license_spdx"],
+                         "CC-BY-4.0")
         self.assertEqual(sources["agentdojo"]["suites"], ["tool-integrity"])
         self.assertEqual(sources["dobliuw-prompts"]["disposition"], "rejected")
         self.assertEqual(sources["the-big-prompt-library"]["execution_policy"],
@@ -72,7 +75,7 @@ class PromptCorpusAdmissionTests(unittest.TestCase):
         self.assertEqual(result["status"], "admitted")
         self.assertEqual(result["rows"], 2)
         self.assertEqual(result["execution_policy"], "inert-text-only")
-        self.assertEqual(result["source_id"], "phtest")
+        self.assertEqual(result["source_id"], "jailbreakbench-behaviors")
 
     def test_unknown_manifest_fields_fail_closed(self) -> None:
         document = self._manifest_document()
@@ -100,6 +103,15 @@ class PromptCorpusAdmissionTests(unittest.TestCase):
             "source_id": "offensive-ai-compilation",
             "revision": "48954374ba6cc5a123b5769b98783987e85047cb",
             "suite": "reference-catalog",
+        })
+        with self.assertRaisesRegex(admit.AdmissionError, "not approved"):
+            admit.validate_artifact(self.manifest, corpus_root=self.root)
+
+    def test_missing_license_source_cannot_be_admitted(self) -> None:
+        self._write_manifest({
+            "source_id": "phtest",
+            "revision": "edb80210812ecc7dab2219aa2e70921710c01888",
+            "suite": "false-refusal",
         })
         with self.assertRaisesRegex(admit.AdmissionError, "not approved"):
             admit.validate_artifact(self.manifest, corpus_root=self.root)

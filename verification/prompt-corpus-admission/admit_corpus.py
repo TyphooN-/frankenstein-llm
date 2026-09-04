@@ -38,7 +38,7 @@ SOURCE_KEYS = {
     "disposition", "suites", "execution_policy", "reason",
 }
 DISPOSITIONS = {"candidate", "reference-only", "rejected"}
-LICENSE_STATUSES = {"verified", "unverified", "mixed-or-incomplete"}
+LICENSE_STATUSES = {"verified", "missing", "unverified", "mixed-or-incomplete"}
 SUITES = {
     "false-refusal", "harmful-refusal", "benign-utility", "tool-integrity",
     "multimodal-safety", "response-judge", "mcp-tool-integrity",

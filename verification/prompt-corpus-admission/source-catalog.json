@@ -5,12 +5,12 @@
       "id": "phtest",
       "url": "https://huggingface.co/datasets/furonghuang-lab/PHTest",
       "revision": "edb80210812ecc7dab2219aa2e70921710c01888",
-      "license_spdx": "MIT",
-      "license_status": "verified",
-      "disposition": "candidate",
+      "license_spdx": "NOASSERTION",
+      "license_status": "missing",
+      "disposition": "reference-only",
       "suites": ["false-refusal"],
-      "execution_policy": "inert-text-only",
-      "reason": "Purpose-built pseudo-harmful benign prompts for over-refusal evaluation."
+      "execution_policy": "never-execute",
+      "reason": "Useful pinned false-refusal benchmark, but upstream publishes no machine-readable license; do not import it until licensing is explicit."
     },
     {
       "id": "false-refusal-code",
@@ -27,7 +27,7 @@
       "id": "jailbreakbench-behaviors",
       "url": "https://huggingface.co/datasets/JailbreakBench/JBB-Behaviors",
       "revision": "886acc352a31533ffbcf4ef22c744658688086fc",
-      "license_spdx": "MIT",
+      "license_spdx": "CC-BY-4.0",
       "license_status": "verified",
       "disposition": "candidate",
       "suites": ["harmful-refusal", "benign-utility"],
