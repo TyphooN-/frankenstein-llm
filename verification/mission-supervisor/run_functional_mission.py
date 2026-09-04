@@ -9,6 +9,7 @@ mission still fails closed.
 """
 from __future__ import annotations
 
+from collections import Counter
 import fcntl
 import hashlib
 import json
@@ -28,6 +29,8 @@ FOUNDATION = ROOT / "verification" / "local-coverage-foundation"
 MIN_AVAILABLE = 32 << 30
 MAX_LOAD = 6.0
 POLL_SECONDS = 30
+BLOCKER_LOG_REPEAT_SECONDS = 600
+CONFLICT_SAMPLE_LIMIT = 8
 
 
 def quiet_timeout(raw: str | None) -> int:
@@ -357,9 +360,23 @@ def wait_for_inputs(state: dict) -> None:
         time.sleep(POLL_SECONDS)
 
 
+def summarize_conflicts(active: list[dict], sample_limit: int = CONFLICT_SAMPLE_LIMIT) -> str:
+    """Bound a potentially huge compiler fan-out for logs and timeout errors."""
+    counts = Counter(str(item.get("reason", "unknown")) for item in active)
+    by_reason = ",".join(f"{name}:{counts[name]}" for name in sorted(counts))
+    sample = [
+        f"{item.get('pid')}:{item.get('command')}:{item.get('reason')}"
+        for item in active[:sample_limit]
+    ]
+    omitted = max(0, len(active) - len(sample))
+    return (f"count={len(active)} by_reason={{{by_reason}}} "
+            f"sample={sample} omitted={omitted}")
+
+
 def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
     quiet = 0
-    last = None
+    last_key = None
+    last_logged = float("-inf")
     deadline = time.monotonic() + timeout
     while quiet < 2:
         active = conflicts()
@@ -367,7 +384,7 @@ def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
         load = os.getloadavg()[0]
         reasons = []
         if active:
-            reasons.append(f"conflicts={active}")
+            reasons.append(f"conflicts={summarize_conflicts(active)}")
         if available < MIN_AVAILABLE:
             reasons.append(f"MemAvailable={available}")
         if load > MAX_LOAD:
@@ -375,11 +392,19 @@ def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
         if reasons:
             quiet = 0
             detail = "; ".join(reasons)
-            if detail != last:
+            key = (
+                tuple(sorted({str(item.get("reason", "unknown")) for item in active})),
+                available < MIN_AVAILABLE,
+                load > MAX_LOAD,
+            )
+            observed = time.monotonic()
+            if key != last_key or observed - last_logged >= BLOCKER_LOG_REPEAT_SECONDS:
                 log(f"waiting for safe host: {detail}")
-                last = detail
+                last_key = key
+                last_logged = observed
         else:
             quiet += 1
+            last_key = None
             log(f"safe-host quiet poll {quiet}/2 MemAvailable={available} load1={load:.2f}")
         state.update({"status": "waiting-safe-host", "updated_at": now()})
         atomic_json(state)

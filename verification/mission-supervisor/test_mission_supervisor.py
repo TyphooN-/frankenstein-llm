@@ -90,13 +90,14 @@ class QuietWaitTests(SupervisorTestCase):
             self.clock[0] += seconds
 
         conflicts = mock.Mock(side_effect=list(polls))
+        self.log = mock.Mock()
         return (
             mock.patch.object(self.supervisor, "conflicts", conflicts),
             mock.patch.object(self.supervisor, "mem_available", return_value=available),
             mock.patch.object(self.supervisor.os, "getloadavg", return_value=(load, load, load)),
             mock.patch.object(self.supervisor.time, "sleep", fake_sleep),
             mock.patch.object(self.supervisor.time, "monotonic", lambda: self.clock[0]),
-            mock.patch.object(self.supervisor, "log"),
+            mock.patch.object(self.supervisor, "log", self.log),
         )
 
     def run_wait(self, polls, timeout, state=None, **kwargs):
@@ -132,6 +133,29 @@ class QuietWaitTests(SupervisorTestCase):
         self.assertIn("4242", message)
         self.assertIn("inference", message)
         self.assertNotIn("unknown", message)
+
+    def test_large_compiler_fanout_is_bounded_and_reports_omissions(self):
+        active = [
+            {"pid": number, "reason": "build", "command": "cc1plus",
+             "cwd": "/tmp/build", "cgroup": "test"}
+            for number in range(1000, 1200)
+        ]
+        summary = self.supervisor.summarize_conflicts(active)
+        self.assertIn("count=200", summary)
+        self.assertIn("build:200", summary)
+        self.assertIn("omitted=192", summary)
+        self.assertLess(len(summary), 600)
+
+    def test_pid_churn_in_one_blocker_class_does_not_spam_the_log(self):
+        polls = []
+        for number in range(10):
+            polls.append([{"pid": 5000 + number, "reason": "build",
+                           "command": "cc1plus", "cwd": "", "cgroup": "test"}])
+        with self.assertRaises(RuntimeError):
+            self.run_wait(polls, timeout=60)
+        waiting = [call for call in self.log.call_args_list
+                   if "waiting for safe host" in call.args[0]]
+        self.assertEqual(1, len(waiting))
 
     def test_low_memory_and_high_load_are_reported_as_the_blockers(self):
         with self.assertRaises(RuntimeError) as caught:
