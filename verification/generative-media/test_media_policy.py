@@ -125,6 +125,60 @@ class MediaPolicyTests(unittest.TestCase):
         self.assertEqual(sorted(healthy_probe()), sorted(probe))
 
 
+class KernelBuildDetectionTests(unittest.TestCase):
+    """The needles, against a fixture /proc rather than against this host."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.proc = Path(self.temporary.name)
+
+    def process(self, pid: str, argv: str, root: Path | None = None) -> Path:
+        entry = (root or self.proc) / pid
+        entry.mkdir()
+        (entry / "cmdline").write_bytes(argv.replace(" ", "\0").encode())
+        return entry
+
+    def fresh_proc(self) -> Path:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        return Path(temporary.name)
+
+    def test_a_kernel_build_is_seen_whatever_job_count_it_chose(self):
+        # The point of dropping the "-j45 LLVM=1" literal: parallelism derived
+        # from nproc differs per machine, and the old needle only knew one.
+        for argv in ("make -j45 LLVM=1", "make -j", "make -j8", "make -j128 LLVM=1"):
+            with self.subTest(argv=argv):
+                root = self.fresh_proc()
+                self.process("4242", argv, root)
+                self.assertEqual(
+                    ["pid=4242 kernel-build"],
+                    policy.host_exclusive_blockers(root),
+                )
+
+    def test_the_link_stage_is_seen_when_no_make_is_left(self):
+        self.process("7", "sh -c ./link-vmlinux.sh")
+        self.assertEqual(["pid=7 kernel-build"], policy.host_exclusive_blockers(self.proc))
+
+    def test_an_idle_host_reports_nothing(self):
+        self.process("11", "sleep 600")
+        self.process("12", "hyprland")
+        self.assertEqual([], policy.host_exclusive_blockers(self.proc))
+
+    def test_non_numeric_and_unreadable_entries_are_skipped(self):
+        (self.proc / "self").mkdir()
+        (self.proc / "meminfo").write_text("MemAvailable: 1 kB\n")
+        (self.proc / "99").mkdir()  # no cmdline at all
+        self.assertEqual([], policy.host_exclusive_blockers(self.proc))
+
+    def test_the_scan_stops_at_the_first_blocker(self):
+        # Bounded on purpose: one blocker already withholds readiness, and this
+        # walk happens on a host that is by definition busy.
+        for pid in ("101", "102", "103"):
+            self.process(pid, "make -j LLVM=1")
+        self.assertEqual(1, len(policy.host_exclusive_blockers(self.proc)))
+
+
 class WorkflowClaimTests(unittest.TestCase):
     """A passing static preflight must not read as functional coverage."""
 

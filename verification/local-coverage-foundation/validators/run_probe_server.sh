@@ -60,6 +60,6 @@ fi
 [ -n "${PROBE_MMPROJ:-}" ] && args+=(--mmproj "$PROBE_MMPROJ")
 
 mkdir -p "$(dirname "$LOG")"
-setsid /home/typhoon/.local/bin/llama-server "${args[@]}" >>"$LOG" 2>&1 &
+setsid /home/typhoon/git/frankenstein-llm/upstream/llama.cpp/build/bin/llama-server "${args[@]}" >>"$LOG" 2>&1 &
 echo $! > "$PIDFILE"
 echo "probe '$ALIAS' started pid=$(cat "$PIDFILE") port=$PORT flash_attn=$FLASH device=$DEVICE log=$LOG"

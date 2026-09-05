@@ -44,6 +44,37 @@ SHA-256 after every run, a rewritten or removed suite is recorded as tampering,
 and a completed `write_file` invalidates an earlier green result -- a passing
 run describes one exact generation of the workspace and nothing later.
 
+## Pinned llama.cpp submodule
+
+```
+python3 -m pytest verification/upstream-pin/test_llama_cpp_pin.py
+```
+
+Which llama.cpp revision this stack runs is written down three times -- the outer
+repository's gitlink, `upstream/llama-cpp.lock.json`, and the prose in ADR 0005 --
+and only the first of those is what a fresh clone actually checks out. The gitlink
+records whatever the submodule worktree happened to be sitting on at `git add`
+time, so staging it after an upstream fetch pins that revision for everyone else
+while the lock, the documents, and every locally built binary still say v0.4.0.
+Nothing reports it: the build script compares the *worktree* `HEAD` against the
+lock and is satisfied, because the worktree is right and the index is not. This
+suite compares the staged gitlink against the lock directly.
+
+It also holds the build entry point to the lock -- backend, `gfx1030`, Ninja,
+Release, the four required targets, and job count discovered through `nproc`
+rather than a number that outlives the machine it was measured on -- and checks
+that no tracked file still executes the removed `/home/typhoon/src` checkout or
+one of the `~/.local/bin` shims that now dangle. Documentation stays free to name
+those paths in order to forbid them; prose is exempt and fenced command blocks
+are not.
+
+The one part that is not purely static runs `llama-server --help` -- no model, no
+GPU, no server -- and checks every key in `llama-models.ini` against the option
+list that build prints. llama.cpp loads `--models-preset` with unknown keys
+fatal, so a key a release drops does not degrade one alias: `load_from_ini`
+throws and the router never finishes starting. Those two cases skip rather than
+fail when the submodule has not been built yet.
+
 ## Mission supervisor contracts
 
 ```

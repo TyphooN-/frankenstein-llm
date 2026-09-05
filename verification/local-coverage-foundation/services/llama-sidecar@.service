@@ -11,7 +11,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=/home/typhoon/git/frankenstein-llm/services/sidecar-%i.env
-ExecStart=/home/typhoon/.local/bin/llama-server \
+ExecStart=/home/typhoon/git/frankenstein-llm/upstream/llama.cpp/build/bin/llama-server \
     --host 127.0.0.1 --port ${SIDECAR_PORT} \
     --alias ${SIDECAR_ALIAS} \
     --model ${SIDECAR_MODEL} \

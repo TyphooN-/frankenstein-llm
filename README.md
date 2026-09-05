@@ -11,6 +11,8 @@ This repository tracks source, configuration, verification, and documentation. I
 - `llama-models.ini` — llama.cpp router presets
 - `scripts/` — download and verification helpers
 - `services/` — sidecar env files and systemd unit copies
+- `upstream/llama.cpp/` — tracked llama.cpp submodule; production source and local ROCm build
+- `upstream/llama-cpp.lock.json` — release, commit, GPU target, and required binary lock
 - `verification/` — functional gates; no tokens/sec measurements
 - `verification/prompt-corpus-admission/` — pinned, inert safety-corpus policy
 - `docs/` — strategy and operating notes
@@ -36,6 +38,7 @@ See:
 - `docs/decisions/0002-serialized-functional-qualification.md`
 - `docs/decisions/0003-hardware-allocation-and-memory-policy.md`
 - `docs/decisions/0004-prompt-corpus-admission.md`
+- `docs/decisions/0005-track-llama-cpp-submodule.md`
 - `docs/LOCAL-AI-MODEL-STRATEGY.md`
 - `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — 2026-09-02 research snapshot
 - `docs/CANDIDATE-STATUS-2026-09-03.md` — current download/policy/runtime/functional state
@@ -74,6 +77,10 @@ serialized gates.
 User systemd units live in `~/.config/systemd/user/` and are copied here under `services/systemd/`. After clone or path changes:
 
 ```
+git submodule update --init --recursive upstream/llama.cpp
+scripts/build-llama-cpp.sh
+install -Dm644 services/systemd/llama-router.service ~/.config/systemd/user/llama-router.service
+install -Dm644 services/systemd/llama-sidecar@.service ~/.config/systemd/user/llama-sidecar@.service
 systemctl --user daemon-reload
 systemctl --user start llama-router.service
 ```

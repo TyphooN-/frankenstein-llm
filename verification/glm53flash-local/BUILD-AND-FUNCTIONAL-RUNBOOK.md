@@ -1,10 +1,10 @@
 # GLM-5.3-Flash Isolated Build and Functional Runbook
 
-Source worktree: `/home/typhoon/src/llama.cpp/.claude/worktrees/glm53flash-local`
+Production source: `/home/typhoon/git/frankenstein-llm/upstream/llama.cpp`
 
-Required source revision: `7152e9bf218ff92baabac61778e99f5a6fe6c966` (PR #27773 head)
+Production revision: v0.4.0 at `5266f24da75dc449bd56cbed7addb9c8e4a6a73e`.
 
-Stable production checkout: `/home/typhoon/src/llama.cpp` at `50f068ffffc3e0e4c9c2e4139281c6075224f429`; do not modify or rebuild it for this experiment.
+The former external PR #27773 worktree no longer exists. v0.4.0 has no `glm5next` architecture identifier, so GLM qualification is blocked until a still-required experimental revision is reviewed and recreated as an isolated worktree below `upstream/llama.cpp/.worktrees/`. It must not modify the production submodule gitlink or build directory.
 
 Model: `/home/typhoon/git/frankenstein-llm/models/glm53flash-regular-iq3xxs/GLM-5.3-Flash-IQ3_XXS-00001-of-00015.gguf`
 
@@ -15,35 +15,38 @@ Expected artifact set: 15 shards, exactly 120,994,791,264 bytes, each verified a
 1. Downloader has exited with code 0 or its tmux pane is dead with status 0.
 2. All 15 final shard filenames exist; no `.partial` remains.
 3. Re-run exact size and SHA-256 checks over every manifest row.
-4. Experimental worktree HEAD equals the required revision and is clean.
-5. Stable checkout HEAD remains unchanged and production router health remains OK.
+4. A reviewed experimental worktree exists below the tracked submodule, its HEAD equals the required revision, and it is clean.
+5. Production submodule HEAD remains v0.4.0 and production router health remains OK.
 6. No unrelated optimized build, Cargo/rustc, CMake/Ninja, package build, or GPU-heavy generation is active.
 7. Record baseline `MemAvailable` and per-GPU VRAM.
 
 ## Build
 
-Use an out-of-tree evidence build directory so the source worktree stays clean:
+Use an ignored evidence build directory inside the experimental worktree. Substitute the reviewed worktree path for `$GLM_SRC`:
 
 ```text
-cmake -S /home/typhoon/src/llama.cpp/.claude/worktrees/glm53flash-local \
-  -B /home/typhoon/git/frankenstein-llm/verification/glm53flash-local/build-pr27773 \
+GLM_SRC=/home/typhoon/git/frankenstein-llm/upstream/llama.cpp/.worktrees/glm53flash-local
+cmake -S "$GLM_SRC" \
+  -B "$GLM_SRC/build-rocm" \
   -G Ninja \
   -DGGML_HIP=ON \
   -DGPU_TARGETS=gfx1030 \
   -DCMAKE_BUILD_TYPE=Release
 
-cmake --build /home/typhoon/git/frankenstein-llm/verification/glm53flash-local/build-pr27773 \
-  --target llama-server llama-cli -j 22
+cmake --build "$GLM_SRC/build-rocm" \
+  --target llama-server llama-cli --parallel "$(nproc)"
 ```
 
 Build only when machine-level optimized-build exclusivity is satisfied. Capture exact configure/build exits and logs.
 
+`gate_glm32.py` reads the same two values from the environment -- `GLM_SRC` for the worktree and `GLM_BINARY` to override the binary directly -- and defaults to the paths above, so the runbook and the gate cannot drift. It refuses to start when that binary is absent and records the worktree's resolved `HEAD` as the run's `runtime_revision` instead of asserting a literal. The superseded `build-pr27752-c9ddd682/` and `build-pr27773/` directories here were produced from the deleted `/home/typhoon/src` worktrees; nothing on disk can still establish which revision they contain, so they are not a valid runtime for a new verdict.
+
 ## Binary proof
 
-1. Run `llama-server --version` and `llama-server --help`.
+1. Run the experimental `llama-server --version` and `llama-server --help`.
 2. Confirm `ldd` resolves ROCm/HIP libraries from the expected installation.
 3. Confirm the binary exposes required context, cache type, device, GPU-layer/offload, flash-attention, host, port, Jinja, and model flags.
-4. Do not infer supported flags from the stable production binary.
+4. Do not infer supported flags from the production v0.4.0 binary.
 
 ## 32K standalone load
 

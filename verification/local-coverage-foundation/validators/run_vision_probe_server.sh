@@ -25,7 +25,7 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
 fi
 
 mkdir -p "$(dirname "$LOG")"
-setsid /home/typhoon/.local/bin/llama-server \
+setsid /home/typhoon/git/frankenstein-llm/upstream/llama.cpp/build/bin/llama-server \
     --host 127.0.0.1 --port "$PORT" \
     --alias vision-probe \
     --model "$MODEL" \

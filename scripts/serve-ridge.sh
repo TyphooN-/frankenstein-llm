@@ -8,7 +8,7 @@ HOST="${LLAMA_HOST:-127.0.0.1}"
 PORT="${LLAMA_PORT:-8080}"
 CTX="${LLAMA_CTX:-131072}"
 NMAX="${SPEC_DRAFT_N_MAX:-2}"
-BIN="${LLAMA_SERVER_BIN:-/home/typhoon/.local/bin/llama-server}"
+BIN="${LLAMA_SERVER_BIN:-/home/typhoon/git/frankenstein-llm/upstream/llama.cpp/build/bin/llama-server}"
 LOG="${LLAMA_LOG:-/home/typhoon/git/frankenstein-llm/logs/ridge-server.log}"
 
 if [[ ! -f "$MODEL" ]]; then

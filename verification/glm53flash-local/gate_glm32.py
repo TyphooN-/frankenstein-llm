@@ -17,7 +17,17 @@ sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-covera
 from gatelib import unload_verdict, vram_used  # noqa: E402
 
 ROOT = Path("/home/typhoon/git/frankenstein-llm/verification/glm53flash-local")
-BINARY = ROOT / "build-pr27752-c9ddd682/bin/llama-server"
+# The former binary lived in build-pr27752-c9ddd682/ here, built from a worktree
+# under /home/typhoon/src that no longer exists, so its revision can no longer be
+# established from anything on disk. GLM work is recreated as an isolated
+# worktree below the tracked submodule instead -- see BUILD-AND-FUNCTIONAL-RUNBOOK.md.
+# Production v0.4.0 has no glm5next architecture, so this stays overridable and
+# is never the production build directory.
+GLM_SRC = Path(os.environ.get(
+    "GLM_SRC",
+    "/home/typhoon/git/frankenstein-llm/upstream/llama.cpp/.worktrees/glm53flash-local",
+))
+BINARY = Path(os.environ.get("GLM_BINARY", GLM_SRC / "build-rocm/bin/llama-server"))
 MODEL = Path("/home/typhoon/git/frankenstein-llm/models/glm53flash-regular-iq3xxs/GLM-5.3-Flash-IQ3_XXS-00001-of-00015.gguf")
 LOG = ROOT / "glm32-server.log"
 EVIDENCE = ROOT / "gate-glm32.json"
@@ -36,6 +46,22 @@ COMMAND = [
     "--fit", "on", "--fit-target", "1536,1024,4096", "--fit-ctx", "32768",
     "--flash-attn", "on", "--load-mode", "mmap", "--parallel", "1", "--no-perf",
 ]
+
+
+def runtime_revision() -> str:
+    """Resolve the experimental worktree's revision, or refuse to claim one.
+
+    This used to be the literal string c9ddd6821..., recorded into evidence by a
+    build whose source tree has since been deleted. Nothing on disk could confirm
+    it, so the artifact asserted a provenance it could no longer support.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(GLM_SRC), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"cannot resolve GLM runtime revision in {GLM_SRC}: {result.stderr.strip()}")
+    return result.stdout.strip()
 
 
 def memory() -> dict[str, int]:
@@ -106,7 +132,7 @@ def main() -> int:
     baseline_vram = vram()
     summary: dict = {
         "gate": "glm-32k", "model": str(MODEL), "command": COMMAND,
-        "runtime_revision": "c9ddd6821c93871c53741344d35d1e440d60d9ea", "runtime_pr": 27752,
+        "runtime_source": str(GLM_SRC), "runtime_revision": None,
         "started_at": started_at, "throughput_measured": False,
         "baseline_memory": baseline_mem, "baseline_vram": baseline_vram,
         "minimum_mem_available_bytes": baseline_mem["MemAvailable"],
@@ -131,6 +157,9 @@ def main() -> int:
         for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
     }
     try:
+        if not BINARY.is_file():
+            raise RuntimeError(f"GLM runtime binary is missing: {BINARY}")
+        summary["runtime_revision"] = runtime_revision()
         missing = unreadable_cards(baseline_vram)
         if missing:
             raise RuntimeError(f"baseline VRAM telemetry unreadable for {missing}")

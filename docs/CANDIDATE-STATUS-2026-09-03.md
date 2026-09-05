@@ -33,18 +33,24 @@ workflows actually run.
 
 ## llama.cpp runtimes
 
-Do not rebuild production llama.cpp for these candidates.
-
-- Production: `/home/typhoon/.local/bin/llama-server` ->
-  `/home/typhoon/src/llama.cpp/build/bin/llama-server`, HIP/ROCm gfx1030,
-  commit `50f068f`. Already includes `--models-preset`, `draft-mtp`,
-  `qwen3next`, `gemma4`, and Gemma 4 vision/audio projectors.
-- Isolated GLM-only: worktree
-  `/home/typhoon/src/llama.cpp/.claude/worktrees/glm53flash-local`,
-  branch `pr27752-glm53flash`. Keep off `:8080`. The on-disk
-  `build-rocm` / `build-rocm-shim` binaries report commit `7152e9bf2`,
-  older than worktree HEAD `c9ddd6821`. Rebuild that isolated tree only
-  if a GLM load fails; never replace production `50f068f` with it.
+- Production source: tracked submodule `upstream/llama.cpp`, tag v0.4.0,
+  commit `5266f24`, with a HIP/ROCm `gfx1030` build produced by
+  `scripts/build-llama-cpp.sh`. Services execute its build directly; there is
+  no required checkout under `/home/typhoon/src` or runtime symlink under
+  `~/.local/bin`.
+- GLM-5.3-Flash remains experimental. v0.4.0 has `qwen4exp` but no
+  `glm5next` architecture identifier. Any renewed GLM work must use an isolated
+  worktree below the tracked submodule and must never replace the production
+  v0.4.0 gitlink or bind the production port.
+- Not yet installed as of 2026-09-04. The tracked units point at the submodule
+  build, but `~/.config/systemd/user/llama-router.service` still execs
+  `~/.local/bin/llama-server`, whose symlink target went away with
+  `/home/typhoon/src`. The unit therefore fails with `status=203/EXEC` and
+  restarts on a five-second timer; the hand-started server that was answering
+  `:8080` has since exited, so nothing is listening there now. The tracked
+  binaries exist and report `0.4.0-dev (build 10809, commit 5266f24da)`.
+  Installing the units as `README.md` describes is the remaining runtime step,
+  and it must not be done while a build is active.
 
 ## Observed 2026-09-03 functional checks
 

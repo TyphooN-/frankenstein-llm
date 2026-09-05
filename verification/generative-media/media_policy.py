@@ -109,18 +109,29 @@ PRIMARY_DEVICE = 1
 LISTEN = "127.0.0.1"
 PORT = 8188
 
+# "make -j45 LLVM=1" was this host's kernel build spelled out exactly, including
+# the job count of the machine it was written on. A rebuilt or resized host, or a
+# build that derives its parallelism from nproc, spells it differently and would
+# have gone unseen. Match the invocation rather than one machine's arithmetic.
 KERNEL_BUILD_NEEDLES = (
-    "make -j45 LLVM=1",
+    "make -j",
     "link-vmlinux",
     "ld.lld -m elf_x86_64",
 )
 
 
-def host_exclusive_blockers() -> list[str]:
-    """Return process fingerprints that must not overlap a GPU gate."""
+def host_exclusive_blockers(proc_root: Path = Path("/proc")) -> list[str]:
+    """Return process fingerprints that must not overlap a GPU gate.
+
+    ``proc_root`` is injectable for the reason the mission supervisor's is: a
+    classification checked against whatever the host happens to be running at
+    the time is not really checked at all.
+
+    The scan stops at the first match. One blocker already withholds
+    ``functional_gate_ready_now``, and a second adds nothing but a longer walk.
+    """
     blockers = []
-    proc = Path("/proc")
-    for entry in proc.iterdir():
+    for entry in proc_root.iterdir():
         if not entry.name.isdigit():
             continue
         try:

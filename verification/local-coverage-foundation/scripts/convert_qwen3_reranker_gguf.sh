@@ -15,7 +15,7 @@ set -euo pipefail
 
 SRC="${RERANK_SRC:-/home/typhoon/git/frankenstein-llm/models/reranker-src/Qwen3-Reranker-8B}"
 OUT_DIR="${RERANK_OUT:-/home/typhoon/git/frankenstein-llm/models/reranker}"
-LLAMA_SRC="${LLAMA_SRC:-/home/typhoon/src/llama.cpp}"
+LLAMA_SRC="${LLAMA_SRC:-/home/typhoon/git/frankenstein-llm/upstream/llama.cpp}"
 VENV="${RERANK_VENV:-/home/typhoon/git/frankenstein-llm/venvs/convert}"
 QUANT="${RERANK_QUANT:-Q6_K}"
 F16="$OUT_DIR/Qwen3-Reranker-8B-f16.gguf"
@@ -42,7 +42,7 @@ fi
 
 if [ ! -f "$FINAL" ]; then
     echo "quantizing -> $FINAL"
-    /home/typhoon/.local/bin/llama-quantize "$F16" "$FINAL.partial" "$QUANT"
+    "$LLAMA_SRC/build/bin/llama-quantize" "$F16" "$FINAL.partial" "$QUANT"
     mv -f "$FINAL.partial" "$FINAL"
 fi
 

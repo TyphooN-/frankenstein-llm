@@ -1,6 +1,6 @@
 # Local Hermes models - architecture, plan, and status
 
-Last updated: 2026-08-30
+Last updated: 2026-09-04
 
 This is the source-of-truth ledger for local LLMs on `frankenstein`. It records verified state, model-selection reasoning, operating commands, and unfinished work.
 
@@ -14,12 +14,12 @@ Expose local GGUF models in Hermes CLI, TUI, and Desktop through the normal mode
 - GPU split: default layer split with `--device ROCm0,ROCm1,ROCm2 --tensor-split 1,2,1`.
 - RAM: 94 GiB.
 - Home storage: 2.8 TiB free at the last check.
-- llama.cpp: `/home/typhoon/.local/bin/llama-server`, HIP/ROCm build `50f068f`.
+- llama.cpp: tracked submodule `upstream/llama.cpp`, pinned to v0.4.0 (`5266f24`), with the HIP/ROCm binary at `upstream/llama.cpp/build/bin/llama-server`.
 - llama.cpp supports router mode (`--models-preset`) and native `draft-mtp`.
 - Context policy: 131,072 tokens, one slot, Q4_0 K/V cache, Flash Attention.
 - Endpoint: loopback only, `http://127.0.0.1:8080/v1`.
 
-Do not use `--split-mode tensor`: Qwen3.8 MTP backend sampling is incompatible with that path. Do not rebuild llama.cpp unless a verified runtime defect requires it.
+Do not use `--split-mode tensor`: Qwen3.8 MTP backend sampling is incompatible with that path. Build the pinned submodule only through `scripts/build-llama-cpp.sh`.
 
 ## Model roster
 
@@ -133,6 +133,8 @@ hermes -z 'Reply with exactly pong.' --provider llamacpp-local -m heretic --reas
 ## Operations
 
 ```bash
+git submodule update --init --recursive upstream/llama.cpp
+scripts/build-llama-cpp.sh
 systemctl --user status llama-router.service
 systemctl --user restart llama-router.service
 /home/typhoon/git/frankenstein-llm/scripts/local-model-status.sh

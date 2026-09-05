@@ -24,7 +24,7 @@ Use a portfolio, not one model for every job:
 - ROCm2: RX 6900 XT, 16 GiB.
 - Aggregate VRAM: approximately 64 GiB, but frameworks do not automatically aggregate it. llama.cpp has a verified `1,2,1` split; ComfyUI/audio models must be tested with their own placement rules.
 - RAM: approximately 94 GiB.
-- llama.cpp: HIP/ROCm build `50f068f`.
+- llama.cpp: tracked v0.4.0 submodule at `upstream/llama.cpp`, commit `5266f24`, built for HIP/ROCm `gfx1030`.
 - Router: `http://127.0.0.1:8080/v1`, loopback only, one resident model.
 - Remote Hermes default remains `openai-codex / gpt-5.6-sol`.
 
@@ -103,7 +103,7 @@ Decision: hosted comparison specialist for difficult code/security tasks, not a 
 - Unsloth's equivalent `UD-IQ3_XXS` shard total is 112.10 GiB. Its `UD-Q3_K_XL` is 137.40 GiB and `UD-IQ4_XS` is 146.05 GiB; neither is a robust active-desktop fit. Sub-3-bit builds fit more easily but lose too much quality for a 320B model intended to improve on the installed 27B models.
 - The 112 GiB IQ3_XXS nominally fits only by combining host RAM and VRAM. Static placement attempted an oversized allocation on a 16 GiB GPU. The auto-fit attempt consumed roughly 66 GiB RSS and entered sustained reclaim pressure, but that run overlapped a 44-thread Linux kernel compile and is therefore inconclusive rather than an admission failure.
 - Retry 32K auto-fit only on an otherwise idle host. Host retuning remains excluded: do not change ARC, swap, kernel, clocks, or persistent policy to make the model fit.
-- The installed llama.cpp commit `50f068f` does not recognize `glm5next`. Support remains in experimental PR/fork code. Build and test it in an isolated checkout; do not replace or destabilize the working router binary. This model's fitting path also requires leaving `-ngl` unset initially, which conflicts with the router's global `gpu-layers = all` and requires a measured alias-specific split before integration.
+- Pinned llama.cpp v0.4.0 does not recognize `glm5next`. Support remains experimental. Build and test any future GLM support in an isolated worktree under the tracked submodule; do not replace or destabilize the production router binary. This model's fitting path also requires leaving `-ngl` unset initially, which conflicts with the router's global `gpu-layers = all` and requires a measured alias-specific split before integration.
 
 Decision: defer regular GLM-5.3-Flash IQ3_XXS for one clean idle-host 32K retry on the current 96 GiB/three-GPU workstation. Keep 64K, A/B, and router integration blocked; add no alias. Requalify again after planned hardware upgrades. Do not use IQ1/IQ2 merely to make it fit.
 

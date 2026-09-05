@@ -66,9 +66,9 @@ Links are pinned to the Hugging Face commit observed on 2026-09-02.
 4. **WeMM-Embedding-2B** — the explicit Apache-2.0 license is resolved at the
    refreshed pin. Qualification must use a separate multimodal index and audit
    the pinned remote-code implementation before execution.
-5. **Gemma-4-12B Heretic** — production `50f068f` already loads the text and
-   vision presets. Remaining work is audio/video, quiet-host memory-fit, and
-   keeping it low-privilege. Do not rebuild llama.cpp for this candidate.
+5. **Gemma-4-12B Heretic** — text and vision passed on the former production
+   runtime. Requalify them on pinned llama.cpp v0.4.0, whose release includes
+   Gemma-4 assistant and vision fixes. Keep the model low-privilege.
 6. **Qwen3-ASR-1.7B** — already downloaded and verified at this reviewed
    revision by phase one; only functional comparison remains.
 

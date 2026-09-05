@@ -16,6 +16,19 @@ DEFAULT_TIMEOUT = 5.0
 MAX_TIMEOUT = 30.0
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
+# llama.cpp v0.4.0 reports one of six model states (tools/server/server-models.h):
+# downloading, downloaded, unloaded, loading, loaded, sleeping. Only a state that
+# still owns a child process occupies the router's single resident slot, which is
+# upstream's own is_running(): loaded, loading, or sleeping. "sleeping" is a live
+# child that idled, so it is resident; "downloaded" only means weights reached
+# local disk. Classifying by "anything except unloaded" -- correct against the
+# three-state runtime this stack ran before v0.4.0 -- therefore reports a cached
+# download as a resident model. Enumerate the vocabulary instead, and fail closed
+# on a state this pin does not define rather than guess which side it belongs on.
+RESIDENT_STATUSES = frozenset({"loading", "loaded", "sleeping"})
+VACANT_STATUSES = frozenset({"downloading", "downloaded", "unloaded"})
+KNOWN_STATUSES = RESIDENT_STATUSES | VACANT_STATUSES
+
 
 class StatusError(RuntimeError):
     pass
@@ -57,6 +70,8 @@ def collect_status(timeout: float = DEFAULT_TIMEOUT) -> dict[str, Any]:
         value = status.get("value") if isinstance(status, dict) else None
         if not isinstance(value, str):
             raise StatusError(f"/models: {raw['id']!r} has no status value")
+        if value not in KNOWN_STATUSES:
+            raise StatusError(f"/models: {raw['id']!r} has unknown status {value!r}")
         architecture = raw.get("architecture")
         architecture = architecture if isinstance(architecture, dict) else {}
         inputs = architecture.get("input_modalities", [])
@@ -75,7 +90,7 @@ def collect_status(timeout: float = DEFAULT_TIMEOUT) -> dict[str, Any]:
         "health": "ok",
         "model_count": len(models),
         "status_counts": dict(sorted(counts.items())),
-        "loaded_models": [model["id"] for model in models if model["status"] != "unloaded"],
+        "loaded_models": [model["id"] for model in models if model["status"] in RESIDENT_STATUSES],
         "models": models,
         "loads_models": False,
     }

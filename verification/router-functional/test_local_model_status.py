@@ -88,6 +88,53 @@ class LocalModelStatusTests(unittest.TestCase):
                 status.fetch_json("/models")
         self.assertEqual(response.requested_size, status.MAX_RESPONSE_BYTES + 1)
 
+    def _models_reply(self, *entries):
+        return iter([
+            FakeResponse({"status": "ok"}),
+            FakeResponse({"data": [
+                {
+                    "id": name,
+                    "status": {"value": value},
+                    "architecture": {"input_modalities": ["text"], "output_modalities": ["text"]},
+                }
+                for name, value in entries
+            ]}),
+        ])
+
+    def test_only_states_that_hold_a_child_process_count_as_resident(self):
+        # llama.cpp v0.4.0 answers /models with six states. "sleeping" is a live
+        # child that idled and "loading" is one starting up: both occupy the
+        # router's single resident slot. "downloaded" only means weights reached
+        # local disk, and the pre-v0.4.0 rule -- resident is anything except
+        # "unloaded" -- reported that as a loaded model.
+        replies = self._models_reply(
+            ("cached", "downloaded"),
+            ("fetching", "downloading"),
+            ("idle", "sleeping"),
+            ("starting", "loading"),
+            ("live", "loaded"),
+            ("cold", "unloaded"),
+        )
+        with patch.object(status.urllib.request, "urlopen", side_effect=lambda *_a, **_k: next(replies)):
+            result = status.collect_status()
+        self.assertEqual(["idle", "live", "starting"], result["loaded_models"])
+        self.assertEqual(6, result["model_count"])
+
+    def test_status_vocabulary_is_partitioned_and_matches_the_pinned_runtime(self):
+        self.assertEqual(frozenset(), status.RESIDENT_STATUSES & status.VACANT_STATUSES)
+        self.assertEqual(
+            {"downloading", "downloaded", "unloaded", "loading", "loaded", "sleeping"},
+            set(status.KNOWN_STATUSES),
+        )
+
+    def test_status_outside_the_pinned_vocabulary_fails_closed(self):
+        # A state this pin does not define could sit on either side of the
+        # resident boundary, so guessing would silently misreport the slot.
+        replies = self._models_reply(("mystery", "hibernating"))
+        with patch.object(status.urllib.request, "urlopen", side_effect=lambda *_a, **_k: next(replies)):
+            with self.assertRaisesRegex(status.StatusError, "unknown status"):
+                status.collect_status()
+
     def test_text_render_does_not_dump_router_launch_arguments(self):
         summary = {
             "endpoint": status.BASE_URL,
