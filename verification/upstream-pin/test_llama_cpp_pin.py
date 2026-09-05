@@ -275,6 +275,12 @@ class RuntimePathTests(unittest.TestCase):
         ):
             with self.subTest(script=relative):
                 text = (REPO / relative).read_text()
+                if relative == "scripts/serve-ridge.sh":
+                    plan = json.loads(subprocess.check_output(
+                        ["bash", str(REPO / relative)], text=True))
+                    self.assertTrue(plan["plan_only"])
+                    self.assertEqual(plan["command"][0], str(REPO / SUBMODULE / "build/bin/llama-server"))
+                    continue
                 self.assertIn(str(REPO / SUBMODULE), text)
                 self.assertIn(f"build/bin/{binary}", text)
 

@@ -2,6 +2,8 @@
 
 ## Start here
 
+- [Scripted model operation](MODEL-RUNS.md): serving, qualification, benchmarks and editable configuration.
+
 - [User guide](USER-GUIDE.md): setup, model choice, daily workflows and safety boundaries.
 - [Architecture](reference/ARCHITECTURE.md): implementation layers, data flows, gates, supervision and evidence.
 - [Configuration](reference/CONFIGURATION.md): presets, manifests, environment variables, ports and schemas.

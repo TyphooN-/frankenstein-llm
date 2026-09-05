@@ -1,5 +1,11 @@
 # frankenstein-llm
 
+## Scripted operation
+
+See [Model runs](docs/MODEL-RUNS.md) for per-model serve scripts, editable configs,
+user/agent-invoked qualification, native benchmarks and saved reports. Commands
+preview by default; the intended GPU topology remains all three cards.
+
 ## Documentation
 
 Start with the [User guide](docs/USER-GUIDE.md) for installation and everyday use.

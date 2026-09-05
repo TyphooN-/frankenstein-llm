@@ -1,5 +1,11 @@
 # Capability matrix
 
+> Operator-interface update: [Model runs](../MODEL-RUNS.md) is the current reference
+> for standalone serving, qualification and native benchmark scripts. The former
+> standalone Ridge environment overrides are replaced by shared presets/configs.
+> Any older statement below about absent benchmark tooling predates this interface;
+> native throughput tooling exists, but comparative agent-quality evaluation remains absent.
+
 What each local capability is backed by, what would prove it, and how to find out
 what is true right now. This file is the *map*; the last observed values live in
 the dated snapshots it links, and the machine reading is regenerated on demand.

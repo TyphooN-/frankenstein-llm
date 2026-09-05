@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "qualify": {
+    "timeout": 86400
+  },
+  "benchmark": {
+    "timeout": 3600,
+    "gpu_layers": 999,
+    "devices": "ROCm0/ROCm1/ROCm2",
+    "tensor_split": "3/6/2",
+    "prompt_tokens": 512,
+    "generation_tokens": 128,
+    "repetitions": 3
+  }
+}

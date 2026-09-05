@@ -1,5 +1,11 @@
 # Configuration reference
 
+> Operator-interface update: [Model runs](../MODEL-RUNS.md) is the current reference
+> for standalone serving, qualification and native benchmark scripts. The former
+> standalone Ridge environment overrides are replaced by shared presets/configs.
+> Any older statement below about absent benchmark tooling predates this interface;
+> native throughput tooling exists, but comparative agent-quality evaluation remains absent.
+
 Undated reference for every tracked configuration file, schema, port, environment
 variable and data flow. Where a value is also stated elsewhere, this file names
 the single owner of that value.

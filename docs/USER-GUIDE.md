@@ -1,5 +1,9 @@
 # User guide
 
+For the unified user/agent command interface and per-model serve scripts, see
+[Model runs](MODEL-RUNS.md). Benchmark tooling is now available for explicit user-run
+measurements; no performance result is implied by its existence.
+
 How to set this workspace up, use it day to day, and tell the difference between
 a capability that is downloaded and one that actually works.
 

@@ -1,5 +1,11 @@
 # Operations runbook
 
+> Operator-interface update: [Model runs](../MODEL-RUNS.md) is the current reference
+> for standalone serving, qualification and native benchmark scripts. The former
+> standalone Ridge environment overrides are replaced by shared presets/configs.
+> Any older statement below about absent benchmark tooling predates this interface;
+> native throughput tooling exists, but comparative agent-quality evaluation remains absent.
+
 Undated procedures. Runtime install state changes; this file documents what to
 do, not what is currently running. To find out what is running, run the commands
 in [checking the backend](#checking-the-backend) — do not read a status sentence

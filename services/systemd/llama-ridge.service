@@ -5,13 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/home/typhoon/git/frankenstein-llm/scripts/serve-ridge.sh
+ExecStart=/home/typhoon/git/frankenstein-llm/scripts/serve-ridge.sh --execute
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
 KillMode=mixed
-Environment=LLAMA_CTX=131072
-Environment=SPEC_DRAFT_N_MAX=2
+
 StandardOutput=append:/home/typhoon/git/frankenstein-llm/logs/ridge-server.log
 StandardError=append:/home/typhoon/git/frankenstein-llm/logs/ridge-server.log
 
