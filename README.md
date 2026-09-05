@@ -1,5 +1,12 @@
 # frankenstein-llm
 
+## Documentation
+
+Start with the [User guide](docs/USER-GUIDE.md) for installation and everyday use.
+The [documentation index](docs/README.md) links implementation architecture,
+configuration, operations, troubleshooting, capability status, development and
+tracked-file coverage. Downloaded weights alone are not functional proof.
+
 Private local-AI workspace for the X99 host: llama.cpp routing, capability qualification, ComfyUI media, and serialized download/gates.
 
 Canonical checkout: `/home/typhoon/git/frankenstein-llm`
@@ -30,7 +37,7 @@ This repository tracks source, configuration, verification, and documentation. I
 
 ## Qualification policy
 
-Functional load, coherence, memory-fit, and clean unload are in scope. Benchmarking and tokens/sec wait until an explicit reboot into the intended kernel.
+Functional load, coherence, memory-fit, and clean unload are in scope. Benchmarking and tokens/sec require explicit user authorization after confirmation of the intended kernel; reboot alone is insufficient.
 
 See:
 

@@ -1,0 +1,194 @@
+# Troubleshooting
+
+Symptom → likely cause → what to do. Every diagnostic here is read-only unless it
+says otherwise.
+
+Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
+[capability matrix](CAPABILITY-MATRIX.md)
+
+## Contents
+
+- [Quick triage](#quick-triage)
+- [Router will not start](#router-will-not-start)
+- [Router starts but a model will not load](#router-starts-but-a-model-will-not-load)
+- [Hermes cannot see local models](#hermes-cannot-see-local-models)
+- [Build failures](#build-failures)
+- [Download problems](#download-problems)
+- [Mission never starts](#mission-never-starts)
+- [Gate problems](#gate-problems)
+- [Ledger says something unexpected](#ledger-says-something-unexpected)
+- [Test suite problems](#test-suite-problems)
+- [Storage and power loss](#storage-and-power-loss)
+
+## Quick triage
+
+```bash
+systemctl --user is-active llama-router.service
+scripts/local-model-status.sh
+systemctl --user status llama-router.service
+journalctl --user -u llama-router.service -n 100 --no-pager
+python3 -m pytest --ignore=verification/repository-agent -q
+```
+
+The last one answers "is this workspace internally consistent". It is never a
+functional verdict — consistency is what makes a live gate worth running.
+
+## Router will not start
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `status=203/EXEC`, restart every 5 s | The installed unit execs a path that no longer exists — typically a `~/.local/bin` shim whose target went away with an external checkout | Reinstall the tracked unit, which execs `upstream/llama.cpp/build/bin/llama-server`. See [operations](OPERATIONS.md#installing-the-user-units) |
+| Exits immediately after a preset edit | An unknown key in `llama-models.ini`. llama.cpp makes unknown preset keys fatal, so one bad key stops the whole router | `python3 -m pytest verification/upstream-pin/test_llama_cpp_pin.py`; the preset-compatibility test names the offending key |
+| `Address already in use` | `llama-ridge.service` or a hand-started `llama-server` already owns 8080 | `systemctl --user stop llama-ridge.service`; they must never run together |
+| Binary missing | The submodule was never built, or `build/` was cleaned | `git submodule update --init --recursive upstream/llama.cpp && scripts/build-llama-cpp.sh` |
+
+The preset test and the version check skip rather than fail when the submodule
+has not been built, so a green pin suite does not by itself mean a binary exists.
+Check directly:
+
+```bash
+upstream/llama.cpp/build/bin/llama-server --version
+```
+
+## Router starts but a model will not load
+
+| Symptom | Cause | Action |
+|---|---|---|
+| First request after a switch hangs for a long time | Expected. `--models-max 1` evicts the previous model and loads the requested GGUF; later requests avoid the initial model-load step | Wait; do not restart mid-load |
+| One alias fails, others work | The GGUF path in that preset is wrong or the file is gone. Weights are untracked, so a fresh clone has none | Check the `model =` path; re-run the download that installs it |
+| Load fails on a 16 GiB card | A `tensor-split` that does not reflect the model's size. `qwen3-coder-next` deliberately keeps a bounded GPU2 share because Q4_K_M is ~48 GB | Adjust the preset's `tensor-split`; do not assume `0,1,0` will hold KV |
+| Odd sampling behaviour on Qwen3.8 | `split-mode = tensor` was added. Qwen3.8 MTP backend sampling is incompatible with that path | Remove it |
+| Vision alias returns text-only behaviour | The `mmproj` file is missing or the projector device is wrong | Check `mmproj` and `mmproj-device` in the preset |
+
+## Hermes cannot see local models
+
+1. Confirm the backend answers:
+   ```bash
+   scripts/local-model-status.sh
+   ```
+   It exits 1 with `local router unavailable:` when it cannot reach `/health` or
+   `/models`.
+2. Confirm the aliases you expect are listed. The script prints each model's id,
+   state and modalities.
+3. Restart the Hermes front end. Desktop, TUI and CLI all read
+   `~/.hermes/config.yaml`; there is no separate Desktop model registry, so a
+   model visible to one and not another is a front-end restart problem.
+4. Start a fresh chat after switching model families. Switching a long
+   conversation midstream hands the local model a history created under different
+   hidden assumptions.
+
+## Build failures
+
+`scripts/build-llama-cpp.sh` refuses before CMake runs when a precondition fails.
+All of these exit 2 with a one-line reason:
+
+| Message | Meaning |
+|---|---|
+| `missing llama.cpp submodule` | run `git submodule update --init --recursive upstream/llama.cpp` |
+| `llama.cpp HEAD does not match <tag>` | the worktree is on a different revision than the lock |
+| `llama.cpp tracked worktree is dirty` | uncommitted changes in the submodule |
+| `unexpected llama.cpp repository in lock` / `unexpected GPU target in lock` | the lock was edited to something this stack does not support |
+| `nproc did not return a positive integer` | the environment cannot report a CPU count |
+
+If CMake itself fails, check that `hipconfig` is on `PATH` — the script derives
+`HIPCXX` and `HIP_PATH` from it.
+
+Do not run this concurrently with another optimized build. It uses every logical
+CPU.
+
+## Download problems
+
+| Symptom | Cause | Action |
+|---|---|---|
+| Unit restarts forever, transfers nothing | Historically: a `.partial` that is already the whole file, resumed at EOF, answered HTTP 416. The current queue promotes or quarantines that case instead | Confirm you are running the tracked `download_queue.py`; check `downloads*.log` |
+| `SHA-256 mismatch` | Corrupt or truncated transfer. The partial is quarantined to `.bad-<digest prefix>` and the transfer restarts from zero | Nothing to do; it self-heals. Investigate if it repeats |
+| `quarantined invalid final` | A file already at the destination did not match size or digest | Expected after a bad copy or a power loss; the queue re-fetches |
+| `duplicate destination in queue` | Two queue entries resolve to the same real path | Fix the queue; per-file ownership is what makes concurrency safe |
+| Exit 75 | Another writer holds the phase lock | Wait, or stop the other unit |
+| Exit 2 | Arguments were passed. The program takes none | Set `HERMES_DOWNLOAD_*` instead |
+| A phase never starts | The previous phase's state is not `complete`, or its stamp does not equal the expected byte total | `cat verification/local-coverage-foundation/downloads*-complete.ok` and compare against the queue's `total_bytes`; run `test_queue_manifests.py` |
+| `phase-one stamp mismatch` | The queue was edited without updating every copy of its byte total | Update queue, phase runner and mission supervisor together |
+
+Read-only reconciliation, safe on a busy host:
+
+```bash
+python3 verification/computer-use-grounding/reconcile_downloads.py
+```
+
+## Mission never starts
+
+The supervisor logs why it is waiting to
+`verification/mission-supervisor/mission.log` and mirrors it into
+`mission-state.json`.
+
+| `status` | Meaning | Action |
+|---|---|---|
+| `waiting-artifacts` | One or more phases are not `complete`, or a stamp mismatches | Finish the downloads; the log names the file and the reason |
+| `waiting-safe-host` | A conflicting process, `MemAvailable < 32 GiB`, or load > 6.0 | The log line names counts by reason and up to eight sample tasks |
+| `blocked-policy` | The candidate policy gate failed; nothing model-backed ran | Read `candidate-qualification/evidence/candidate-policy.json` → `problems` |
+| `interrupted` | An operator stop or a signal | Re-run; passed steps are skipped, the interrupted step repeats |
+| `failed` with `host did not become quiet` | The bounded wait expired | The message lists the blockers actually observed |
+
+Common quiet-host blockers: a compiler or `makepkg`; a transfer; a **sidecar left
+resident by a failed gate**; `llama-server` started by hand, which is a conflict
+even though the managed router is not — the router is excused by its cgroup, not
+its name.
+
+Exit 75 from the unit means another supervisor holds the lock.
+
+## Gate problems
+
+| Symptom | Cause | Action |
+|---|---|---|
+| A runner exits 75 immediately | Its opening `--preflight-only --max-load 6.0` check found the host no longer idle | Wait for the host to drain and re-run |
+| Repository-agent gate refuses to start | `bwrap` is missing or not executable. There is deliberately no unisolated fallback | Install bubblewrap |
+| Repository-agent aborts mid-run with a sandbox error | The boundary failed, which is a host problem, not a candidate mistake. It aborts rather than returning a retryable tool error | Check namespace limits and host pressure; the in-progress artifact remains fail-closed |
+| `oracle_tampered` in the artifact | The fixed test suite was modified or removed during the run | The run does not count. Investigate the candidate's behaviour |
+| Computer-use gate exits 3 | Another instance holds the flock | Wait; do not start a second worker |
+| Computer-use gate exits 4 | Interrupted by a handled signal | Re-run; an unfinished run is not a verdict |
+| Runner exits 5 | Python exited 0 but the artifact is missing, stale or unreadable | Fail-closed by design; check the gate log |
+| Media runner reports `V620 retained excess VRAM after unload` | ComfyUI did not release residency within the 768 MiB tolerance | Check for a surviving ComfyUI process before re-running |
+| A gate passes but the ledger disagrees | The artifact's `gate` field does not match the expected identity, or `sections_missing` is non-empty | Compare against [the evidence contract](DEVELOPER-GUIDE.md#writing-an-evidence-artifact) |
+| Grounding scores look confidently wrong | A geometry or action-space mismatch, not the model. This is exactly what `groundlib.py` exists to prevent | `python3 -m pytest verification/computer-use-grounding/test_grounding_contract.py` |
+
+## Ledger says something unexpected
+
+| Reading | Meaning |
+|---|---|
+| `evidence-stale` | The gate artifact is older than the newest weight file for that capability. It is a statement about coverage, not about the model. Re-run the gate. mtime also moves when a verified file is re-promoted rather than re-fetched |
+| `evidence-interrupted` | A run was cut short. Re-run it to completion |
+| `downloaded` with "no evidence artifact is declared" | Intentional for `image-generation-editing` and `uncensored-multimodal`; see [the matrix](CAPABILITY-MATRIX.md#the-matrix) |
+| `download-incomplete` | A declared file is missing or the wrong size. Re-run the queue |
+| `problems: [… reports measured throughput]` | An artifact claims a measurement this workspace forbids. Find and remove it |
+| `problems: [… declared for a capability no queue owns]` | `CAPABILITY_EVIDENCE` names a capability no queue provides. Fix the map or the queue |
+| Everything reads `downloaded` on a fresh clone | Correct. Evidence is untracked runtime state |
+
+## Test suite problems
+
+| Symptom | Cause | Action |
+|---|---|---|
+| Dozens of collection errors | `pytest` was run without this repository's `pytest.ini`, so it walked into `tools/` and `venvs/` | Run from the repository root |
+| Three failures in `verification/repository-agent/fixture/` | The fixture is the gate's oracle and is defective on purpose | It is excluded by `norecursedirs`; do not "fix" it |
+| Sandbox tests hang or fail on a loaded host | A busy or RCU-stalled host is not a valid namespace test environment | `python3 -m pytest --ignore=verification/repository-agent`, then run the full suite when the host drains |
+| Preset-compatibility test skips | The submodule has not been built, so there is no `--help` to check against | Build it |
+| `verification/docs` fails on a new file | A tracked file has no coverage-map row, or a link/anchor does not resolve | Update [the coverage map](COVERAGE-MAP.md) or fix the link |
+
+## Storage and power loss
+
+After an unclean shutdown, a model whose byte size is complete is not
+trustworthy. Re-verify the publisher SHA-256 before loading it. Both failure
+shapes have been seen here: ZFS rejecting a full-size replacement with
+`Input/output error`, and a different full-size pre-crash copy failing its digest.
+
+```bash
+python3 verification/computer-use-grounding/reconcile_full.py   # re-hashes every declared digest
+sudo zpool status -v zroot                                      # privileged listing of affected paths
+```
+
+Do not run `zpool clear` until the scrub result and affected paths have been
+reviewed. Model artifacts are replaceable; unrelated user data needs a restore
+decision.
+
+Crash residue you may see, all gitignored: `*.partial`, `*.recovered`,
+`*.bad-*`, `*.tmp`, `*.tmp.<pid>`. `reconcile_full.py` accounts for reclaimable
+bytes and never deletes them — that is an operator decision.
