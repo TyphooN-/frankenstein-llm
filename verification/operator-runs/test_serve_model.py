@@ -11,12 +11,28 @@ sys.modules[spec.name] = m
 spec.loader.exec_module(m)
 
 
-def test_listing_includes_full_weight_names(capsys):
+def test_listing_shows_full_name_and_use_case(capsys):
     assert m.main(['--list']) == 0
     out = capsys.readouterr().out
-    assert 'Qwen3.8-27B-Ridge-3.7bpw.gguf' in out
-    assert 'Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf' in out
-    assert 'Qwen3.8-27B-OBLITERATED-mmproj-bf16.gguf' in out
+    assert 'Qwen3.8-27B-Heretic-Abliterated-Uncensored Q6_K (General-purpose Hermes agent and tool use)' in out
+    assert 'Qwen3-Coder-Next Q4_K_M (Coding and repository-agent work)' in out
+    assert '.gguf' not in out
+    assert 'projector:' not in out
+    assert 'heretic  (' not in out
+
+
+def test_listing_details_retains_identifiers(capsys):
+    assert m.main(['--list', '--details']) == 0
+    out = capsys.readouterr().out
+    assert 'alias: heretic' in out
+    assert 'RVN-Q6_K-multilingual-mtp.gguf' in out
+
+
+def test_catalog_covers_every_preset():
+    import json
+    catalog = json.loads((ROOT / 'config/model-catalog.json').read_text())
+    assert set(catalog) == set(m.presets(ROOT / 'llama-models.ini'))
+    assert all(set(row) == {'name', 'purpose'} and all(row.values()) for row in catalog.values())
 
 
 def test_all_presets_have_wrappers():

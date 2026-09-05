@@ -4,6 +4,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 
 | Tracked file | Documentation |
 |---|---|
+| [`config/model-catalog.json`](../../config/model-catalog.json) | [Reference](../MODEL-RUNS.md) |
 | [`.gitignore`](../../.gitignore) | [Reference](ARCHITECTURE.md) |
 | [`.gitmodules`](../../.gitmodules) | [Reference](ARCHITECTURE.md) |
 | [`LICENSE`](../../LICENSE) | [Reference](ARCHITECTURE.md) |
@@ -219,4 +220,4 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/tts-local/test_tts_gate.py`](../../verification/tts-local/test_tts_gate.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/upstream-pin/test_llama_cpp_pin.py`](../../verification/upstream-pin/test_llama_cpp_pin.py) | [Reference](DEVELOPER-GUIDE.md) |
 
-Inventory entries: 214. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 215. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

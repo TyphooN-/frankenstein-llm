@@ -52,6 +52,8 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('alias', nargs='?')
     p.add_argument('--list', action='store_true')
+    p.add_argument('--details', action='store_true', help='include alias and artifact paths with --list')
+    p.add_argument('--catalog', type=Path, default=ROOT / 'config/model-catalog.json')
     p.add_argument('--execute', action='store_true')
     p.add_argument('--presets', type=Path, default=ROOT / 'llama-models.ini')
     p.add_argument('--config', type=Path, default=ROOT / 'config/serving.json')
@@ -63,10 +65,18 @@ def main(argv=None):
     try:
         registry = presets(a.presets)
         if a.list:
+            catalog = json.loads(a.catalog.read_text())
+            if not isinstance(catalog, dict) or set(registry) - set(catalog):
+                raise ValueError('every preset needs a full name and purpose in the model catalog')
             for alias, preset in sorted(registry.items()):
-                print(f"{alias}  ({Path(preset['model']).name})")
-                if preset.get('mmproj'):
-                    print(f"  projector: {Path(preset['mmproj']).name}")
+                row = catalog[alias]
+                if not isinstance(row, dict) or set(row) != {'name', 'purpose'} or not all(isinstance(v, str) and v.strip() for v in row.values()):
+                    raise ValueError(f'invalid catalog entry: {alias}')
+                print(f"{row['name']} ({row['purpose']})")
+                if a.details:
+                    print(f"  alias: {alias}\n  model: {preset['model']}")
+                    if preset.get('mmproj'):
+                        print(f"  projector: {preset['mmproj']}")
             return 0
         if a.alias not in registry:
             raise ValueError('unknown alias; use --list')

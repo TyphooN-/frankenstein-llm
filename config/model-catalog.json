@@ -1,0 +1,50 @@
+{
+  "ridge": {
+    "name": "Qwen3.8-27B-Ridge 3.7bpw",
+    "purpose": "General chat and compressed baseline"
+  },
+  "heretic": {
+    "name": "Qwen3.8-27B-Heretic-Abliterated-Uncensored Q6_K",
+    "purpose": "General-purpose Hermes agent and tool use"
+  },
+  "obliterated": {
+    "name": "Qwen3.8-27B-OBLITERATED Q6_K",
+    "purpose": "General chat and tool use with reduced refusal behavior"
+  },
+  "obliterated-vision": {
+    "name": "Qwen3.8-27B-OBLITERATED Q6_K + Vision",
+    "purpose": "Image understanding and visual reasoning"
+  },
+  "fable": {
+    "name": "Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP Q6_K",
+    "purpose": "Creative writing and long-form fiction"
+  },
+  "phr00ty": {
+    "name": "Phr00tyMix-v4-32B imat Q6_K",
+    "purpose": "Roleplay, dialogue and prose"
+  },
+  "qwen3-embedding-8b": {
+    "name": "Qwen3-Embedding-8B Q6_K",
+    "purpose": "Text embeddings and semantic retrieval"
+  },
+  "qwen3-reranker-8b": {
+    "name": "Qwen3-Reranker-8B Q6_K",
+    "purpose": "Ranking retrieved documents for RAG"
+  },
+  "qwen25-coder-7b-fim": {
+    "name": "Qwen2.5-Coder-7B Q8_0",
+    "purpose": "Fill-in-the-middle code completion"
+  },
+  "qwen3-coder-next": {
+    "name": "Qwen3-Coder-Next Q4_K_M",
+    "purpose": "Coding and repository-agent work"
+  },
+  "gemma4-heretic": {
+    "name": "Gemma-4-12B-it-Heretic Q6_K",
+    "purpose": "Reader-only text analysis; no executable tools"
+  },
+  "gemma4-heretic-vision": {
+    "name": "Gemma-4-12B-it-Heretic Q6_K + Vision",
+    "purpose": "Reader-only image analysis; no executable tools"
+  }
+}

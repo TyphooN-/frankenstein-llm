@@ -32,6 +32,11 @@ available logical CPUs; add an integer `threads` to the benchmark config to tune
 
 ## Serve any configured model
 
+The default listing displays **Full model name (purpose/use case)**. Human-readable
+names and intended roles live in `config/model-catalog.json`; they are descriptions,
+not comparative quality claims. Use `--list --details` to additionally expose aliases,
+weight paths and projectors. Aliases remain stable command/API identifiers.
+
 ```bash
 cd /home/typhoon/git/frankenstein-llm
 python3 scripts/serve-model.py --list
