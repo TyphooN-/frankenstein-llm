@@ -55,7 +55,7 @@ observed working.
 What it is **not**: a hosted service, a multi-user deployment, or a place where
 model weights live in Git. It also does not measure models — there is no
 authorized comparative-performance result here. Functional gates do score specific correctness criteria; those scores are not throughput benchmarks. See
-[no model-characterization harness](reference/CAPABILITY-MATRIX.md#no-model-characterization-harness).
+[no numeric model-characterization harness](reference/CAPABILITY-MATRIX.md#no-numeric-model-characterization-harness).
 
 ## Before you start
 

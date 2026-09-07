@@ -176,7 +176,7 @@ key names; nothing was loaded, so it is not a compatibility result.
 
 **Decision: wait, then isolated evaluation.** The video capability is real and
 would be new, but the repository's own gate must be cleared first, and
-[CANDIDATE-STATUS-2026-09-03.md](../CANDIDATE-STATUS-2026-09-03.md) is explicit
+[CANDIDATE-STATUS-2026-09-06.md](../CANDIDATE-STATUS-2026-09-06.md) is explicit
 that the already-downloaded ComfyUI stacks (Z-Image, ACE-Step, Qwen Image Edit,
 FLUX.2) are still unproven as workflows. Another unproven media stack ahead of
 those is not an upgrade.
@@ -340,9 +340,11 @@ larger decision than the 11 MB adapter that prompted this entry.
 | `Reallexi-llc/lexipix-models` | `314776a9ab97` | 13 | 10,639,980,998 | **none declared** | reject |
 | `speach1sdef178/MiniMax-H3-Semantic-Bridge` | `8c2d9b0edb84` | 69 | 20,825,454 | other | reject, adapter without base |
 
-Eleven of eleven investigated. One isolated-evaluation candidate, three waits,
-seven rejects. **Nothing here is downloaded, admitted, or GPU-qualified**, and
+Eleven of eleven were investigated in this first pass. **Verdict counts in the
+table above are superseded by**
+[CANDIDATE-RESEARCH-CLOSEOUT.md](CANDIDATE-RESEARCH-CLOSEOUT.md).
+**Nothing here is downloaded, admitted, or GPU-qualified**, and
 the "do not download next" rule in
-[CANDIDATE-STATUS-2026-09-03.md](../CANDIDATE-STATUS-2026-09-03.md) still
+[CANDIDATE-STATUS-2026-09-06.md](../CANDIDATE-STATUS-2026-09-06.md) still
 stands: the weights already on disk are unproven as product workflows, and that
 outranks every candidate above.

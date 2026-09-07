@@ -61,7 +61,8 @@ See:
 - `docs/decisions/0005-track-llama-cpp-submodule.md`
 - `docs/LOCAL-AI-MODEL-STRATEGY.md`
 - `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — 2026-09-02 research snapshot
-- `docs/CANDIDATE-STATUS-2026-09-03.md` — current download/policy/runtime/functional state
+- `docs/CANDIDATE-STATUS-2026-09-06.md` — current download/policy/runtime/functional state
+- `docs/CANDIDATE-STATUS-2026-09-03.md` — historical 2026-09-03 snapshot
 
 ## Downloads
 

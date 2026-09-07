@@ -1,10 +1,10 @@
 # Local and frontier AI model strategy
 
-Last updated: 2026-09-03
+Last updated: 2026-09-06
 
 This document is the decision record for Hermes, local llama.cpp models, coding, creative generation, and authorized security research on `frankenstein`. The coverage-complete deployment roadmap is maintained in `docs/LOCAL-HERMES-CAPABILITY-COVERAGE-PLAN.md`.
 
-The 2026-09-02 candidate sweep — Qwen3-Coder-Next, Gemma-4-12B Heretic, UI-Mate-9B, WeMM-Embedding-2B, FLUX.2-klein-4B and the models rejected alongside them — is recorded with pinned revisions and source links in `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`. That review is the research snapshot. Current download, policy, runtime, and functional state is `docs/CANDIDATE-STATUS-2026-09-03.md`. Phase-three and phase-four artifacts are on disk; they are not all functionally qualified.
+The 2026-09-02 candidate sweep — Qwen3-Coder-Next, Gemma-4-12B Heretic, UI-Mate-9B, WeMM-Embedding-2B, FLUX.2-klein-4B and the models rejected alongside them — is recorded with pinned revisions and source links in `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`. That review is a research snapshot. Current download, policy, runtime, and functional state is `docs/CANDIDATE-STATUS-2026-09-06.md`. Phase-three and phase-four artifacts are on disk; they are not all functionally qualified. Later researched additions are in `docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md` and are not admitted.
 
 ## Executive decision
 

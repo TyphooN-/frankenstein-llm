@@ -1,6 +1,6 @@
 # Local Hermes models - architecture, plan, and status
 
-Last updated: 2026-09-04
+Last updated: 2026-09-06
 
 This is the source-of-truth ledger for local LLMs on `frankenstein`. It records verified state, model-selection reasoning, operating commands, and unfinished work.
 
@@ -51,7 +51,7 @@ Do not use `--split-mode tensor`: Qwen3.8 MTP backend sampling is incompatible w
 - Expected SHA-256: `3535d4a15b75840fb391138ce04e6c73fde709320c6f5fe788cdbd586ee08e3a`.
 - Alias: `obliterated`.
 - Version: V3 with corrected baked template and restored MTP/vision tensors.
-- Matching projector: `/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-OBLITERATED-mmproj-bf16.gguf` (931,145,888 bytes, SHA-256 `e484e3b7e907ed0e0644c0de56c3f5929c7ad5c9c6cc84d35a9d8dc08d461545`, repo revision `a58c3b53b3ce71551eafde2ed5ec8df48e0f4ff8`). Downloaded and publisher-hash verified 2026-09-01. Not yet wired into the production alias; vision gates remain pending.
+- Matching projector: `/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-OBLITERATED-mmproj-bf16.gguf` (931,145,888 bytes, SHA-256 `e484e3b7e907ed0e0644c0de56c3f5929c7ad5c9c6cc84d35a9d8dc08d461545`, repo revision `a58c3b53b3ce71551eafde2ed5ec8df48e0f4ff8`). Downloaded and publisher-hash verified 2026-09-01. Wired as preset `obliterated-vision`. `vision-grounding` is ledger-qualified; that is not idle-host memory-fit and not a claim about every screenshot corpus.
 - Role: use when avoiding soft deflections matters more than staying maximally close to stock.
 - Published cost: MMLU 82.3% vs stock 84.5% (-2.1 percentage points); STEM was the most affected category. Recommended local agent sampling is temperature 0.2 with repetition penalty 1.15.
 
@@ -104,7 +104,15 @@ Preset: `/home/typhoon/git/frankenstein-llm/llama-models.ini`
 
 Service: `llama-router.service`
 
-The router publishes `ridge`, `heretic`, `obliterated`, `fable`, and `phr00ty`, autoloads the requested model, and uses `--models-max 1` so switching evicts the previous model rather than exhausting VRAM. The first prompt after a switch waits for model loading; later prompts are immediate.
+The router publishes chat aliases `ridge`, `heretic`, `obliterated`,
+`obliterated-vision`, `fable`, `phr00ty`, `qwen3-coder-next`, `gemma4-heretic`,
+and `gemma4-heretic-vision`, plus sidecar-oriented presets for embeddings,
+reranking, and FIM. Chat switching uses `--models-max 1` so a new large chat
+model evicts the previous one. The first prompt after a switch waits for load.
+
+Capability qualification for sidecars and specialists is in
+`docs/CANDIDATE-STATUS-2026-09-06.md`. Do not infer that every listed preset is
+functionally qualified.
 
 The old `llama-ridge.service` remains available as a rollback unit but must not run at the same time as `llama-router.service` because both bind port 8080 and own the same GPUs.
 
@@ -208,10 +216,10 @@ Full evidence and acceptance gates are in `docs/LOCAL-AI-MODEL-STRATEGY.md`.
 | Item | Status |
 |---|---|
 | Ridge download/service/API/Hermes proof | Done |
-| Router preset syntax and five-model discovery | Done; all five aliases visible through `/v1/models` and Desktop picker |
+| Router preset syntax and five-model discovery | Done for the original five chat aliases; later presets added in `llama-models.ini` |
 | Q6 OBLITERATUS V3 download/checksum | Done; publisher SHA-256 matched |
 | Q6 RVN multilingual MTP download/checksum | Done; publisher SHA-256 matched after crash recovery |
-| Router service file and unit verification | Active, enabled, loopback-only; Ridge rollback unit disabled/inactive |
+| Router service file and unit verification | Tracked units install from `services/systemd/`; live ActiveState is host state |
 | Hermes `llamacpp-local` provider and five aliases | Configured; cloud default remains `openai-codex / gpt-5.6-sol` |
 | Direct API test for Ridge and OBLITERATUS | Done; deterministic completion passed and one-model eviction observed |
 | Direct API test for Heretic | Done; deterministic completion passed after scrub |
@@ -219,7 +227,8 @@ Full evidence and acceptance gates are in `docs/LOCAL-AI-MODEL-STRATEGY.md`.
 | Hermes one-shot test for Heretic | Done; alias resolved, exact completion passed, one API call |
 | Desktop packaged build | Done: Electron 40.10.2 Linux unpacked app and launcher entry verified |
 | Desktop launch | Done: packaged Wayland window mapped in Hyprland and rendered Skills Hub without fatal overlay |
-| Desktop picker visual confirmation | Done; packaged Desktop visibly listed all five aliases under `LOCAL LLAMA.CPP ROUTER` |
+| Desktop picker visual confirmation | Done; packaged Desktop visibly listed the original five aliases under `LOCAL LLAMA.CPP ROUTER` |
+| Additional router presets (vision, Coder-Next, Gemma-4, embedding, reranker, FIM) | Present in `llama-models.ini`; qualification is per capability in `docs/CANDIDATE-STATUS-2026-09-06.md` |
 | Fable/Phr00ty download and checksum | Done; both complete files matched their publisher SHA-256 values before atomic promotion |
 | Fable/Phr00ty direct API and Hermes acceptance | Done; direct deterministic completion passed and each Hermes alias completed one API call through the custom provider |
 | ZFS post-outage scrub | Done; 0B repaired, 0 errors, zero device counters, no known data errors |

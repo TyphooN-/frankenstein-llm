@@ -1,137 +1,164 @@
 # Local Hermes Capability Coverage Plan
 
-Status date: 2026-08-31
+Status date: 2026-09-06
 
-Objective: progressively replace paid AI services with a private local stack while preserving a cloud frontier fallback for capabilities that local models have not yet matched. A model is admitted only when it fills a named workflow and passes functional, memory, and clean-unload gates.
+Objective: progressively replace paid AI services with a private local stack
+while preserving a cloud frontier fallback for capabilities that local models
+have not yet matched. A model is admitted only when it fills a named workflow
+and passes functional, memory, and clean-unload gates.
+
+This is the living coverage roadmap. Operational states (researched /
+downloaded / policy-admitted / functionally qualified) are in
+[CANDIDATE-STATUS-2026-09-06.md](CANDIDATE-STATUS-2026-09-06.md). Refresh the
+machine reading with:
+
+```bash
+python3 verification/local-coverage-foundation/build_capability_ledger.py --print-only
+```
+
+Do not read [CANDIDATE-STATUS-2026-09-03.md](CANDIDATE-STATUS-2026-09-03.md) or
+the 2026-08-31 rows that used to live here as current inventory. Those described
+an earlier host. Weights on disk are not product workflows.
 
 ## Hardware stages
 
 ### Current workstation
 
 - Xeon E5-2696 v4, 22 cores / 44 threads
-- Approximately 94.16 GiB RAM
-- Radeon Pro V620 32 GiB plus two RX 6900 XT 16 GiB
-- Approximately 61.55 GiB aggregate VRAM
-- llama.cpp router is loopback-only and normally keeps one model resident
+- Approximately 94.17 GiB RAM (`MemTotal` 101,109,370,880 bytes on 2026-09-06)
+- Radeon Pro V620 ~30 GiB plus two RX 6900 XT 16 GiB
+- llama.cpp router is loopback-only and keeps one large chat model resident
+  (`--models-max 1`)
 
-Operational implication: 27B Q6 models fit well. Very large MoE models require hybrid CPU/GPU placement and compete with RAM, KV cache, desktop applications, and filesystem cache.
+Operational implication: 27B Q6 models fit well. Very large MoE models require
+hybrid CPU/GPU placement and compete with RAM, KV cache, desktop applications,
+and filesystem cache. A 128 GB RAM upgrade is a future baseline, not current
+capacity.
 
-### Planned 3–4 V620 system
+### Planned RAM / extra-V620 expansion
 
-- 96 GiB aggregate VRAM with three V620s
-- 128 GiB aggregate VRAM with four V620s
+- 128 GiB RAM (planned)
+- Additional V620 cards remain a hardware plan, not an installed topology
 
-Operational implication: 27B–35B high-quality models can be fully GPU-resident with substantial context; selected 70B-class quants become practical; approximately 90–120 GiB artifacts may fit only with careful runtime/KV headroom and should not be treated as safely fully resident merely because file size is below aggregate VRAM.
+Requalify after each material change. Do not treat aggregate VRAM as a fully
+resident budget.
 
 ## Coverage matrix
 
-| Capability | Current local coverage | Gap | Preferred next component | Admission proof |
+Ledger states below are from 2026-09-06. `functionally-qualified` is a gate
+pass, not idle-host memory-fit and not tokens/sec.
+
+| Capability | Current local coverage | Gap | Next work | Admission proof |
 |---|---|---|---|---|
-| Low-latency daily chat | `ridge`, `heretic`, `obliterated` | Model switching has cold-load delay | Keep one responsive 27B preset; optionally Ornith 9B only if measured faster | First-token usability, coherence, 64K+ context, clean unload |
-| General reasoning | `heretic`; GLM-5.3-Flash IQ3_XXS deferred for idle-host retry | Local quality below frontier on hard long-horizon work | Retain `heretic` and cloud fallback; retry GLM only with no kernel compilation or other heavy workload | Normal-system load, correctness suite, memory safety, workflow quality |
-| Repository-scale coding/repair | `heretic` plus local tools | No proven local replacement for Claude Code/GPT frontier agents | Benchmark candidate coding models through real repo tasks; do not infer from model-card scores | Patch correctness, tests, diff review, long-horizon completion |
-| Fast code completion | No dedicated always-hot FIM service | General chat models are wasteful/slow for keystroke completion | Select a compact FIM-capable coder after latency/quality bakeoff | FIM exactness, low latency, bounded residency, IDE integration |
-| Structured output/tool calls | Installed Qwen3.8 models; not yet systematically tested | Schema adherence and recovery unproven | Test installed `obliterated`; conditional Qwen3 4B structured-output worker | JSON-schema corpus, malformed retry, tool name/argument accuracy |
-| Authorized security/red-team | `heretic`, `obliterated`, scanners/tooling | Need repeatable agent scaffold and evidence discipline | Keep Qwen3.8 unrestricted model; evaluate a sandboxed CAI-style scaffold | Scope enforcement, reproducible findings, false-positive rate |
-| Vision/screenshots/diagrams | Qwen3.8 text weights installed, projector absent | No verified local image understanding | Download matching Qwen3.8 BF16 projector; conditional Ornith 9B fallback | Screenshot, chart, document, diagram, multi-image tests |
-| OCR/document images | No dedicated verified OCR service | General VLMs are not enough for dense layouts | Evaluate PaddleOCR-VL 1.6 and HunyuanOCR 1.5 on local documents | CER/WER, tables, forms, rotation, handwriting, bounded batches |
-| Browser/computer use | Hermes desktop control exists; local visual policy unproven | No verified local screen-grounding model | First test Qwen3.8 vision in a sandbox; evaluate UI-TARS only if grounding fails | Click/point accuracy, state verification, prompt-injection resistance |
-| Embeddings | No standardized local embedding endpoint | Retrieval cannot be coverage-complete | Qwen3-Embedding-8B, with a smaller tier if latency requires | MTEB-like local corpus recall, dimension/storage cost, multilingual data |
-| Reranking | No standardized reranker | Vector-only retrieval quality ceiling | Qwen3-Reranker-8B | nDCG/recall improvement, batch latency, long-query behavior |
-| Local RAG | Bounded SQLite/NumPy store with provenance, deletion, Markdown/text/HTML and OOXML extraction | PDF requires an optional parser; scanned documents require the unqualified OCR sidecar | Connect admitted embeddings/reranker and add OCR fallback only after their live gates pass | Incremental ingest, stale-content retirement, archive caps, citations, adversarial documents |
-| Long documents | 131K router presets on installed models | No end-to-end ingest/retrieval proof; million-token claims not practical proof | Retrieval-first pipeline, then long-context synthesis | Needle/retrieval suite, citation accuracy, memory bounds |
-| Speech-to-text | No dedicated verified local ASR stack | Audio input still depends on external/limited paths | Qwen3-ASR-1.7B; retain Whisper-class fallback for comparison | WER, timestamps, accents, noise, long-stream chunking |
-| Text-to-speech | Hermes TTS supports configured providers, but local quality path not established | Need private natural voice and streaming | Qwen3-TTS-12Hz-1.7B-Base or a proven lightweight local voice | Intelligibility, latency, long-text chunking, voice consistency |
-| Image generation/editing | No deployed pipeline | Text model cannot render/edit images | ComfyUI on ROCm with one known-good FLUX/SDXL-class workflow | Actual image, inpaint/img2img, reproducible workflow, VRAM recovery |
-| Music/audio generation | No deployed pipeline | No local full-song generation | ACE-Step 1.5 through ComfyUI; secondary sound-effect model later | Actual song, lyrics adherence, duration, clean GPU handoff |
-| Multilingual work | Qwen3.8 family | Not independently measured on user languages | Keep Qwen generalists; measure before specialist downloads | Translation/retrieval/ASR/TTS corpus in required languages |
-| Persistent memory | Hermes session/memory plus files | No unified semantic memory with retention/deletion policy | RAG store with explicit provenance, TTL, and deletion | Correct updates/deletes, dedupe, source traceability, privacy |
-| High-capability slow specialist | No admitted model; GLM-5.3-Flash retry deferred | Fit remains unproven because the prior pressure run overlapped a Linux kernel compile | Retry once on an otherwise idle current host; requalify after planned RAM/GPU upgrades | Normal-system load, coherence, workflow wins, safe headroom |
+| Low-latency daily chat | Router presets `ridge`, `heretic`, `obliterated` | Cold-load delay on switch; live three-GPU splits unexercised | Keep one responsive 27B; qualify placement on an idle host | First-token usability, coherence, context, clean unload, measured residency |
+| General reasoning | `heretic`; GLM-5.3-Flash still experimental | Local quality below frontier on hard long-horizon work | Retain `heretic` and cloud fallback; GLM only in an isolated `glm5next` worktree on an idle host | Normal-system load, correctness, memory safety |
+| Repository-scale coding | Presets `heretic` and `qwen3-coder-next`; Coder-Next **downloaded** | Repository-agent gate artifacts absent | Run `gate-repo-agent-heretic` and `gate-repo-agent-qwen3-coder-next` | Patch correctness, tests, long-horizon completion |
+| Fast code completion | FIM weights on disk (`qwen25-coder-7b-fim`); evidence **stale** | Gate predates current bytes | Re-run FIM gate; then IDE integration if it still passes | FIM exactness, bounded residency |
+| Structured output / tools | `native-tool-use` **qualified**; obliterated/phr00ty auto-tool still historically missed | Schema recovery not a scored corpus | Keep the existing gate; add obliterated/phr00ty cases if needed | JSON-schema, malformed retry, `message.tool_calls` |
+| Authorized security | `heretic`, `obliterated`, scanners; Strix scaffold executes nothing | No authorized live security-agent run | Do not add execution without a separate decision | Scope enforcement, reproducible findings |
+| Vision / screenshots | `vision-grounding` **qualified** on `obliterated-vision`; Gemma-4 vision hand-checked 2026-09-03 | Gemma audio/video untested; no durable Gemma gate | Write Gemma text/vision evidence; do not claim audio/video | Screenshot/chart/document tests, unload |
+| OCR | HunyuanOCR **downloaded**; evidence **stale** | Gate predates current bytes; PDF ingest still optional | Re-run OCR gate; scanned-document RAG fallback only after it passes | CER/WER-style fixtures, rotation, tables |
+| Browser / computer use | UI-TARS and UI-Mate **downloaded**; grounding **interrupted** | No computer-control **service** | Finish UI-TARS gate, then UI-Mate A/B, then screenshot→action→readback | Click/point accuracy, injection resistance, state verification |
+| Embeddings | Qwen3-Embedding-8B **downloaded**; evidence **stale** | Gate predates current bytes | Re-run embeddings gate | Local corpus order, dimension, unload |
+| Reranking | Qwen3-Reranker-8B **downloaded**; evidence **stale** | Gate predates current bytes | Re-run reranker gate | nDCG-style fixtures, batch behaviour |
+| Local RAG | `rag` **qualified** (structural + behavioural + live) | PDF parser optional; scanned docs need qualified OCR | Do not silently skip; keep skip reasons explicit | Citations, deletion, stale-chunk retirement |
+| Multimodal embeddings | WeMM text-only **qualified** | Image/video needs torchvision; 2048-D index not built | Keep text-only claim; no HIP_VISIBLE_DEVICES filter on this host | Text semantic order now; image/video later |
+| Long documents | 131K presets exist | Million-token claims are not local proof | Retrieval-first, then long-context synthesis | Needle/retrieval, memory bounds |
+| Speech-to-text | `asr` **qualified** | Streaming/long-chunk and TTS round-trip still open | Pair with TTS intelligibility after TTS gates | WER-style fixtures, timestamps, unload |
+| Text-to-speech | Qwen3-TTS **downloaded**; `gate-tts.json` absent | No intelligibility proof | Isolated TTS gate, then TTS→ASR | Intelligibility, chunking, VRAM recovery |
+| Image generation | Z-Image **downloaded** | `media-functional.json` absent | One ComfyUI workflow, then unload | Actual image, VRAM recovery |
+| Image editing | Qwen Image Edit stack **downloaded**; FLUX.2-klein-4B **downloaded** with no declared gate | Workflows unproven | Pin and submit one edit graph; add a FLUX.2 evidence declaration only when the gate actually submits it | Actual edit, reproducible workflow, unload |
+| Music | ACE-Step **downloaded** | Same missing media-functional artifact | After image GPU lifecycle is stable | Actual audio, lyrics adherence, unload |
+| Multilingual | Qwen3.8 family installed | Not independently measured | Measure before specialist downloads | Translation/retrieval/ASR/TTS in required languages |
+| Persistent memory | Hermes memory plus RAG store | No unified TTL/deletion product beyond RAG gates | Keep provenance explicit | Correct updates/deletes |
+| High-capability slow specialist | **No admitted model.** Research closeout names 122B Q4_K_M, 35B Q6_K, Omega 70B, Flash-Next UD-IQ4_XS | Not downloaded; GLM still unsupported in production binary | Qualify installed workflows first; then isolated eval on an idle host | Load, quality vs `heretic`, pressure, unload. No production alias first |
 
 ## Deployment architecture
 
 ### Tier 0: deterministic tools
 
-Use compilers, tests, linters, Semgrep/CodeQL, OCR engines, parsers, checksums, databases, and browser state inspection as authoritative evidence. Models orchestrate and interpret; they do not replace deterministic proof.
+Compilers, tests, linters, Semgrep/CodeQL, OCR engines, parsers, checksums,
+databases, and browser state inspection remain authoritative. Models orchestrate
+and interpret.
 
 ### Tier 1: always-available interactive model
 
-Keep one responsive Qwen3.8-class model resident behind the loopback llama.cpp router. This is the default for private chat, code explanation, lightweight tool calls, summarization, and routine authorized security work.
+Keep one responsive Qwen3.8-class chat preset resident behind the loopback
+router (`heretic` preferred daily driver; `ridge` compact; `obliterated` when
+refusal friction matters more than stock closeness).
 
 ### Tier 2: switched specialists
 
-Cold-load specialists only when their workflow justifies eviction:
-
-- Qwen3.8 OBLITERATED plus projector for unrestricted multimodal/security work
-- OCR specialist for dense documents
-- embedding and reranking services, preferably separate and persistent if memory permits
-- ASR/TTS services
-- image/music generation pipelines
+Cold-load only when the workflow justifies eviction: vision, FIM, embeddings,
+reranker, ASR/TTS, ComfyUI, Coder-Next, Gemma-4. Sidecars may stay up when
+memory permits; they still need current-byte gates.
 
 ### Tier 3: heavyweight reasoning
 
-No local heavyweight specialist is admitted. GLM-5.3-Flash IQ3_XXS remains isolated and may receive one clean 32K retry on the normal 96 GiB/three-GPU system only when Linux kernel compilation and every other heavy workload are absent. Do not tune the workstation around it.
+No local heavyweight specialist is admitted. GLM-5.3-Flash stays isolated.
+Researched 70B–122B class artifacts are evaluation candidates only.
 
 ### Tier 4: cloud fallback
 
-Retain GPT/Claude access for repository-scale autonomous work, difficult multimodal reasoning, or time-critical tasks where local tests have not demonstrated parity. Route progressively less traffic to cloud as each local gate passes; do not declare replacement based on model-card benchmarks.
+Retain GPT/Claude for repository-scale autonomous work and tasks where local
+gates have not demonstrated parity. Do not declare replacement from model cards.
 
 ## Sequenced execution plan
 
-### Phase A — GLM-5.3-Flash idle-host retry
+Work already on disk outranks new downloads.
 
-1. Done: all 15 IQ3_XXS shards were publisher-hash verified and the isolated PR #27752 runtime was built.
-2. The prior auto-fit run is inconclusive because it overlapped a 44-thread Linux kernel compile. Static `3,6,2` placement remains invalid because it exceeded a 16 GiB GPU.
-3. Retry 32K auto-fit once only after confirming no kernel compile, linker, downloader, or other heavy workload is active. Do not change ARC, swap policy, or other host settings.
-4. Keep 64K, A/B, and router integration blocked until that clean 32K gate passes. No production alias is permitted before full admission.
+### Phase A — GLM-5.3-Flash idle-host retry (blocked)
 
-### Phase B — complete the installed Pliny model
+1. Done: IQ3_XXS shards were publisher-hash verified historically; isolated
+   experimental runtime is required because production v0.4.0 has no `glm5next`.
+2. Prior auto-fit overlapping a kernel compile remains inconclusive.
+3. Retry 32K only on an idle host, isolated worktree, off the production port.
+4. No production alias before full admission.
 
-1. Done: local projector `/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-OBLITERATED-mmproj-bf16.gguf` matches publisher size 931,145,888 and SHA-256 `e484e3b7e907ed0e0644c0de56c3f5929c7ad5c9c6cc84d35a9d8dc08d461545` (revision `a58c3b53b3ce71551eafde2ed5ec8df48e0f4ff8`).
-2. Test text coherence, coding patch quality, JSON/schema output, tool calls, low-refusal behavior, screenshots/documents/charts, MTP, context handling, and clean unload.
-3. Tune from measured behavior. Publisher recommendations are temperature 0, repetition penalty 1.15, empty system prompt, and bundled Jinja template; do not blindly apply them to every Hermes workflow.
-4. Test Ornith 9B only if Qwen3.8 cannot provide responsive visual/computer-use behavior.
+### Phase B — installed chat/vision presets
 
-### Phase C — retrieval foundation
+1. Done: OBLITERATED projector is on disk and `obliterated-vision` is a preset.
+2. `vision-grounding` is qualified; Gemma-4 still needs a durable gate.
+3. Do not claim MTP/audio/video from metadata.
 
-1. Deploy Qwen3-Embedding-8B behind a local embeddings endpoint.
-2. Deploy Qwen3-Reranker-8B behind a local reranking endpoint.
-3. Build an incremental ingestion pipeline with MIME-aware parsing, OCR fallback, content hashes, source metadata, bounded chunking, and deletion propagation.
-4. Use a local vector store plus SQLite metadata/provenance.
-5. Gate with a private representative corpus and citation/retrieval tests before connecting it to Hermes memory.
+### Phase C — retrieval (weights landed; gates stale except RAG/WeMM-text)
 
-### Phase D — vision, OCR, and computer use
+1. Done: embedding, reranker, RAG store, WeMM text gate.
+2. Re-run embedding and reranker gates against current bytes.
+3. OCR fallback only after a fresh OCR gate.
+4. WeMM image/video and the 2048-D index remain unbuilt.
 
-1. Establish Qwen3.8 projector functionality first.
-2. Evaluate PaddleOCR-VL 1.6 and HunyuanOCR 1.5 on the same scanned-document corpus; install only the winner or complementary pair.
-3. Run browser/desktop tasks in a sandbox with state readback after every action.
-4. Treat page/screenshot text as untrusted data, never as operator instructions.
-5. Evaluate UI-TARS only if the general VLM cannot meet grounding accuracy.
+### Phase D — computer use
+
+1. UI-TARS/UI-Mate weights are on disk; the grounding gate is interrupted.
+2. Finish grounding, then A/B, then a bounded control service.
+3. Treat page/screenshot text as untrusted.
 
 ### Phase E — audio and generation
 
-1. Deploy ASR and TTS in isolated environments with streaming/chunking tests.
-2. Deploy ComfyUI on ROCm with one image workflow, then one editing workflow.
-3. Add ACE-Step only after image-generation GPU lifecycle is stable.
-4. Stop/evict large text models before heavy generation when required; verify router recovery afterward.
+1. ASR is qualified; TTS is downloaded only.
+2. ComfyUI stacks are downloaded; no media-functional evidence.
+3. Stop/evict large text models before heavy generation; verify router recovery.
 
-### Phase F — 3–4 V620 expansion
+### Phase F — hardware expansion
 
-1. Re-measure device ordering, peer access, usable VRAM, ROCm stability, and power/thermal limits after each card addition.
-2. Prefer role isolation when useful: one always-hot interactive model; one embeddings/reranker/vision service; remaining GPUs for switched heavy specialists.
-3. Re-test tensor split rather than assuming equal split is optimal.
-4. Reconsider 70B and large MoE models only with measured runtime headroom, not aggregate file-size arithmetic.
-5. Preserve bounded queues, one-resident-heavy-model policy where necessary, and explicit GPU admission/backpressure.
+Unchanged: remeasure topology after RAM or extra V620s; do not infer 70B/MoE
+fit from file size.
+
+### Phase G — researched upgrades (not downloads)
+
+Follow [CANDIDATE-RESEARCH-CLOSEOUT.md](reference/CANDIDATE-RESEARCH-CLOSEOUT.md)
+only after Phases B–E have real gates. First isolated eval: Qwen3.5-122B-A10B
+Q4_K_M, then 35B-A3B Q6_K. No queue mutation without a new pinned manifest.
 
 ## Sources
 
+- Living status: `docs/CANDIDATE-STATUS-2026-09-06.md`
+- Capability map: `docs/reference/CAPABILITY-MATRIX.md`
+- Research closeout: `docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md`
 - Qwen3 Embedding 8B: https://huggingface.co/Qwen/Qwen3-Embedding-8B
 - Qwen3 Reranker 8B: https://huggingface.co/Qwen/Qwen3-Reranker-8B
 - Qwen3 ASR 1.7B: https://huggingface.co/Qwen/Qwen3-ASR-1.7B
 - Qwen3 TTS 12Hz 1.7B Base: https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base
-- HunyuanOCR 1.5: https://huggingface.co/Tencent-Hunyuan/HunyuanOCR-1.5
-- PaddleOCR-VL 1.6: https://huggingface.co/PaddlePaddle/PaddleOCR-VL-1.6
-- UI-TARS Desktop: https://github.com/bytedance/UI-TARS-desktop
+- HunyuanOCR: https://huggingface.co/Tencent-Hunyuan/HunyuanOCR-1.5
 - UI-TARS 1.5 7B: https://huggingface.co/ByteDance-Seed/UI-TARS-1.5-7B
-- Pliny catalog evidence: `verification/obliteratus-hf-inventory-2026-08-31-live.json`
-- Pliny model-by-model assessment: `verification/OBLITERATUS-CATALOG-ASSESSMENT-2026-08-31.md`

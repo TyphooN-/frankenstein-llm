@@ -58,7 +58,7 @@ carry the envelope and add an injection case.
 **No throughput.** Do not add a timing measurement to a gate. Every artifact
 carries `throughput_measured: false`, and the ledger reports an artifact claiming
 otherwise as a problem. See
-[why](CAPABILITY-MATRIX.md#no-model-characterization-harness).
+[why](CAPABILITY-MATRIX.md#no-numeric-model-characterization-harness).
 
 **Comment the load-bearing part.** The prevailing style here explains *why* a
 check exists and what breaks without it, usually with the incident that motivated

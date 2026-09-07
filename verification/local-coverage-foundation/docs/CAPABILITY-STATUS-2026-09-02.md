@@ -1,7 +1,7 @@
 # Local capability status — 2026-09-02 static recovery
 
 **Historical.** This pass froze phases 1–2 after an outage. Current operational
-status is `docs/CANDIDATE-STATUS-2026-09-03.md`. The ignored
+status is `docs/CANDIDATE-STATUS-2026-09-06.md`. The ignored
 `../evidence/capability-ledger.json` snapshot is also 2026-09-02 and still
 omits phases 3–4.
 

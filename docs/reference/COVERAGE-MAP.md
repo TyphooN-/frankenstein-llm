@@ -14,6 +14,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`config/serving.json`](../../config/serving.json) | [Reference](../MODEL-RUNS.md) |
 | [`docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md`](../../docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/CANDIDATE-STATUS-2026-09-03.md`](../../docs/CANDIDATE-STATUS-2026-09-03.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/CANDIDATE-STATUS-2026-09-06.md`](../../docs/CANDIDATE-STATUS-2026-09-06.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/HERMES-DESKTOP-LOCAL-MODELS.md`](../../docs/HERMES-DESKTOP-LOCAL-MODELS.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/LOCAL-AI-MODEL-STRATEGY.md`](../../docs/LOCAL-AI-MODEL-STRATEGY.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/LOCAL-HERMES-CAPABILITY-COVERAGE-PLAN.md`](../../docs/LOCAL-HERMES-CAPABILITY-COVERAGE-PLAN.md) | [Reference](DEVELOPER-GUIDE.md) |

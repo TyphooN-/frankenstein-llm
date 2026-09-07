@@ -14,6 +14,8 @@
 - [Candidate research closeout](reference/CANDIDATE-RESEARCH-CLOSEOUT.md): current dispositions for the eleven queued additions, upgrade families, and extra artifacts. Research is not admission.
 - [Queued candidate additions](reference/CANDIDATE-ADDITIONS-INVESTIGATION.md): earlier primary-source notes for the eleven additions; verdicts there are superseded by the closeout.
 - [Troubleshooting](reference/TROUBLESHOOTING.md): symptoms, diagnostic checks and recovery.
+- [Coverage plan](LOCAL-HERMES-CAPABILITY-COVERAGE-PLAN.md): living capability roadmap against current downloads and ledger states.
+- [Candidate status](CANDIDATE-STATUS-2026-09-06.md): current researched / downloaded / qualified reading.
 - [Capability matrix](reference/CAPABILITY-MATRIX.md): what exists, what is admitted, and how to obtain current proof.
 - [Developer guide](reference/DEVELOPER-GUIDE.md): tests, extending capabilities and evidence contracts.
 - [Coverage map](reference/COVERAGE-MAP.md): outer-repository file inventory and reference ownership.

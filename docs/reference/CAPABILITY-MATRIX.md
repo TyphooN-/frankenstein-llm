@@ -20,13 +20,13 @@ Related: [architecture](ARCHITECTURE.md) · [operations](OPERATIONS.md) ·
 - [The matrix](#the-matrix)
 - [Capabilities with no artifact of their own](#capabilities-with-no-artifact-of-their-own)
 - [What is genuinely absent](#what-is-genuinely-absent)
-- [No model-characterization harness](#no-model-characterization-harness)
+- [No numeric model-characterization harness](#no-numeric-model-characterization-harness)
 - [Dated observation](#dated-observation)
 
 ## State vocabulary
 
 Four human states are defined by
-[`docs/CANDIDATE-STATUS-2026-09-03.md`](../CANDIDATE-STATUS-2026-09-03.md), and a
+[`docs/CANDIDATE-STATUS-2026-09-06.md`](../CANDIDATE-STATUS-2026-09-06.md), and a
 later state never rewrites an earlier document:
 
 | State | Means |
@@ -137,11 +137,15 @@ service does not exist". They need different work.
 | Prompt-corpus evaluation | **data + evaluator** | Catalog and admission exist; no rows have been admitted and no model score is claimed. |
 | Model characterization | **harness** | See below. |
 
-## No model-characterization harness
+## No numeric model-characterization harness
 
-There is no local harness that *measures* a model. This is the single largest
-honest gap in the repository and it is deliberate, so it should not be discovered
-by surprise.
+There is no local harness that *scores* a model. Qualitative characterization
+exists (`verification/qualitative-characterization`): preview by default,
+`--execute` for inference, saved prompts and outputs. That is inspectable
+admission evidence, not tokens/sec, perplexity, or a comparable ranking.
+
+This remains a deliberate gap for numeric claims, so it should not be
+discovered by surprise.
 
 What does not exist here:
 
@@ -191,11 +195,11 @@ that exists yet.
 
 ## Dated observation
 
-> **Snapshot — 2026-09-04.** A reading, not a claim about any later state.
+> **Snapshot — 2026-09-06.** A reading, not a claim about any later state.
 > Regenerate with the command in
 > [how to get the current reading](#how-to-get-the-current-reading).
 
-Rebuilding the ledger on 2026-09-04 reported no `problems`, and these states:
+Rebuilding the ledger on 2026-09-06 reported no `problems`, and these states:
 
 | State | Capabilities |
 |---|---|
@@ -210,8 +214,7 @@ afterwards, so their artifacts are older than the artifact set they are being
 read against. The 2026-09-02 snapshot at
 [`verification/local-coverage-foundation/docs/CAPABILITY-STATUS-2026-09-02.md`](../../verification/local-coverage-foundation/docs/CAPABILITY-STATUS-2026-09-02.md)
 listed eight qualified capabilities and remains correct *for 2026-09-02*; the
-difference between the two readings is exactly the staleness rule that motivated
-tracking the generator.
+difference is the staleness rule.
 
 For the download, policy, runtime and functional narrative behind these states,
-read [`docs/CANDIDATE-STATUS-2026-09-03.md`](../CANDIDATE-STATUS-2026-09-03.md).
+read [`docs/CANDIDATE-STATUS-2026-09-06.md`](../CANDIDATE-STATUS-2026-09-06.md).

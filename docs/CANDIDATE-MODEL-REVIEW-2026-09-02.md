@@ -3,7 +3,7 @@
 Status: **historical research snapshot from 2026-09-02.** Keep the matrix and
 pins. Do not read the original “nothing downloaded” banner as current state.
 
-Current operational status: `docs/CANDIDATE-STATUS-2026-09-03.md`.
+Current operational status: `docs/CANDIDATE-STATUS-2026-09-06.md`.
 
 This is the decision/backlog record for the 2026-09-02 candidate sweep. It sits
 under `docs/LOCAL-AI-MODEL-STRATEGY.md`, which remains the portfolio decision

@@ -1,7 +1,10 @@
 # Candidate and capability status — 2026-09-03
 
-This is the current operational reading. Dated 2026-09-02 documents remain
-historical snapshots; where they disagree with this file, this file wins.
+> **Historical snapshot from 2026-09-03.** Keep the hand-check notes. Do not
+> read this file as current host state. Current operational status:
+> [CANDIDATE-STATUS-2026-09-06.md](CANDIDATE-STATUS-2026-09-06.md).
+
+Dated 2026-09-02 documents remain earlier snapshots.
 
 States remain distinct:
 
