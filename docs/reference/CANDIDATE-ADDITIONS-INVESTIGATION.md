@@ -55,11 +55,10 @@ was silent — the shortest listing looked like a complete one:
 
 The first row is why this matters: the truncated listing contained no weight
 shards at all, and would have supported a confident, wrong finding that the
-advertised artifact was missing from its repository. **No previously collected
-repository is affected** — the largest document collected before this batch
-holds 39 files, below the cap — so no earlier conclusion in
-[MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md) or the candidate
-reviews needs revisiting for this reason. The collector now walks every page,
+advertised artifact was missing from its repository. Earlier saved listings
+cannot establish their own completeness: directory entries also consume API
+pages. Recollect an earlier inventory before relying on its completeness.
+The collector now walks every page,
 reports a mid-walk failure instead of returning a short list as complete, and
 publishes through fsync/rename so a crash cannot leave a zero-byte document.
 
@@ -90,9 +89,9 @@ sibling repository.
 Header read from the real `i1-IQ4_XS` artifact: architecture `llama`, 80
 blocks, embedding 8192, 64 heads with 8 KV heads, key and value width 128,
 trained context 131,072, 724 tensors. That is an ordinary Llama-3.3-70B shape,
-so the pinned runtime loads it without any new architecture work — the only
-candidate here that is both a genuine capability step and immediately
-executable.
+so the pinned source has the relevant architecture support. Actual binary and
+ROCm execution remain untested. It is a candidate for a capability upgrade,
+not a demonstrated improvement over the installed models.
 
 At the repository's default context of 131,072 with `q4_0` K/V cache, the KV
 cache alone is **11.25 GiB**, which dominates the fit:

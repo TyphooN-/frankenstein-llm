@@ -82,6 +82,19 @@ def load_policy(path=POLICY) -> dict:
         raise PolicyError(f"device {sorted(overlap)} is both preferred and fallback")
     if not isinstance(policy["split_scale"], int) or policy["split_scale"] < 1:
         raise PolicyError("split_scale must be a positive integer")
+    baselines = policy.get("idle_baseline_bytes", {})
+    if not isinstance(baselines, dict):
+        raise PolicyError("idle_baseline_bytes must be an object keyed by GPU UUID")
+    for key, value in baselines.items():
+        # These were keyed by ROCm index until a boot renumbered the cards. A
+        # stale index-keyed policy would now match no device at all and quietly
+        # drop every baseline, so it is rejected rather than half-honoured.
+        if not isinstance(key, str) or not key.strip() or key.strip().isdigit():
+            raise PolicyError(
+                f"idle_baseline_bytes key {key!r} is not a GPU UUID; re-key the "
+                "policy off the ROCm index, which is not stable across boots")
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise PolicyError(f"idle_baseline_bytes[{key!r}] must be a byte count")
     return policy
 
 
@@ -673,6 +686,32 @@ def format_models(report: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def device_baselines(rows: list[dict], policy: dict) -> tuple[dict[int, int], list[int]]:
+    """Idle baselines matched to the cards actually present, keyed by GPU UUID.
+
+    These were keyed by ROCm index until a boot came up without the V620 and
+    renumbered what was left. An index is a position in the runtime's device
+    list, not an identity, so on that topology index 2's baseline would have
+    been subtracted from a different physical card. A UUID survives it.
+
+    A device whose UUID is absent from the policy gets no baseline rather than a
+    borrowed one. That understates the desktop's share and so reports the
+    estimate as *less* conservative than it is -- the direction that asks for
+    attention instead of granting it. Which devices those were is returned, not
+    swallowed.
+    """
+    configured = policy.get("idle_baseline_bytes") or {}
+    matched: dict[int, int] = {}
+    unmatched: list[int] = []
+    for row in rows:
+        uuid = row.get("uuid")
+        if uuid is not None and uuid in configured:
+            matched[row["rocm_index"]] = configured[uuid]
+        else:
+            unmatched.append(row["rocm_index"])
+    return matched, unmatched
+
+
 def verify(rows: list[dict], devices: list[dict], report: list[dict],
            policy: dict) -> dict:
     """Check the estimate against live residency for whatever is resident now.
@@ -686,10 +725,11 @@ def verify(rows: list[dict], devices: list[dict], report: list[dict],
     but still worth knowing the size of.
     """
     used = {device["rocm_index"]: device.get("used_bytes") for device in devices}
-    baseline = {int(k): v for k, v in (policy.get("idle_baseline_bytes") or {}).items()}
+    baseline, without_baseline = device_baselines(rows, policy)
     result: dict = {
         "measured_used_bytes": used,
         "idle_baseline_bytes": baseline,
+        "devices_without_baseline": without_baseline,
         "devices": [
             {"rocm_index": row["rocm_index"], "card": row["card"],
              "used_bytes": used.get(row["rocm_index"]),
@@ -743,6 +783,11 @@ def verify(rows: list[dict], devices: list[dict], report: list[dict],
                  "reading taken with the model unloaded, so the residual "
                  "carries whatever those figures are stale by."),
     }
+    if without_baseline:
+        result["comparison"]["note"] += (
+            f" Devices {without_baseline} have no idle baseline under their GPU "
+            "UUID, so their whole residency is charged to the model and the "
+            "residual is smaller than the arithmetic alone would make it.")
     if unread:
         result["comparison"]["note"] += (
             f" Devices {unread} reported no residency and are excluded from "

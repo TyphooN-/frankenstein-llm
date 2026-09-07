@@ -608,7 +608,11 @@ class VerifyBaselineTests(unittest.TestCase):
     slip in a published number rather than in a debug line.
     """
 
-    POLICY = dict(POLICY, idle_baseline_bytes={"0": 1 * GIB, "1": 1 * GIB, "2": 2 * GIB})
+    POLICY = dict(POLICY, idle_baseline_bytes={
+        "GPU-aaa": 1 * GIB, "GPU-bbb": 1 * GIB, "GPU-ccc": 2 * GIB})
+    # The same three cards as HOST, but carrying the identities the policy keys on.
+    IDENTIFIED = [dict(row, uuid=uuid) for row, uuid
+                  in zip(HOST, ("GPU-aaa", "GPU-bbb", "GPU-ccc"))]
 
     def setUp(self):
         # verify() reaches for the router through this module; a stub keeps the
@@ -625,7 +629,8 @@ class VerifyBaselineTests(unittest.TestCase):
                 for index, value in enumerate(used)]
 
     def test_residual_is_the_estimate_less_measured_bytes_net_of_baseline(self):
-        result = placement.verify(HOST, self.devices(11 * GIB, 11 * GIB, 12 * GIB),
+        result = placement.verify(self.IDENTIFIED,
+                                  self.devices(11 * GIB, 11 * GIB, 12 * GIB),
                                   self.report, self.POLICY)
         comparison = result["comparison"]
         self.assertEqual(comparison["measured_bytes"], 34 * GIB)
@@ -642,7 +647,8 @@ class VerifyBaselineTests(unittest.TestCase):
         by that baseline and making the estimate look more conservative than it
         is.
         """
-        result = placement.verify(HOST, self.devices(11 * GIB, 11 * GIB, None),
+        result = placement.verify(self.IDENTIFIED,
+                                  self.devices(11 * GIB, 11 * GIB, None),
                                   self.report, self.POLICY)
         comparison = result["comparison"]
         self.assertEqual(comparison["measured_bytes"], 22 * GIB)
@@ -651,6 +657,99 @@ class VerifyBaselineTests(unittest.TestCase):
         self.assertEqual(comparison["unread_devices"], [2])
         self.assertEqual(comparison["compared_devices"], [0, 1])
         self.assertIn("covers only part of the model", comparison["note"])
+
+    def test_baselines_follow_the_card_when_the_rocm_indices_move(self):
+        """The flaw this closes.
+
+        A boot without the V620 renumbered the remaining cards. Keyed by ROCm
+        index, the display card's 2 GiB baseline would have been subtracted from
+        whichever card landed at that position. Keyed by UUID it follows the
+        card, so the same two cards in the other order attribute the same bytes.
+        """
+        swapped = [dict(self.IDENTIFIED[2], rocm_index=0),
+                   dict(self.IDENTIFIED[0], rocm_index=1)]
+        matched, unmatched = placement.device_baselines(swapped, self.POLICY)
+        self.assertEqual({0: 2 * GIB, 1: 1 * GIB}, matched)
+        self.assertEqual([], unmatched)
+
+    def test_a_card_the_policy_does_not_name_gets_no_baseline_and_is_reported(self):
+        # No baseline is the direction that understates the desktop's share and
+        # so makes the estimate look *less* conservative -- the safe way to be
+        # wrong. Borrowing a neighbour's figure would be the unsafe one.
+        stranger = [dict(self.IDENTIFIED[0]), dict(self.IDENTIFIED[1], uuid="GPU-zzz")]
+        matched, unmatched = placement.device_baselines(stranger, self.POLICY)
+        self.assertEqual({0: 1 * GIB}, matched)
+        self.assertEqual([1], unmatched)
+
+    def test_a_device_with_no_uuid_at_all_gets_no_baseline(self):
+        matched, unmatched = placement.device_baselines(
+            [dict(self.IDENTIFIED[0], uuid=None)], self.POLICY)
+        self.assertEqual({}, matched)
+        self.assertEqual([0], unmatched)
+
+    def test_an_unnamed_card_is_called_out_in_the_comparison_note(self):
+        rows = [dict(self.IDENTIFIED[0]), dict(self.IDENTIFIED[1]),
+                dict(self.IDENTIFIED[2], uuid="GPU-zzz")]
+        result = placement.verify(rows, self.devices(11 * GIB, 11 * GIB, 12 * GIB),
+                                  self.report, self.POLICY)
+        comparison = result["comparison"]
+        # ROCm2's 12 GiB is charged whole to the model: 34 - 1 - 1 = 32 GiB.
+        self.assertEqual(32 * GIB, comparison["attributed_bytes"])
+        self.assertEqual([2], result["devices_without_baseline"])
+        self.assertIn("no idle baseline under their GPU", comparison["note"])
+
+
+class PolicyBaselineKeyTests(unittest.TestCase):
+    """A stale index-keyed policy must fail loudly, not silently lose baselines.
+
+    Once lookup moved to UUIDs, ``{"0": ...}`` matches no device on any host. A
+    policy that still reads that way would produce a verification that quietly
+    charges every idle byte to the model, so loading it is an error.
+    """
+
+    def write(self, baselines) -> Path:
+        policy = dict(POLICY, idle_baseline_bytes=baselines)
+        path = Path(tempfile.mkdtemp()) / "policy.json"
+        path.write_text(json.dumps(policy))
+        return path
+
+    def test_an_index_keyed_policy_is_refused(self):
+        with self.assertRaises(placement.PolicyError) as caught:
+            placement.load_policy(self.write({"0": 1 << 20}))
+        self.assertIn("not a GPU UUID", str(caught.exception))
+
+    def test_a_uuid_keyed_policy_loads(self):
+        loaded = placement.load_policy(self.write({"GPU-aaa": 1 << 20}))
+        self.assertEqual({"GPU-aaa": 1 << 20}, loaded["idle_baseline_bytes"])
+
+    def test_non_object_baselines_are_refused_even_when_empty(self):
+        for value in (None, [], "", False, 0):
+            with self.subTest(value=value):
+                with self.assertRaises(placement.PolicyError):
+                    placement.load_policy(self.write(value))
+
+    def test_a_negative_or_non_integer_baseline_is_refused(self):
+        for value in (-1, "26 MiB", 1.5, True):
+            with self.subTest(value=value):
+                with self.assertRaises(placement.PolicyError):
+                    placement.load_policy(self.write({"GPU-aaa": value}))
+
+    def test_a_policy_without_baselines_still_loads(self):
+        policy = dict(POLICY)
+        path = Path(tempfile.mkdtemp()) / "policy.json"
+        path.write_text(json.dumps(policy))
+        self.assertNotIn("idle_baseline_bytes", placement.load_policy(path))
+
+    def test_the_shipped_policy_names_every_card_this_host_reports(self):
+        """The configured file, not a fixture: a re-key that missed a card would
+        pass every test above and still lose that card's baseline in practice."""
+        shipped = placement.load_policy()
+        configured = shipped.get("idle_baseline_bytes") or {}
+        devices, _ = placement.gpu_vram.devices()
+        present = [row["uuid"] for row in devices if row.get("uuid")]
+        if len(present) != 3:
+            self.skipTest("needs the three-GPU host")
+        self.assertEqual([], [uuid for uuid in present if uuid not in configured])
 
 
 class ScanTests(unittest.TestCase):

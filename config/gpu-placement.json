@@ -27,11 +27,11 @@
   ],
   "equal_split_when_it_fits": true,
   "split_scale": 96,
-  "_idle_baseline_comment": "card0 and card2 measured 2026-09-05 on an idle set of cards immediately before a cold load: 26 MiB and 1551 MiB, recorded in docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md. card1 re-measured 2026-09-06 on a freshly booted host with the router up and every preset unloaded, where it holds 26 MiB and not the 385 MiB first recorded; it drives no display, so it has no desktop allocation to keep out of a residual, and 385 MiB was residue from an earlier load rather than an idle floor. Keyed by ROCm index. Only used by --verify, which subtracts these from measured residency: an inflated baseline is charged to the desktop rather than to the model and makes the estimate look more conservative than it is, so every figure here is the lowest reading seen for its card.",
+  "_idle_baseline_comment": "card0 and card2 measured 2026-09-05 on an idle set of cards immediately before a cold load: 26 MiB and 1551 MiB, recorded in docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md. card1 re-measured 2026-09-06 on a freshly booted host with the router up and every preset unloaded, where it holds 26 MiB and not the 385 MiB first recorded; it drives no display, so it has no desktop allocation to keep out of a residual, and 385 MiB was residue from an earlier load rather than an idle floor. Keyed by GPU UUID as scripts/gpu_vram.py reports it, not by ROCm index: a 2026-09-06 boot came up without the V620 and renumbered the remaining cards, which would have subtracted one card's baseline from another. A UUID with no card present is ignored, and a card whose UUID is absent here gets no baseline at all rather than a borrowed one. Only used by --verify, which subtracts these from measured residency: an inflated baseline is charged to the desktop rather than to the model and makes the estimate look more conservative than it is, so every figure here is the lowest reading seen for its card.",
   "idle_baseline_bytes": {
-    "0": 27262976,
-    "1": 27729920,
-    "2": 1626341376
+    "GPU-6b3c785d187d9cbf": 27262976,
+    "GPU-a21e268c0b0a73d7": 27729920,
+    "GPU-4d1c68aee3a84b64": 1626341376
   },
   "_min_slack_comment": "Working headroom every placement rule plans against, on top of the per-device reserve. Without it the rules fill a card to its last modelled byte and produce knife-edge splits for a figure --verify measures as roughly 5 percent conservative."
 }
