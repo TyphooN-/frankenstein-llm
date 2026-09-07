@@ -150,6 +150,15 @@ def blocked_workloads(proc_root: Path = Path("/proc")) -> list[dict[str, object]
     return blocked
 
 
+def record_late_conflicts(result: dict) -> None:
+    """Fail closed if competing work appeared after the pre-load check."""
+    conflicts = blocked_workloads()
+    result["post_load_conflicts"] = conflicts
+    if conflicts:
+        result["problems"].append(
+            "confounded qualification: competing workloads observed after load")
+
+
 def pressure() -> dict[str, str]:
     values = {}
     for kind in ("memory", "io"):
@@ -392,6 +401,7 @@ def check_model(model: str) -> dict:
                 "capability is claimed for this preset")
         result["metadata"] = model_metadata(model)
         result["loaded"] = sample("loaded")
+        record_late_conflicts(result)
     except Exception as error:  # noqa: BLE001 - every model must leave evidence
         result["problems"].append(f"functional error: {type(error).__name__}: {error}"[:500])
     finally:
@@ -430,6 +440,7 @@ def check_vision_model(model: str) -> dict:
         result["checks"]["vision_grounding"] = {"pass": text == "Run Gate", "content": text}
         result["metadata"] = model_metadata(model)
         result["loaded"] = sample("loaded")
+        record_late_conflicts(result)
     except Exception as error:  # noqa: BLE001 - every model must leave evidence
         result["problems"].append(f"functional error: {type(error).__name__}: {error}"[:500])
     finally:

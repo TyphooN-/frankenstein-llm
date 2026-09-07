@@ -284,6 +284,22 @@ class ModelCoverageTests(unittest.TestCase):
 class ReleaseAccountingTests(unittest.TestCase):
     """Eviction has to be proven, not assumed from a reading that went missing."""
 
+    def test_late_competitor_preserves_existing_failures(self):
+        conflict = {"pid": 123, "reason": "build", "command": "clang", "cwd": "/build"}
+        result = {"problems": ["existing failure"]}
+        with patch.object(module, "blocked_workloads", return_value=[conflict]):
+            module.record_late_conflicts(result)
+        self.assertEqual([conflict], result["post_load_conflicts"])
+        self.assertEqual("existing failure", result["problems"][0])
+        self.assertIn("confounded qualification", result["problems"][1])
+
+    def test_quiet_post_load_check_adds_no_failure(self):
+        result = {"problems": []}
+        with patch.object(module, "blocked_workloads", return_value=[]):
+            module.record_late_conflicts(result)
+        self.assertEqual([], result["post_load_conflicts"])
+        self.assertEqual([], result["problems"])
+
     def release(self, before: dict, after: dict) -> list[str]:
         result: dict = {"problems": []}
         with patch.object(module, "sample", return_value=after):
