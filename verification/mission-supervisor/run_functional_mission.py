@@ -27,7 +27,6 @@ LOG = HERE / "mission.log"
 LOCK = HERE / "mission.lock"
 FOUNDATION = ROOT / "verification" / "local-coverage-foundation"
 MIN_AVAILABLE = 32 << 30
-MAX_LOAD = 6.0
 POLL_SECONDS = 30
 BLOCKER_LOG_REPEAT_SECONDS = 600
 CONFLICT_SAMPLE_LIMIT = 8
@@ -212,6 +211,10 @@ INFERENCE_PREFIX = "llama-"
 ROUTER_UNIT = "llama-router.service"
 KERNEL_TREE = "/linux-tkg"
 DELETED_SUFFIX = " (deleted)"
+# Only these conflict classes actually collide with a serialized GPU gate on this
+# desktop. cargo/rustc/makepkg in other trees, aria2 re-hash, and Chromium load
+# are not kernel compiles and must not hold the mission after a new kernel boot.
+MISSION_BLOCKING_REASONS = frozenset({"kernel-build", "inference"})
 
 
 def printable(raw: bytes | str) -> str:
@@ -322,6 +325,19 @@ def conflicts(proc_root: Path = Path("/proc")) -> list[dict[str, object]]:
 
 
 def phase_status(state_path: Path, stamp_path: Path, expected: str) -> tuple[str, str]:
+    """A matching completion stamp is readiness, even if a writer is re-checking.
+
+    After reboot the downloader marks state ``running`` while it re-hashes files
+    that already exist. The stamp is the durable byte-total proof; waiting for
+    the re-hash to flip status back to complete would gate the mission on work
+    that is not a missing download.
+    """
+    try:
+        stamp = stamp_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        stamp = None
+    if stamp == expected:
+        return "ready", state_path.name
     try:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -329,15 +345,9 @@ def phase_status(state_path: Path, stamp_path: Path, expected: str) -> tuple[str
     status = state.get("status")
     if status == "failed":
         return "failed", f"{state_path.name}: {state.get('error', 'unknown error')}"
-    if status != "complete":
-        return "waiting", f"{state_path.name}: {status}"
-    try:
-        stamp = stamp_path.read_text(encoding="utf-8").strip()
-    except OSError:
+    if stamp is None:
         return "waiting", f"{stamp_path.name}: missing"
-    if stamp != expected:
-        return "failed", f"{stamp_path.name}: expected {expected}, got {stamp!r}"
-    return "ready", state_path.name
+    return "failed", f"{stamp_path.name}: expected {expected}, got {stamp!r}"
 
 
 def wait_for_inputs(state: dict) -> None:
@@ -379,23 +389,20 @@ def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
     last_logged = float("-inf")
     deadline = time.monotonic() + timeout
     while quiet < 2:
-        active = conflicts()
+        active = [item for item in conflicts()
+                  if item.get("reason") in MISSION_BLOCKING_REASONS]
         available = mem_available()
-        load = os.getloadavg()[0]
         reasons = []
         if active:
             reasons.append(f"conflicts={summarize_conflicts(active)}")
         if available < MIN_AVAILABLE:
             reasons.append(f"MemAvailable={available}")
-        if load > MAX_LOAD:
-            reasons.append(f"load1={load:.2f}")
         if reasons:
             quiet = 0
             detail = "; ".join(reasons)
             key = (
                 tuple(sorted({str(item.get("reason", "unknown")) for item in active})),
                 available < MIN_AVAILABLE,
-                load > MAX_LOAD,
             )
             observed = time.monotonic()
             if key != last_key or observed - last_logged >= BLOCKER_LOG_REPEAT_SECONDS:
@@ -405,7 +412,7 @@ def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
         else:
             quiet += 1
             last_key = None
-            log(f"safe-host quiet poll {quiet}/2 MemAvailable={available} load1={load:.2f}")
+            log(f"safe-host quiet poll {quiet}/2 MemAvailable={available}")
         state.update({"status": "waiting-safe-host", "updated_at": now()})
         atomic_json(state)
         if quiet < 2:

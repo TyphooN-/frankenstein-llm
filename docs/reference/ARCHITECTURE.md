@@ -405,16 +405,20 @@ The twelve steps, in order: `candidate-policy`, `wemm-embeddings`,
 `generative-media-functional`.
 
 **Waiting for inputs.** `wait_for_inputs` is deliberately unbounded: it waits on
-roughly 219 GiB of downloads that legitimately take days. It polls all four
-phase state files and stamps; a `failed` state aborts, a stamp that does not
-match its expected byte total aborts.
+roughly 219 GiB of downloads that legitimately take days. A completion stamp that
+matches the expected byte total is readiness even if a downloader has marked
+state `running` while it re-hashes existing files after reboot. A `failed` state
+aborts; a stamp that does not match its expected byte total aborts.
 
 **Waiting for a quiet host.** `wait_for_quiet` requires two consecutive clean
-polls with `MemAvailable ≥ 32 GiB`, 1-minute load ≤ 6.0 and no conflicting
-process. Unlike the input wait it is bounded — default six hours, overridable
-with `HERMES_MISSION_QUIET_TIMEOUT`, which rejects a non-positive or unparseable
-value rather than silently substituting a default. On timeout it records the
-blockers it actually observed into durable state *before* raising.
+polls with `MemAvailable ≥ 32 GiB` and no competing kernel-tree build or
+unmanaged llama.cpp/inference process. Unrelated cargo/rustc, download re-hash,
+and desktop load average are not blockers: they are not a missing kernel and
+must not hold the mission after a new-kernel boot. Unlike the input wait it is
+bounded — default six hours, overridable with `HERMES_MISSION_QUIET_TIMEOUT`,
+which rejects a non-positive or unparseable value rather than silently
+substituting a default. On timeout it records the blockers it actually observed
+into durable state *before* raising.
 
 **How conflicts are found.** Classification reads only `/proc/<pid>/comm`, the
 `cwd` symlink and `cgroup`. It never opens `/proc/<pid>/cmdline`: Linux serves

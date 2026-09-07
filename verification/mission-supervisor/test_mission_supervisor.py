@@ -149,20 +149,33 @@ class QuietWaitTests(SupervisorTestCase):
     def test_pid_churn_in_one_blocker_class_does_not_spam_the_log(self):
         polls = []
         for number in range(10):
-            polls.append([{"pid": 5000 + number, "reason": "build",
-                           "command": "cc1plus", "cwd": "", "cgroup": "test"}])
+            polls.append([{"pid": 5000 + number, "reason": "inference",
+                           "command": "llama-server", "cwd": "", "cgroup": "test"}])
         with self.assertRaises(RuntimeError):
             self.run_wait(polls, timeout=60)
         waiting = [call for call in self.log.call_args_list
                    if "waiting for safe host" in call.args[0]]
         self.assertEqual(1, len(waiting))
 
-    def test_low_memory_and_high_load_are_reported_as_the_blockers(self):
+    def test_low_memory_is_reported_as_the_blocker(self):
         with self.assertRaises(RuntimeError) as caught:
             self.run_wait([[]] * 40, timeout=60, available=1 << 30, load=99.0)
         message = str(caught.exception)
         self.assertIn("MemAvailable=", message)
-        self.assertIn("load1=99.00", message)
+        self.assertNotIn("load1=", message)
+
+    def test_desktop_load_and_unrelated_builds_do_not_block_the_wait(self):
+        cargo = [{"pid": 99, "reason": "build", "command": "rustc",
+                  "cwd": "/home/typhoon/git/xiphercash", "cgroup": "test"}]
+        state = self.run_wait([cargo, cargo], timeout=3600, load=99.0)
+        self.assertEqual("waiting-safe-host", state["status"])
+
+    def test_kernel_tree_builds_still_block(self):
+        busy = [{"pid": 7, "reason": "kernel-build", "command": "bash",
+                 "cwd": "/home/typhoon/git/linux-tkg/src", "cgroup": "test"}]
+        with self.assertRaises(RuntimeError) as caught:
+            self.run_wait([busy] * 40, timeout=60)
+        self.assertIn("kernel-build", str(caught.exception))
 
     def test_the_timeout_is_recorded_in_state_before_it_raises(self):
         # The unit dies on this exception, so the durable record of why has to be
@@ -374,6 +387,34 @@ class DurableStateTests(SupervisorTestCase):
             stamp_path.write_text("4")
             present = self.supervisor.mission_inputs_fingerprint()
         self.assertNotEqual(absent, present)
+
+
+class PhaseStatusTests(SupervisorTestCase):
+    def test_a_matching_stamp_is_ready_while_state_says_running(self):
+        state_path = self.sandbox / "download-state.json"
+        stamp_path = self.sandbox / "complete.ok"
+        state_path.write_text('{"status":"running"}')
+        stamp_path.write_text("4\n")
+        self.assertEqual(
+            ("ready", "download-state.json"),
+            self.supervisor.phase_status(state_path, stamp_path, "4"))
+
+    def test_a_missing_stamp_waits(self):
+        state_path = self.sandbox / "download-state.json"
+        stamp_path = self.sandbox / "complete.ok"
+        state_path.write_text('{"status":"complete"}')
+        self.assertEqual(
+            ("waiting", "complete.ok: missing"),
+            self.supervisor.phase_status(state_path, stamp_path, "4"))
+
+    def test_a_wrong_stamp_fails(self):
+        state_path = self.sandbox / "download-state.json"
+        stamp_path = self.sandbox / "complete.ok"
+        state_path.write_text('{"status":"complete"}')
+        stamp_path.write_text("3\n")
+        status, detail = self.supervisor.phase_status(state_path, stamp_path, "4")
+        self.assertEqual("failed", status)
+        self.assertIn("expected 4", detail)
 
     def test_state_round_trips_and_leaves_no_temp_file(self):
         self.supervisor.atomic_json({"status": "running", "steps": {}})
