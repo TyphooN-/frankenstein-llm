@@ -26,6 +26,8 @@ STATE = HERE / "mission-state.json"
 LOG = HERE / "mission.log"
 LOCK = HERE / "mission.lock"
 FOUNDATION = ROOT / "verification" / "local-coverage-foundation"
+TTS_PYTHON = ROOT / "venvs" / "tts" / "bin" / "python"
+SCRATCH = ROOT / "verification" / "tmp"
 MIN_AVAILABLE = 32 << 30
 POLL_SECONDS = 30
 BLOCKER_LOG_REPEAT_SECONDS = 600
@@ -75,7 +77,7 @@ STEPS = (
     ("embeddings", [sys.executable, str(FOUNDATION / "validators/gate_embeddings.py")]),
     ("reranker", [sys.executable, str(FOUNDATION / "validators/gate_reranker.py")]),
     ("fim", [sys.executable, str(FOUNDATION / "validators/gate_fim.py")]),
-    ("asr", [sys.executable, str(FOUNDATION / "validators/gate_asr.py")]),
+    ("asr", [str(TTS_PYTHON), str(FOUNDATION / "validators/gate_asr.py")]),
     ("computer-use-grounding", ["/usr/bin/bash", str(ROOT / "verification/computer-use-grounding/run_when_idle.sh")]),
     ("tts-asr-roundtrip", ["/usr/bin/bash", str(ROOT / "verification/tts-local/run_serialized.sh")]),
     ("repository-agent", ["/usr/bin/bash", str(ROOT / "verification/repository-agent/run_serialized.sh")]),
@@ -474,8 +476,23 @@ def run_step(name: str, command: list[str], state: dict) -> int:
     return rc
 
 
+def prepare_child_environment() -> None:
+    """Give every gate a writable temp dir under ProtectSystem=strict.
+
+    systemd remounts /tmp read-only unless it is in ReadWritePaths. Torch
+    probes tempfile.gettempdir() at import time and dies with FileNotFoundError
+    if that probe cannot create a file. Point TMPDIR at a path the unit already
+    allows, even when the unit file on disk has not been reloaded yet.
+    """
+    SCRATCH.mkdir(parents=True, exist_ok=True)
+    os.environ["TMPDIR"] = str(SCRATCH)
+    os.environ["TMP"] = str(SCRATCH)
+    os.environ["TEMP"] = str(SCRATCH)
+
+
 def main() -> int:
     HERE.mkdir(parents=True, exist_ok=True)
+    prepare_child_environment()
     lock_handle = LOCK.open("a+")
     try:
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

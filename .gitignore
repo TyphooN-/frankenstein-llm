@@ -43,6 +43,7 @@ __pycache__/
 /verification/**/transcript-*.jsonl
 /verification/**/download-state*.json
 /verification/**/mission-state.json
+/verification/tmp/
 /verification/**/lane.json
 /verification/prompt-corpus-admission/corpora/
 /verification/qwen38-obliterated-functional/*.json

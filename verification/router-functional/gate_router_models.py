@@ -12,7 +12,13 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
+sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/mission-supervisor")
 from candidate_policy import tool_grant_allowed_for_preset  # noqa: E402
+from run_functional_mission import (  # noqa: E402
+    MISSION_BLOCKING_REASONS,
+    conflict_reason,
+    process_metadata,
+)
 
 BASE = "http://127.0.0.1:8080"
 CHAT_MODELS = ["ridge", "heretic", "obliterated", "fable", "phr00ty",
@@ -32,33 +38,10 @@ OUT = Path(__file__).resolve().parent / "evidence"
 ARTIFACT = OUT / "router-functional.json"
 VRAM_TOLERANCE = 768 << 20
 RAM_TOLERANCE = 2 << 30
-# Workload classes named by /proc/<pid>/comm rather than by cmdline. Linux
-# serves cmdline through access_remote_vm, so a task holding its own mmap write
-# lock can wedge a reader that only meant to inspect it -- and a wide parallel
-# build, which is precisely what this scan is looking for, is such a task. A
-# task name is coarser than an argument vector, so this blocks on strictly more
-# than the argument substrings it replaces; for a gate whose job is to refuse
-# measuring a contended host, more is the safe direction.
-#
-# The mission supervisor's conflict_reason() owns the canonical set, because it
-# is the one that has to wait a host out. This gate refuses outright, so it may
-# be broader but never narrower, and test_gate_router_models asserts it is not.
-BLOCKED_WORKLOAD_COMMANDS = frozenset({
-    "make", "gmake", "makepkg", "cmake", "ninja", "samu", "meson", "scons",
-    "ccache", "sccache", "cc", "c++", "gcc", "g++", "clang", "clang++",
-    "cc1", "cc1plus", "lto1", "collect2", "as", "ar", "ranlib", "strip",
-    "objtool", "ld", "ld.bfd", "ld.gold", "ld.lld", "lld", "mold",
-    "cargo", "rustc", "go", "nvcc", "cicc", "ptxas", "hipcc",
-    "pacman", "paru", "yay", "dkms",
-})
-# The transfer processes a download queue runs, whichever way it was started.
-# The queue's own interpreter is named "python3" like every gate in this
-# workspace, including the supervisor that launched this one, so it is found by
-# its unit below instead of by a task name that cannot tell them apart.
-BLOCKED_TRANSFER_COMMANDS = frozenset({
-    "aria2c", "curl", "wget", "axel", "lftp", "rsync", "scp", "sftp",
-    "git-lfs", "git-remote-http", "huggingface-cli", "hf",
-})
+# Functional checks are not throughput claims. cargo/rustc/makepkg outside the
+# kernel tree and desktop load do not confound a PONG / tool-call / unload
+# verdict. Refuse only what the mission itself waits out, plus an in-flight
+# download queue that can replace the weights under the router.
 DOWNLOAD_UNIT_PREFIX = "local-ai-model-downloads"
 
 
@@ -100,14 +83,12 @@ def vram_used() -> dict[str, int]:
 
 
 def blocked_workloads(proc_root: Path = Path("/proc")) -> list[dict[str, object]]:
-    """Find workload classes that would confound a memory/load qualification.
+    """Find workloads that would confound a functional router qualification.
 
-    Reads only kernel metadata: ``comm`` for the task name and ``cgroup`` for the
-    systemd unit that owns it. Neither touches the target's address space. See
-    ``BLOCKED_WORKLOAD_COMMANDS`` for why ``cmdline`` is not opened here.
-
-    ``proc_root`` is injectable so the classification can be exercised without
-    arranging for a real build to be running.
+    Reads only kernel metadata (``comm``, ``cwd``, ``cgroup``). Never opens
+    ``cmdline``. Classification is the mission supervisor's ``conflict_reason``;
+    this gate then refuses the same classes the mission waits for, plus an
+    in-flight download queue.
     """
     blocked: list[dict[str, object]] = []
     self_pid = os.getpid()
@@ -116,27 +97,18 @@ def blocked_workloads(proc_root: Path = Path("/proc")) -> list[dict[str, object]
     for pid in pids:
         if pid == self_pid:
             continue
-        proc = proc_root / str(pid)
-        try:
-            command = (proc / "comm").read_bytes().decode(errors="replace").strip()
-        except OSError:
-            # A task that exited underneath the scan is not a workload.
-            continue
+        command, cwd, cgroup = process_metadata(proc_root / str(pid))
         if not command:
             continue
-        try:
-            cgroup = (proc / "cgroup").read_bytes().decode(errors="replace")
-        except OSError:
-            cgroup = ""
-        if command in BLOCKED_WORKLOAD_COMMANDS:
-            reason = "build"
-        elif command in BLOCKED_TRANSFER_COMMANDS:
-            reason = "transfer"
+        reason = conflict_reason(command, cwd, cgroup)
+        if reason in MISSION_BLOCKING_REASONS:
+            pass
         elif DOWNLOAD_UNIT_PREFIX in cgroup:
             reason = "download-queue"
         else:
             continue
-        blocked.append({"pid": pid, "reason": reason, "command": command[:500]})
+        blocked.append({"pid": pid, "reason": reason, "command": command[:500],
+                        "cwd": cwd[:300]})
     return blocked
 
 

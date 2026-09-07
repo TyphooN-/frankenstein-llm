@@ -5,6 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+ExecStartPre=/usr/bin/mkdir -p /home/typhoon/git/frankenstein-llm/verification/tmp
 ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/mission-supervisor/run_functional_mission.py
 TimeoutStartSec=infinity
 Nice=5
@@ -12,7 +13,13 @@ NoNewPrivileges=true
 PrivateTmp=false
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/typhoon/git/frankenstein-llm/verification /home/typhoon/git/frankenstein-llm/models /run/user/%U
+# ProtectSystem=strict remounts /tmp read-only unless listed. Torch, TTS,
+# ComfyUI and tempfile all need a real temp dir; venvs/tools need write for
+# bytecode and ComfyUI runtime files.
+ReadWritePaths=/home/typhoon/git/frankenstein-llm/verification /home/typhoon/git/frankenstein-llm/models /home/typhoon/git/frankenstein-llm/venvs /home/typhoon/git/frankenstein-llm/tools /tmp /var/tmp /run/user/%U
+Environment=TMPDIR=/home/typhoon/git/frankenstein-llm/verification/tmp
+Environment=TMP=/home/typhoon/git/frankenstein-llm/verification/tmp
+Environment=TEMP=/home/typhoon/git/frankenstein-llm/verification/tmp
 
 [Install]
 WantedBy=default.target

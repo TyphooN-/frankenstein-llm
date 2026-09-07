@@ -626,6 +626,7 @@ class MissionPolicyTests(SupervisorTestCase):
         steps = dict(self.supervisor.STEPS)
         names = list(steps)
         self.assertIn("asr", steps)
+        self.assertEqual(str(self.supervisor.TTS_PYTHON), steps["asr"][0])
         self.assertTrue(steps["asr"][-1].endswith("validators/gate_asr.py"))
         self.assertLess(names.index("asr"), names.index("tts-asr-roundtrip"))
 
@@ -638,6 +639,15 @@ class MissionPolicyTests(SupervisorTestCase):
                          ledger.CAPABILITY_EVIDENCE["asr"])
         self.assertEqual("asr", ledger.EXPECTED_EVIDENCE_GATES[
             ledger.EVIDENCE / "gate-asr.json"])
+
+    def test_mission_unit_keeps_a_writable_temp_dir(self):
+        unit = (self.supervisor.ROOT / "services/systemd/local-ai-functional-mission.service").read_text()
+        self.assertIn("ProtectSystem=strict", unit)
+        self.assertIn("Environment=TMPDIR=/home/typhoon/git/frankenstein-llm/verification/tmp", unit)
+        writable = unit.split("ReadWritePaths=", 1)[1].splitlines()[0]
+        for path in ("/tmp", "/var/tmp", "/venvs", "/tools", "/verification"):
+            with self.subTest(path=path):
+                self.assertIn(path, writable)
 
 
 if __name__ == "__main__":

@@ -226,11 +226,14 @@ class BlockedWorkloadTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.proc = Path(self.temporary.name)
 
-    def process(self, pid: str, command: str, cgroup: str = "0::/user.slice") -> None:
+    def process(self, pid: str, command: str, cgroup: str = "0::/user.slice",
+                cwd: str | None = None) -> None:
         entry = self.proc / pid
         entry.mkdir()
         (entry / "comm").write_text(command + "\n")
         (entry / "cgroup").write_text(cgroup + "\n")
+        if cwd is not None:
+            (entry / "cwd").symlink_to(cwd)
 
     def reasons(self) -> list[tuple[int, object]]:
         return [(entry["pid"], entry["reason"])
@@ -239,20 +242,26 @@ class BlockedWorkloadTests(unittest.TestCase):
     def test_a_quiet_host_blocks_nothing(self):
         self.process("10", "hyprland")
         self.process("11", "zsh")
-        self.process("12", "llama-server")
+        self.process("12", "llama-server",
+                     cgroup="0::/user.slice/.../llama-router.service")
+        self.process("13", "cargo")
+        self.process("14", "rustc")
         self.assertEqual([], self.reasons())
 
-    def test_compilers_and_build_drivers_block(self):
-        for pid, command in (("20", "makepkg"), ("21", "cmake"), ("22", "ninja"),
-                             ("23", "cargo"), ("24", "rustc"), ("25", "clang")):
-            self.process(pid, command)
-        self.assertEqual([(20, "build"), (21, "build"), (22, "build"),
-                          (23, "build"), (24, "build"), (25, "build")], self.reasons())
+    def test_unmanaged_inference_blocks(self):
+        self.process("12", "llama-server")
+        self.assertEqual([(12, "inference")], self.reasons())
 
-    def test_transfers_block_however_they_were_started(self):
-        self.process("30", "aria2c")
-        self.process("31", "curl")
-        self.assertEqual([(30, "transfer"), (31, "transfer")], self.reasons())
+    def test_kernel_tree_builds_block(self):
+        self.process("20", "make", cwd="/home/typhoon/git/linux-tkg/src")
+        self.assertEqual([(20, "kernel-build")], self.reasons())
+
+    def test_unrelated_compilers_and_transfers_do_not_block(self):
+        for pid, command in (("20", "makepkg"), ("21", "cmake"), ("22", "ninja"),
+                             ("23", "cargo"), ("24", "rustc"), ("25", "clang"),
+                             ("30", "aria2c"), ("31", "curl")):
+            self.process(pid, command)
+        self.assertEqual([], self.reasons())
 
     def test_the_download_queue_is_found_by_its_unit_not_its_task_name(self):
         self.process("40", "python3",
@@ -267,21 +276,21 @@ class BlockedWorkloadTests(unittest.TestCase):
         self.assertEqual([], self.reasons())
 
     def test_the_scanning_process_does_not_report_itself(self):
-        self.process(str(os.getpid()), "cargo")
+        self.process(str(os.getpid()), "llama-server")
         self.assertEqual([], self.reasons())
 
     def test_a_task_that_exited_mid_scan_is_not_a_workload(self):
         (self.proc / "60").mkdir()  # no comm: gone between listing and reading
-        self.process("61", "cargo")
-        self.assertEqual([(61, "build")], self.reasons())
+        self.process("61", "llama-server")
+        self.assertEqual([(61, "inference")], self.reasons())
 
     def test_findings_are_ordered_so_two_scans_compare(self):
         for pid in ("900", "9", "90"):
-            self.process(pid, "cargo")
+            self.process(pid, "llama-server")
         self.assertEqual([9, 90, 900], [pid for pid, _ in self.reasons()])
 
     def test_cmdline_is_never_opened(self):
-        self.process("70", "cargo")
+        self.process("70", "llama-server")
         original = Path.read_bytes
 
         def guarded(path, *args, **kwargs):
@@ -290,40 +299,18 @@ class BlockedWorkloadTests(unittest.TestCase):
             return original(path, *args, **kwargs)
 
         with patch.object(Path, "read_bytes", guarded):
-            self.assertEqual([(70, "build")], self.reasons())
+            self.assertEqual([(70, "inference")], self.reasons())
 
-    def test_every_workload_class_the_argument_scan_caught_is_still_caught(self):
-        """The task names behind the cmdline substrings this replaced."""
-        for command in ("makepkg", "cmake", "ninja", "cargo"):
-            self.assertIn(command, module.BLOCKED_WORKLOAD_COMMANDS)
-        self.assertIn("aria2c", module.BLOCKED_TRANSFER_COMMANDS)
-
-    def test_no_task_name_exceeds_what_comm_can_hold(self):
-        names = module.BLOCKED_WORKLOAD_COMMANDS | module.BLOCKED_TRANSFER_COMMANDS
-        self.assertEqual([], sorted(name for name in names if len(name) > 15))
-
-    def test_workload_names_do_not_drift_from_the_mission_supervisor(self):
-        """Two gates that disagree about what a build looks like is one gate.
-
-        The supervisor owns the canonical list because it is the one that has to
-        wait a host out. This gate refuses a qualification outright, so it may
-        block on more than the supervisor waits for, but never on less: a build
-        the supervisor would wait for and this gate would measure through is a
-        confounded result that nothing downstream can tell apart from a clean
-        one.
-        """
+    def test_refusal_matches_what_the_mission_waits_for(self):
+        """A functional gate must not refuse cargo the supervisor would let through."""
         source = (Path(__file__).resolve().parents[1]
                   / "mission-supervisor" / "run_functional_mission.py")
         spec = importlib.util.spec_from_file_location("supervisor_workload_names", source)
         assert spec is not None and spec.loader is not None
         supervisor = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(supervisor)
-        self.assertEqual(
-            frozenset(),
-            supervisor.BUILD_COMMANDS - module.BLOCKED_WORKLOAD_COMMANDS)
-        self.assertEqual(
-            frozenset(),
-            supervisor.TRANSFER_COMMANDS - module.BLOCKED_TRANSFER_COMMANDS)
+        self.assertEqual(supervisor.MISSION_BLOCKING_REASONS,
+                         module.MISSION_BLOCKING_REASONS)
 
 
 if __name__ == "__main__":

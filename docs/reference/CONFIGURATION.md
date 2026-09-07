@@ -203,8 +203,11 @@ Tracked copies of user units. They are **not** installed by cloning; see
 
 Notable hardening: the download phases run `ProtectSystem=strict`,
 `ProtectHome=read-only`, `NoNewPrivileges=true` with `ReadWritePaths` limited to
-`models/` and their own foundation directory. The mission unit adds
-`/run/user/%U` so it can reach the user bus. The computer-use unit deliberately
+`models/` and their own foundation directory. The mission unit keeps that
+sandbox, but must also write `/tmp`, `/var/tmp`, `venvs/`, `tools/`, and
+`verification/tmp` (`TMPDIR`): `ProtectSystem=strict` otherwise remounts `/tmp`
+read-only and torch dies at import with `No usable temporary directory`. It
+adds `/run/user/%U` so it can reach the user bus. The computer-use unit deliberately
 omits `[Install]` because it places ~15.5 GiB across all three GPUs and must
 never start at boot; it bounds restarts (`StartLimitBurst=3`), excludes its own
 verdict exit codes from restart (`RestartPreventExitStatus=1 3 5`), stops rather
