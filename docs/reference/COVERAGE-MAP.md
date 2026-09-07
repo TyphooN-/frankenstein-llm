@@ -258,5 +258,6 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/benchmarks/qwen3-embedding-8b.md`](../../docs/benchmarks/qwen3-embedding-8b.md) | [Reference](../MODEL-RUNS.md) |
 | [`docs/benchmarks/qwen3-reranker-8b.md`](../../docs/benchmarks/qwen3-reranker-8b.md) | [Reference](../MODEL-RUNS.md) |
 | [`docs/reference/PLACEMENT-MEASUREMENTS.md`](../../docs/reference/PLACEMENT-MEASUREMENTS.md) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
+| [`docs/HANDOFF-2026-09-07.md`](../../docs/HANDOFF-2026-09-07.md) | [Reference](DEVELOPER-GUIDE.md) |
 
-Inventory entries: 254. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 255. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
