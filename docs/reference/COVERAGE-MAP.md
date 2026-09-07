@@ -4,6 +4,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 
 | Tracked file | Documentation |
 |---|---|
+| [`config/gpu-placement.json`](../../config/gpu-placement.json) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
 | [`config/model-catalog.json`](../../config/model-catalog.json) | [Reference](../MODEL-RUNS.md) |
 | [`.gitignore`](../../.gitignore) | [Reference](ARCHITECTURE.md) |
 | [`.gitmodules`](../../.gitmodules) | [Reference](ARCHITECTURE.md) |
@@ -27,11 +28,15 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/decisions/0005-track-llama-cpp-submodule.md`](../../docs/decisions/0005-track-llama-cpp-submodule.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/decisions/README.md`](../../docs/decisions/README.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/local-hermes-models.md`](../../docs/local-hermes-models.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/decisions/0006-placement-policy-prefers-the-rx-6900-xts.md`](../../docs/decisions/0006-placement-policy-prefers-the-rx-6900-xts.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/ARCHITECTURE.md`](../../docs/reference/ARCHITECTURE.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/CAPABILITY-MATRIX.md`](../../docs/reference/CAPABILITY-MATRIX.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/CONFIGURATION.md`](../../docs/reference/CONFIGURATION.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/COVERAGE-MAP.md`](../../docs/reference/COVERAGE-MAP.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/DEVELOPER-GUIDE.md`](../../docs/reference/DEVELOPER-GUIDE.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md`](../../docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md) | [Reference](ARCHITECTURE.md) |
+| [`docs/reference/MODEL-UPGRADE-EVALUATION.md`](../../docs/reference/MODEL-UPGRADE-EVALUATION.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/reference/MODEL-UPGRADE-SHORTLIST.md`](../../docs/reference/MODEL-UPGRADE-SHORTLIST.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/OPERATIONS.md`](../../docs/reference/OPERATIONS.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/TROUBLESHOOTING.md`](../../docs/reference/TROUBLESHOOTING.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`hermes-llamacpp-ridge.yaml`](../../hermes-llamacpp-ridge.yaml) | [Reference](CONFIGURATION.md) |
@@ -44,8 +49,12 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`scripts/download-ridge.sh`](../../scripts/download-ridge.sh) | [Reference](OPERATIONS.md) |
 | [`scripts/download-uncensored-models.sh`](../../scripts/download-uncensored-models.sh) | [Reference](OPERATIONS.md) |
 | [`scripts/download-writing-models.sh`](../../scripts/download-writing-models.sh) | [Reference](OPERATIONS.md) |
+| [`scripts/gguf_header.py`](../../scripts/gguf_header.py) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
+| [`scripts/gpu_placement.py`](../../scripts/gpu_placement.py) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
+| [`scripts/gpu_vram.py`](../../scripts/gpu_vram.py) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
 | [`scripts/local-model-status.sh`](../../scripts/local-model-status.sh) | [Reference](OPERATIONS.md) |
 | [`scripts/local_model_status.py`](../../scripts/local_model_status.py) | [Reference](OPERATIONS.md) |
+| [`scripts/model_catalog.py`](../../scripts/model_catalog.py) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/model-runs.py`](../../scripts/model-runs.py) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/qualify-models.sh`](../../scripts/qualify-models.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/redownload-heretic-after-crash.sh`](../../scripts/redownload-heretic-after-crash.sh) | [Reference](OPERATIONS.md) |
@@ -140,6 +149,8 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/glm53flash-local/manifest.tsv`](../../verification/glm53flash-local/manifest.tsv) | [Reference](ARCHITECTURE.md) |
 | [`verification/glm53flash-local/test_gate_glm32.py`](../../verification/glm53flash-local/test_gate_glm32.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/glm53flash-local/watch_download.py`](../../verification/glm53flash-local/watch_download.py) | [Reference](ARCHITECTURE.md) |
+| [`verification/gpu-placement/test_gpu_placement.py`](../../verification/gpu-placement/test_gpu_placement.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/gpu-placement/test_gpu_vram.py`](../../verification/gpu-placement/test_gpu_vram.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/local-coverage-foundation/build_capability_ledger.py`](../../verification/local-coverage-foundation/build_capability_ledger.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/docs/CAPABILITY-STATUS-2026-09-02.md`](../../verification/local-coverage-foundation/docs/CAPABILITY-STATUS-2026-09-02.md) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/docs/GAP-DECISIONS-2026-09-02.md`](../../verification/local-coverage-foundation/docs/GAP-DECISIONS-2026-09-02.md) | [Reference](ARCHITECTURE.md) |
@@ -201,6 +212,10 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/repository-agent/fixture/calculator.py`](../../verification/repository-agent/fixture/calculator.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/repository-agent/fixture/test_calculator.py`](../../verification/repository-agent/fixture/test_calculator.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/repository-agent/fixture/util.py`](../../verification/repository-agent/fixture/util.py) | [Reference](ARCHITECTURE.md) |
+| [`verification/qualitative-characterization/README.md`](../../verification/qualitative-characterization/README.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/qualitative-characterization/characterize.py`](../../verification/qualitative-characterization/characterize.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/qualitative-characterization/corpus.json`](../../verification/qualitative-characterization/corpus.json) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/qualitative-characterization/test_characterize.py`](../../verification/qualitative-characterization/test_characterize.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/repository-agent/gate_repo_agent.py`](../../verification/repository-agent/gate_repo_agent.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/repository-agent/run_serialized.sh`](../../verification/repository-agent/run_serialized.sh) | [Reference](ARCHITECTURE.md) |
 | [`verification/repository-agent/test_repo_agent.py`](../../verification/repository-agent/test_repo_agent.py) | [Reference](DEVELOPER-GUIDE.md) |
@@ -220,4 +235,4 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/tts-local/test_tts_gate.py`](../../verification/tts-local/test_tts_gate.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/upstream-pin/test_llama_cpp_pin.py`](../../verification/upstream-pin/test_llama_cpp_pin.py) | [Reference](DEVELOPER-GUIDE.md) |
 
-Inventory entries: 215. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 230. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

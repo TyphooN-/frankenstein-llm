@@ -22,8 +22,10 @@ def members():
             pgrp = int(fields[2])
             if pgrp != PGID:
                 continue
-            cmd = (p / 'cmdline').read_bytes().replace(b'\0', b' ').decode('utf-8', 'replace')[:300]
-            rows.append((int(p.name), state, cmd))
+            # Only membership and liveness are used below. cmdline would add
+            # nothing and is served through access_remote_vm, where a target
+            # holding its mmap write lock can wedge this poll.
+            rows.append((int(p.name), state))
         except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, OSError):
             continue
     return rows

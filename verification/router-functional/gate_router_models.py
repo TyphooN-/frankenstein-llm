@@ -32,15 +32,34 @@ OUT = Path(__file__).resolve().parent / "evidence"
 ARTIFACT = OUT / "router-functional.json"
 VRAM_TOLERANCE = 768 << 20
 RAM_TOLERANCE = 2 << 30
-BLOCKED_WORKLOAD_MARKERS = (
-    "download_queue.py",
-    "/makepkg",
-    " makepkg",
-    "cmake --build",
-    "/ninja",
-    " cargo build",
-    " cargo test",
-)
+# Workload classes named by /proc/<pid>/comm rather than by cmdline. Linux
+# serves cmdline through access_remote_vm, so a task holding its own mmap write
+# lock can wedge a reader that only meant to inspect it -- and a wide parallel
+# build, which is precisely what this scan is looking for, is such a task. A
+# task name is coarser than an argument vector, so this blocks on strictly more
+# than the argument substrings it replaces; for a gate whose job is to refuse
+# measuring a contended host, more is the safe direction.
+#
+# The mission supervisor's conflict_reason() owns the canonical set, because it
+# is the one that has to wait a host out. This gate refuses outright, so it may
+# be broader but never narrower, and test_gate_router_models asserts it is not.
+BLOCKED_WORKLOAD_COMMANDS = frozenset({
+    "make", "gmake", "makepkg", "cmake", "ninja", "samu", "meson", "scons",
+    "ccache", "sccache", "cc", "c++", "gcc", "g++", "clang", "clang++",
+    "cc1", "cc1plus", "lto1", "collect2", "as", "ar", "ranlib", "strip",
+    "objtool", "ld", "ld.bfd", "ld.gold", "ld.lld", "lld", "mold",
+    "cargo", "rustc", "go", "nvcc", "cicc", "ptxas", "hipcc",
+    "pacman", "paru", "yay", "dkms",
+})
+# The transfer processes a download queue runs, whichever way it was started.
+# The queue's own interpreter is named "python3" like every gate in this
+# workspace, including the supervisor that launched this one, so it is found by
+# its unit below instead of by a task name that cannot tell them apart.
+BLOCKED_TRANSFER_COMMANDS = frozenset({
+    "aria2c", "curl", "wget", "axel", "lftp", "rsync", "scp", "sftp",
+    "git-lfs", "git-remote-http", "huggingface-cli", "hf",
+})
+DOWNLOAD_UNIT_PREFIX = "local-ai-model-downloads"
 
 
 def checks_for(model: str) -> tuple[str, ...]:
@@ -80,16 +99,44 @@ def vram_used() -> dict[str, int]:
     return values
 
 
-def blocked_workloads() -> list[dict[str, object]]:
-    """Find workload classes that would confound a memory/load qualification."""
-    blocked = []
-    for proc in Path("/proc").glob("[0-9]*"):
-        try:
-            command = (proc / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
-        except OSError:
+def blocked_workloads(proc_root: Path = Path("/proc")) -> list[dict[str, object]]:
+    """Find workload classes that would confound a memory/load qualification.
+
+    Reads only kernel metadata: ``comm`` for the task name and ``cgroup`` for the
+    systemd unit that owns it. Neither touches the target's address space. See
+    ``BLOCKED_WORKLOAD_COMMANDS`` for why ``cmdline`` is not opened here.
+
+    ``proc_root`` is injectable so the classification can be exercised without
+    arranging for a real build to be running.
+    """
+    blocked: list[dict[str, object]] = []
+    self_pid = os.getpid()
+    pids = sorted(int(entry.name) for entry in proc_root.glob("[0-9]*")
+                  if entry.name.isdigit())
+    for pid in pids:
+        if pid == self_pid:
             continue
-        if any(marker in command for marker in BLOCKED_WORKLOAD_MARKERS):
-            blocked.append({"pid": int(proc.name), "command": command[:500]})
+        proc = proc_root / str(pid)
+        try:
+            command = (proc / "comm").read_bytes().decode(errors="replace").strip()
+        except OSError:
+            # A task that exited underneath the scan is not a workload.
+            continue
+        if not command:
+            continue
+        try:
+            cgroup = (proc / "cgroup").read_bytes().decode(errors="replace")
+        except OSError:
+            cgroup = ""
+        if command in BLOCKED_WORKLOAD_COMMANDS:
+            reason = "build"
+        elif command in BLOCKED_TRANSFER_COMMANDS:
+            reason = "transfer"
+        elif DOWNLOAD_UNIT_PREFIX in cgroup:
+            reason = "download-queue"
+        else:
+            continue
+        blocked.append({"pid": pid, "reason": reason, "command": command[:500]})
     return blocked
 
 

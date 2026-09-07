@@ -1,6 +1,6 @@
 # 0003. Hardware allocation and memory policy
 
-- Status: accepted
+- Status: accepted; GPU placement amended by [ADR 0006](0006-placement-policy-prefers-the-rx-6900-xts.md)
 - Date: 2026-09-02
 
 ## Context
@@ -18,7 +18,10 @@ Treat zram as the compressed-swap path. Do not document zswap as the active poli
 ## Decision
 
 - Prefer GPU0 (RX 6900 XT 16 GiB, headless) and GPU1 (Radeon Pro V620 32 GiB, headless) for compute.
-- Minimize GPU2 (RX 6900 XT 16 GiB, display) compute.
+  **Narrowed by ADR 0006:** compute preference is now GPU0 and GPU2, the two RX 6900 XTs.
+- Minimize GPU2 (RX 6900 XT 16 GiB, display) compute. **Narrowed by ADR 0006:** what is
+  preserved on GPU2 is its *memory* headroom, through an explicit display reserve; it does
+  carry compute.
 - Keep llama.cpp on-demand with a single resident model.
 - Preserve three 1 GiB HugeTLB pages for RandomX.
 - Use `/dev/zram0` zstd 16G as compressed swap.
@@ -28,5 +31,8 @@ Treat zram as the compressed-swap path. Do not document zswap as the active poli
 ## Consequences
 
 - Media and large single-GPU loads prefer the 32 GiB V620.
-- Router presets split tensors across ROCm0/ROCm1/ROCm2 as `3,6,2` unless a gate overrides that for a specific model.
+- Router presets split tensors across ROCm0/ROCm1/ROCm2. **Superseded by ADR 0006:** the
+  `3,6,2` capacity-proportional default gave the throttling V620 the majority share of
+  every preset. Placement is now computed per preset by `scripts/gpu_placement.py` and
+  prefers the two RX 6900 XTs.
 - Benchmarking remains blocked until explicit post-reboot confirmation.

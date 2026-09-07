@@ -15,6 +15,13 @@ tracked-file coverage. Downloaded weights alone are not functional proof.
 
 Private local-AI workspace for the X99 host: llama.cpp routing, capability qualification, ComfyUI media, and serialized download/gates.
 
+**This repository is AMD ROCm only.** Every GPU in it is an AMD card, the pinned
+llama.cpp submodule is built for the HIP/ROCm backend by `scripts/build-llama-cpp.sh`,
+device selectors are spelled `ROCm0,ROCm1,ROCm2` throughout the presets, and
+ComfyUI is launched with `HIP_VISIBLE_DEVICES`. There is no CUDA path here and
+none is planned; NVIDIA-specific advice does not transfer. See
+[GPU execution and model loading](docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md).
+
 Canonical checkout: `/home/typhoon/git/frankenstein-llm`
 
 This repository tracks source, configuration, verification, and documentation. It does not track model weights.
@@ -65,21 +72,24 @@ only verified bytes. Independent files run concurrently according to
 
 When `aria2c` is installed, each file can also use bounded HTTP range
 connections. `HERMES_DOWNLOAD_CONNECTION_BUDGET` is shared across active files
-(default and general service policy 32; phases three and four 64), with at most 16
+(default and general service policy 32; the image-editing and researched-candidate
+queues 64), with at most 16
 connections assigned to one
 file. If aria2 is unavailable or only one connection is assigned, the portable
 curl continuation path is used. Model loading and functional qualification
 remain serialized even though transfers are parallel.
 
-Phase four is the pinned research-candidate queue. It installs Qwen3-Coder-Next
-Q4_K_M, Gemma-4 Heretic Q6_K with its projector, UI-Mate-9B, WeMM-Embedding-2B,
-and the non-duplicated FLUX.2-klein-4B runtime files. Qwen3-ASR-1.7B is not
-duplicated because the same pinned revision was already verified by phase one.
-The mission supervisor treats successful phase-four completion as a prerequisite
-for subsequent serialized functional qualification. It then runs the non-inference
-candidate policy gate before loading anything. That gate verifies manifest-backed
-inventory, the phase-one ASR deduplication claim, distinct text/multimodal vector
-spaces, privilege boundaries, and the exact reviewed WeMM remote-code digests.
+The researched-candidate queue (`download-queue-phase4.json`, kept under its
+original name because its completion stamp records what was downloaded) installs
+Qwen3-Coder-Next Q4_K_M, Gemma-4 Heretic Q6_K with its projector, UI-Mate-9B,
+WeMM-Embedding-2B, and the non-duplicated FLUX.2-klein-4B runtime files.
+Qwen3-ASR-1.7B is not duplicated because the same pinned revision was already
+verified by the core-capability queue. The mission supervisor treats that queue's
+successful completion as a prerequisite for subsequent serialized functional
+qualification. It then runs the non-inference candidate policy gate before loading
+anything. That gate verifies manifest-backed inventory, the core-capability ASR
+deduplication claim, distinct text/multimodal vector spaces, privilege boundaries,
+and the exact reviewed WeMM remote-code digests.
 See `verification/candidate-qualification/README.md`. A passing policy gate is
 not a functional model verdict: UI-Mate grounding, WeMM retrieval, FLUX.2
 workflows, and all candidate load/behavior/unload checks still require their live

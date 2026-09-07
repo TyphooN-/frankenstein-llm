@@ -9,10 +9,14 @@ no GPU topology is auto-rewritten, and no dependency is automatically downloaded
 The intended host has **three GPUs**, not two: ROCm0 RX 6900 XT 16 GiB
 (headless), ROCm1 Radeon Pro V620 32 GiB (headless), ROCm2 RX 6900 XT 16 GiB
 (display). Temporary device absence does not change this design. Shared serving
-presets retain `ROCm0,ROCm1,ROCm2` and `3,6,2`; individual models may override
-proportions. Benchmark defaults use the same roles with native bench syntax
-`ROCm0/ROCm1/ROCm2` and `3/6/2`. These are allocation requests, not measured
-residency or memory-fit proof. A missing required device should cause a failed run,
+presets retain `ROCm0,ROCm1,ROCm2` and an equal `1,1,1` default; almost every
+preset overrides the proportions with a placement computed by
+`scripts/gpu_placement.py` (see [ADR 0006](decisions/0006-placement-policy-prefers-the-rx-6900-xts.md)).
+Benchmark defaults use the same roles with native bench syntax
+`ROCm0/ROCm1/ROCm2`, at the same proportions the `[*]` section configures — only
+the ratio matters, so `6/6/6` and `1,1,1` are the same placement, and a test
+compares the two files by ratio rather than by literal. These are allocation
+requests, not measured residency or memory-fit proof. A missing required device should cause a failed run,
 not silently establish a smaller machine as the default.
 
 Editable sources of truth:
@@ -32,10 +36,30 @@ available logical CPUs; add an integer `threads` to the benchmark config to tune
 
 ## Serve any configured model
 
-The default listing displays **Full model name (purpose/use case)**. Human-readable
-names and intended roles live in `config/model-catalog.json`; they are descriptions,
-not comparative quality claims. Use `--list --details` to additionally expose aliases,
-weight paths and projectors. Aliases remain stable command/API identifiers.
+The default listing leads with the **full weight filename(s) and (purpose/use
+case)**, and tags the short handle behind them as
+`[compatibility alias: <name>]`. The filename is the primary label because it is
+the artifact `llama-server` actually opens; a vision preset also names its
+projector, because it shares the weight file with its text-only sibling.
+
+A handle like `heretic` is not a name for anything on disk — it identifies no
+file, and nothing stops two different weight files wearing it across a
+reconfiguration. It is retained solely so existing commands, scripts and API
+callers keep working.
+
+`config/model-catalog.json` holds two fields per alias. `purpose` is the intended
+use case shown in parentheses; it is a description, not a comparative quality
+claim. `source` is the publisher's name for the release the bytes came from, and
+it is provenance rather than identity — `heretic` loads
+`RVN-Q6_K-multilingual-mtp.gguf` from a release published as
+`Qwen3.8-27B-Heretic-Abliterated-Uncensored`, so printing the source alone would
+name a file that is not on this disk. `--list --details` adds `source` and the
+full weight/projector paths. Aliases remain the stable command and API
+identifiers and are never renamed; they trail the description as labelled
+compatibility metadata, never lead it. `scripts/model_catalog.py` owns these strings so the serving
+listing, the router status summary and the direct-API acceptance suite cannot
+drift apart. A preset with no catalog entry fails the listing rather than
+printing a blank use case.
 
 ```bash
 cd /home/typhoon/git/frankenstein-llm
@@ -126,7 +150,12 @@ Qualification and benchmarks refuse execution if the mission lock is busy, ZFS
 cannot be positively identified as healthy, recognized compiler/download
 processes are active, or available RAM is below 16 GiB. Benchmarks additionally
 refuse live `llama-*` processes. The RAM threshold is only a minimum, not proof
-that the selected model fits. Process inspection reads `stat`, never `cmdline`.
+that the selected model fits. Process inspection across this repository reads
+`stat`, `comm`, `cgroup` and the `cwd` symlink, never `cmdline`: Linux serves
+`cmdline` through `access_remote_vm`, so inspecting a compiler that holds its own
+mmap write lock can block the inspector. Classification from a task name is
+coarser than an argument vector and therefore blocks on more, which is the safe
+direction for a refusal check.
 This is conservative preflight, not system-wide exclusion: unrelated Python/GPU
 work or a workload starting later still requires operator discipline. Do not run
 other model clients, downloads, mining-heavy tests or builds during measurement.

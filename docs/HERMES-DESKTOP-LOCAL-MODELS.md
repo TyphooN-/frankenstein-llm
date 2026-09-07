@@ -37,13 +37,17 @@ hermes desktop --skip-build
 
 ## Which model to pick
 
-- `heretic`: recommended uncensored daily driver. Q6, multilingual/code calibrated, embedded MTP, closest-to-stock published behavior evidence of the installed unrestricted models.
-- `obliterated`: aggressive OBLITERATUS V3. Better when refusal/deflection removal is the priority; published MMLU is 2.1 percentage points below stock.
-- `ridge`: compact 3.7-bpw option. Fastest and smallest, but not the quality-first choice on this hardware.
-- `fable`: unrestricted Qwen3.6 27B Q6_K fantasy-writing generalist. Prefer it for plot logic, continuity, instruction following, and explicit prose.
-- `phr00ty`: unrestricted Phr00tyMix v4 32B Q6_K prose/RP specialist. Prefer it when voice, scene texture, and spicy roleplay matter most.
-- `qwen3-coder-next`: official 80B-A3B repository-agent candidate. Use for local coding/tool work. Keep Qwen2.5 Coder for FIM.
-- `gemma4-heretic`: low-privilege multimodal reader. Do not grant it executable tools.
+- `heretic` loads `RVN-Q6_K-multilingual-mtp.gguf`: recommended uncensored daily driver. Q6, multilingual/code calibrated, embedded MTP, closest-to-stock published behavior evidence of the installed unrestricted models.
+- `obliterated` loads `Qwen3.8-27B-OBLITERATED-Q6_K.gguf`: aggressive OBLITERATUS V3. Better when refusal/deflection removal is the priority; published MMLU is 2.1 percentage points below stock.
+- `ridge` loads `Qwen3.8-27B-Ridge-3.7bpw.gguf`: compact 3.7-bpw option. Fastest and smallest, but not the quality-first choice on this hardware.
+- `fable` loads `Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP-Q6_K.gguf`: unrestricted Qwen3.6 27B Q6_K fantasy-writing generalist. Prefer it for plot logic, continuity, instruction following, and explicit prose.
+- `phr00ty` loads `Phr00tyMix-v4-32B-imat-Q6_K.gguf`: unrestricted Phr00tyMix v4 32B Q6_K prose/RP specialist. Prefer it when voice, scene texture, and spicy roleplay matter most.
+- `qwen3-coder-next` loads `Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf`: official 80B-A3B repository-agent candidate. Use for local coding/tool work. Keep Qwen2.5 Coder for FIM.
+- `gemma4-heretic` loads `Gemma-4-12B-it-heretic-Q6_K.gguf`: low-privilege multimodal reader. Do not grant it executable tools.
+
+The picker lists aliases; the filename after each one is the artifact that
+actually loads. `python3 /home/typhoon/git/frankenstein-llm/scripts/serve-model.py --list`
+prints the same mapping for every preset, including the vision pair.
 
 `fable` and `phr00ty` use 65,536-token router presets. Phr00ty's GGUF declares a 131,072-token native training context but has no MTP tensors; its preset therefore omits draft-MTP intentionally.
 

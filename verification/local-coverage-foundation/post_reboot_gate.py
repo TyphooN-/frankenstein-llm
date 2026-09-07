@@ -26,18 +26,37 @@ if current['boot_id'] == BASELINE['boot_id']:
 if current['proc_version'] == BASELINE['proc_version']:
     reasons.append('booted kernel build signature is unchanged from the flawed baseline')
 
-# Exact process-name check; inspect cmdlines so this script cannot self-match.
-for proc in Path('/proc').iterdir():
-    if not proc.name.isdigit():
+# Kernel metadata only. Linux serves /proc/<pid>/cmdline through
+# access_remote_vm, so reading it can block on the mmap write lock held by the
+# very wide parallel compile this gate is looking for. comm and the cwd symlink
+# cannot. Dropping the old "is 'linux' in the argument vector" qualifier makes
+# this block on any build rather than only a kernel one, which is the safe
+# direction for a gate that exists to refuse a contended benchmark; cwd still
+# says which kind it was, and this script's own name is not in the set.
+BUILD_COMMANDS = {'makepkg', 'make', 'gmake', 'ninja', 'cmake', 'cc', 'gcc', 'g++',
+                  'clang', 'clang++', 'cc1', 'cc1plus', 'ld', 'ld.lld', 'lld', 'mold'}
+KERNEL_TREE = '/linux-tkg'
+DELETED_SUFFIX = ' (deleted)'
+self_pid = os.getpid()
+for pid in sorted(int(p.name) for p in Path('/proc').iterdir() if p.name.isdigit()):
+    if pid == self_pid:
         continue
+    proc = Path('/proc') / str(pid)
     try:
         comm = (proc / 'comm').read_text().strip()
-        cmd = (proc / 'cmdline').read_bytes().replace(b'\0', b' ').decode(errors='replace')
     except OSError:
         continue
-    if comm in {'makepkg', 'make', 'clang', 'ld.lld'} and ('linux' in cmd or 'Makefile.build' in cmd):
-        reasons.append(f'kernel build process remains active: pid={proc.name} comm={comm}')
-        break
+    if comm not in BUILD_COMMANDS:
+        continue
+    try:
+        # Refused for another user's process as a matter of course; that costs
+        # the label, not the detection, because comm already matched.
+        cwd = os.readlink(proc / 'cwd').removesuffix(DELETED_SUFFIX)
+    except OSError:
+        cwd = ''
+    kind = 'kernel build' if KERNEL_TREE in cwd else 'build'
+    reasons.append(f'{kind} process remains active: pid={pid} comm={comm} cwd={cwd or "unreadable"}')
+    break
 
 services = {}
 for unit in ('local-ai-model-downloads.service', 'local-ai-model-downloads-phase2.service', 'llama-router.service'):

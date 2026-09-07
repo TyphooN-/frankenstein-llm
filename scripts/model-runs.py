@@ -44,7 +44,9 @@ def parser():
         if name == 'benchmark':
             s.add_argument('--model', required=True, help='local GGUF path, first shard for split models')
             s.add_argument('--devices', default='ROCm0/ROCm1/ROCm2', help='native slash-separated benchmark device list')
-            s.add_argument('--tensor-split', default='3/6/2', help='native slash-separated proportions')
+            s.add_argument('--tensor-split', default='1/1/1',
+                           help='native slash-separated proportions; the repository default '
+                                'is the equal split llama-models.ini [*] configures')
             s.add_argument('--confirm-kernel', action='store_true',
                            help='I verified the intended kernel and authorize this benchmark run')
             s.add_argument('--threads', type=bounded(1, 1024), default=len(os.sched_getaffinity(0)))

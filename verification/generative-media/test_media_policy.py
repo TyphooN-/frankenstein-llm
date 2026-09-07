@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -126,7 +128,7 @@ class MediaPolicyTests(unittest.TestCase):
 
 
 class KernelBuildDetectionTests(unittest.TestCase):
-    """The needles, against a fixture /proc rather than against this host."""
+    """Kernel metadata fixtures; process address-space reads are forbidden."""
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -137,6 +139,9 @@ class KernelBuildDetectionTests(unittest.TestCase):
         entry = (root or self.proc) / pid
         entry.mkdir()
         (entry / "cmdline").write_bytes(argv.replace(" ", "\0").encode())
+        (entry / "comm").write_text(Path(argv.split()[0]).name + "\n")
+        if "link-vmlinux" in argv:
+            (entry / "cwd").symlink_to("/build/linux-tkg/linux-src")
         return entry
 
     def fresh_proc(self) -> Path:
@@ -165,10 +170,10 @@ class KernelBuildDetectionTests(unittest.TestCase):
         self.process("12", "hyprland")
         self.assertEqual([], policy.host_exclusive_blockers(self.proc))
 
-    def test_non_numeric_and_unreadable_entries_are_skipped(self):
+    def test_non_numeric_and_vanished_entries_are_skipped(self):
         (self.proc / "self").mkdir()
         (self.proc / "meminfo").write_text("MemAvailable: 1 kB\n")
-        (self.proc / "99").mkdir()  # no cmdline at all
+        (self.proc / "99").mkdir()  # exited between listing and reading: no comm
         self.assertEqual([], policy.host_exclusive_blockers(self.proc))
 
     def test_the_scan_stops_at_the_first_blocker(self):
@@ -177,6 +182,90 @@ class KernelBuildDetectionTests(unittest.TestCase):
         for pid in ("101", "102", "103"):
             self.process(pid, "make -j LLVM=1")
         self.assertEqual(1, len(policy.host_exclusive_blockers(self.proc)))
+
+    def test_cmdline_is_never_opened(self):
+        self.process("401", "make -j LLVM=1")
+        original = Path.read_bytes
+        def guarded(path, *args, **kwargs):
+            if path.name == "cmdline":
+                raise AssertionError("reading target address space is forbidden")
+            return original(path, *args, **kwargs)
+        with mock.patch.object(Path, "read_bytes", guarded):
+            self.assertEqual(["pid=401 kernel-build"], policy.host_exclusive_blockers(self.proc))
+
+    def test_permission_failure_is_not_a_quiet_host(self):
+        self.process("401", "sleep 2")
+        original = Path.read_bytes
+        def denied(path, *args, **kwargs):
+            if path.name == "comm":
+                raise PermissionError("denied")
+            return original(path, *args, **kwargs)
+        with mock.patch.object(Path, "read_bytes", denied):
+            self.assertEqual(["pid=401 process-inspection-unavailable"], policy.host_exclusive_blockers(self.proc))
+
+    def test_missing_proc_root_is_not_a_quiet_host(self):
+        self.assertEqual(["process-inspection-unavailable"], policy.host_exclusive_blockers(self.proc / "absent"))
+
+    def test_compiler_without_make_is_a_blocker(self):
+        self.process("404", "clang -c kernel.c")
+        self.assertEqual(["pid=404 kernel-build"], policy.host_exclusive_blockers(self.proc))
+
+    def test_an_unreadable_cwd_does_not_make_every_host_look_busy(self):
+        """readlink on another user's process is refused as a matter of course.
+
+        Reported as an inspection failure it would name pid 1 on every real
+        scan, withhold functional_gate_ready_now forever, and leave the gate
+        unable to run on a host that was in fact idle. comm is still readable
+        for those processes, so they stay classified by name.
+        """
+        self.process("11", "sleep 600")
+        self.process("12", "hyprland")
+        with mock.patch.object(policy.os, "readlink", side_effect=PermissionError("denied")):
+            self.assertEqual([], policy.host_exclusive_blockers(self.proc))
+
+    def test_a_build_is_still_named_when_its_cwd_is_unreadable(self):
+        self.process("11", "sleep 600")
+        self.process("12", "cargo build")
+        with mock.patch.object(policy.os, "readlink", side_effect=PermissionError("denied")):
+            self.assertEqual(["pid=12 kernel-build"], policy.host_exclusive_blockers(self.proc))
+
+    def test_a_deleted_kernel_tree_still_reads_as_a_kernel_build(self):
+        entry = self.proc / "77"
+        entry.mkdir()
+        (entry / "comm").write_text("sh\n")
+        (entry / "cwd").symlink_to("/home/typhoon/git/linux-tkg/linux-src (deleted)")
+        self.assertEqual(["pid=77 kernel-build"], policy.host_exclusive_blockers(self.proc))
+
+    def test_the_reported_blocker_does_not_depend_on_directory_order(self):
+        """Two scans of one host must record the same pid, so evidence compares."""
+        for pid in ("9", "10", "1001"):
+            self.process(pid, "make -j LLVM=1")
+        self.assertEqual(["pid=9 kernel-build"], policy.host_exclusive_blockers(self.proc))
+
+    def test_the_scanning_process_does_not_report_itself(self):
+        self.process(str(os.getpid()), "cargo build")
+        self.assertEqual([], policy.host_exclusive_blockers(self.proc))
+
+    def test_build_names_do_not_drift_from_the_mission_supervisor(self):
+        """Two gates that disagree about what a build looks like is one gate.
+
+        The supervisor owns the canonical list because it is the one that has to
+        wait a host out; this preflight only withholds readiness, so it may be
+        broader but never narrower.
+        """
+        source = (Path(__file__).resolve().parents[1]
+                  / "mission-supervisor" / "run_functional_mission.py")
+        spec = importlib.util.spec_from_file_location("supervisor_build_names", source)
+        supervisor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(supervisor)
+        self.assertEqual(frozenset(), supervisor.BUILD_COMMANDS - policy.BUILD_COMMANDS)
+        self.assertIn(policy.KERNEL_TREE, supervisor.KERNEL_TREE)
+        self.assertEqual(supervisor.DELETED_SUFFIX, policy.DELETED_SUFFIX)
+
+    def test_no_command_name_exceeds_what_comm_can_hold(self):
+        """The kernel truncates comm to 15 characters; a longer needle never matches."""
+        too_long = sorted(name for name in policy.BUILD_COMMANDS if len(name) > 15)
+        self.assertEqual([], too_long)
 
 
 class WorkflowClaimTests(unittest.TestCase):

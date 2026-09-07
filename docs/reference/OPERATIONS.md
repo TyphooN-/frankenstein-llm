@@ -97,6 +97,15 @@ and `/models` over loopback, caps the response at 2 MiB, never loads a model, an
 never prints router launch arguments. It exits 1 with `local router unavailable:`
 on stderr when the router is not answering.
 
+Each router model id is an alias, so the summary resolves it against
+`llama-models.ini` and `config/model-catalog.json` and leads each entry with the
+weight filename and use case, putting the state and the handle on the line
+beneath (`description` in `--json`, plus `loaded_descriptions`).
+An id this checkout does not configure is reported as `not a configured preset`
+rather than shown bare; unreadable local configuration degrades the description
+but never fails the status read, which describes a live service rather than
+gating configuration.
+
 It classifies each model by llama.cpp's own six-state vocabulary rather than
 guessing. `loading`, `loaded` and `sleeping` occupy the single resident slot;
 `downloading`, `downloaded` and `unloaded` do not — `downloaded` only means
@@ -172,10 +181,22 @@ scripts/redownload-heretic-after-crash.sh    # same, and clears a bad .partial
 All of them verify a publisher SHA-256 before renaming into place.
 `download-writing-models.sh` additionally holds a `flock` on the partial.
 
-### The phased queues
+### The chained download queues
 
-The four queues are the supported path for everything else. Each is one systemd
-unit; each waits for its predecessors' stamps.
+The four queues are the supported path for everything else, one systemd unit
+each, each waiting for its predecessors' stamps. They are listed by content;
+their unit and file names retain the original `phaseN` spelling because the
+completion stamps that record what was downloaded use it, and renaming them would
+rewrite evidence rather than clarify it.
+
+| Queue unit | Installs |
+|---|---|
+| `local-ai-model-downloads.service` | core capabilities: embeddings, reranker, OCR, ASR, TTS, music, image, FIM |
+| `local-ai-model-downloads-phase2.service` | computer-use grounding: UI-TARS |
+| `local-ai-model-downloads-phase3.service` | image editing: Qwen Image Edit set |
+| `local-ai-model-downloads-phase4.service` | researched candidates: Qwen3-Coder-Next, Gemma-4 Heretic, UI-Mate, WeMM, FLUX.2 Klein |
+
+All four completed on this host; starting one revalidates rather than refetches.
 
 ```bash
 systemctl --user start local-ai-model-downloads.service
@@ -402,7 +423,7 @@ systemctl --user stop  llama-router.service
 systemctl --user start llama-ridge.service
 ```
 
-Note it uses the historical `--tensor-split 1,2,1`, not the router's `3,6,2`.
+Note it uses the historical `--tensor-split 1,2,1`, not the placement the router preset carries (`1,0,1`).
 
 **A preset change.** Presets are plain text in `llama-models.ini`; revert the
 file and restart the router. Nothing caches a preset elsewhere.

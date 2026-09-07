@@ -23,7 +23,12 @@ def members() -> list[dict]:
             rows.append({
                 'pid': int(proc.name),
                 'state': fields[0],
-                'cmdline': (proc / 'cmdline').read_bytes().replace(b'\0', b' ').decode(errors='replace')[:1000],
+                # comm, not cmdline. Linux serves cmdline through
+                # access_remote_vm, so reading it can block on the target's mmap
+                # write lock -- and every task this watcher polls is a compiler
+                # in a wide parallel kernel build, which is exactly the task
+                # that holds it. stat and comm are kernel metadata.
+                'command': (proc / 'comm').read_bytes().decode(errors='replace').strip(),
             })
         except (OSError, ValueError, IndexError):
             continue

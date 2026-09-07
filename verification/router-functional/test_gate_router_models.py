@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -210,6 +212,118 @@ class ReleaseAccountingTests(unittest.TestCase):
             self.state({"card0": 0}, available=50 << 30, swap=0),
             self.state({"card0": module.VRAM_TOLERANCE}, available=50 << 30, swap=0))
         self.assertEqual([], problems)
+
+
+class BlockedWorkloadTests(unittest.TestCase):
+    """Contended-host detection, against a fixture /proc rather than this host.
+
+    Nothing here writes a ``cmdline`` file: reading one is what the scan must
+    never do, so a fixture that offered one would let a regression pass.
+    """
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.proc = Path(self.temporary.name)
+
+    def process(self, pid: str, command: str, cgroup: str = "0::/user.slice") -> None:
+        entry = self.proc / pid
+        entry.mkdir()
+        (entry / "comm").write_text(command + "\n")
+        (entry / "cgroup").write_text(cgroup + "\n")
+
+    def reasons(self) -> list[tuple[int, object]]:
+        return [(entry["pid"], entry["reason"])
+                for entry in module.blocked_workloads(self.proc)]
+
+    def test_a_quiet_host_blocks_nothing(self):
+        self.process("10", "hyprland")
+        self.process("11", "zsh")
+        self.process("12", "llama-server")
+        self.assertEqual([], self.reasons())
+
+    def test_compilers_and_build_drivers_block(self):
+        for pid, command in (("20", "makepkg"), ("21", "cmake"), ("22", "ninja"),
+                             ("23", "cargo"), ("24", "rustc"), ("25", "clang")):
+            self.process(pid, command)
+        self.assertEqual([(20, "build"), (21, "build"), (22, "build"),
+                          (23, "build"), (24, "build"), (25, "build")], self.reasons())
+
+    def test_transfers_block_however_they_were_started(self):
+        self.process("30", "aria2c")
+        self.process("31", "curl")
+        self.assertEqual([(30, "transfer"), (31, "transfer")], self.reasons())
+
+    def test_the_download_queue_is_found_by_its_unit_not_its_task_name(self):
+        self.process("40", "python3",
+                     cgroup="0::/user.slice/.../local-ai-model-downloads-phase4.service")
+        self.assertEqual([(40, "download-queue")], self.reasons())
+
+    def test_the_supervisor_that_launched_this_gate_is_not_a_blocker(self):
+        """Every gate in this workspace is a "python3"; blocking on that name
+        would make the mission refuse every run it started itself."""
+        self.process("50", "python3", cgroup="0::/user.slice/.../local-ai-functional-mission.service")
+        self.process("51", "python3")
+        self.assertEqual([], self.reasons())
+
+    def test_the_scanning_process_does_not_report_itself(self):
+        self.process(str(os.getpid()), "cargo")
+        self.assertEqual([], self.reasons())
+
+    def test_a_task_that_exited_mid_scan_is_not_a_workload(self):
+        (self.proc / "60").mkdir()  # no comm: gone between listing and reading
+        self.process("61", "cargo")
+        self.assertEqual([(61, "build")], self.reasons())
+
+    def test_findings_are_ordered_so_two_scans_compare(self):
+        for pid in ("900", "9", "90"):
+            self.process(pid, "cargo")
+        self.assertEqual([9, 90, 900], [pid for pid, _ in self.reasons()])
+
+    def test_cmdline_is_never_opened(self):
+        self.process("70", "cargo")
+        original = Path.read_bytes
+
+        def guarded(path, *args, **kwargs):
+            if path.name == "cmdline":
+                raise AssertionError("reading target address space is forbidden")
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, "read_bytes", guarded):
+            self.assertEqual([(70, "build")], self.reasons())
+
+    def test_every_workload_class_the_argument_scan_caught_is_still_caught(self):
+        """The task names behind the cmdline substrings this replaced."""
+        for command in ("makepkg", "cmake", "ninja", "cargo"):
+            self.assertIn(command, module.BLOCKED_WORKLOAD_COMMANDS)
+        self.assertIn("aria2c", module.BLOCKED_TRANSFER_COMMANDS)
+
+    def test_no_task_name_exceeds_what_comm_can_hold(self):
+        names = module.BLOCKED_WORKLOAD_COMMANDS | module.BLOCKED_TRANSFER_COMMANDS
+        self.assertEqual([], sorted(name for name in names if len(name) > 15))
+
+    def test_workload_names_do_not_drift_from_the_mission_supervisor(self):
+        """Two gates that disagree about what a build looks like is one gate.
+
+        The supervisor owns the canonical list because it is the one that has to
+        wait a host out. This gate refuses a qualification outright, so it may
+        block on more than the supervisor waits for, but never on less: a build
+        the supervisor would wait for and this gate would measure through is a
+        confounded result that nothing downstream can tell apart from a clean
+        one.
+        """
+        source = (Path(__file__).resolve().parents[1]
+                  / "mission-supervisor" / "run_functional_mission.py")
+        spec = importlib.util.spec_from_file_location("supervisor_workload_names", source)
+        assert spec is not None and spec.loader is not None
+        supervisor = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(supervisor)
+        self.assertEqual(
+            frozenset(),
+            supervisor.BUILD_COMMANDS - module.BLOCKED_WORKLOAD_COMMANDS)
+        self.assertEqual(
+            frozenset(),
+            supervisor.TRANSFER_COMMANDS - module.BLOCKED_TRANSFER_COMMANDS)
 
 
 if __name__ == "__main__":

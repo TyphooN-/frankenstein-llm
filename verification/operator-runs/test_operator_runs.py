@@ -39,8 +39,37 @@ def test_real_child_report_and_timeout(tmp_path):
 def test_default_topology_remains_three_gpus():
     a = m.configured_args(['benchmark', '--model', '/tmp/a.gguf'])
     assert a.devices == 'ROCm0/ROCm1/ROCm2'
-    assert a.tensor_split == '3/6/2'
     assert a.gpu_layers == 999
+    assert len(a.tensor_split.split('/')) == 3
+
+
+def test_benchmark_split_matches_the_router_default_proportions():
+    """Two files configure a split; only their ratio has to agree.
+
+    ``config/model-runs.json`` and the ``[*]`` section of ``llama-models.ini``
+    are edited by hand at different times, and a benchmark that measures a
+    different placement than the router serves measures the wrong thing. Only
+    the ratio is compared, because ``--tensor-split`` takes proportions:
+    ``6/6/6`` and ``1,1,1`` are the same placement written two ways, and an
+    assertion on the literal would fail on an edit that changed nothing.
+    """
+    import configparser
+    from math import gcd
+    from functools import reduce
+
+    def ratio(text):
+        values = [int(part) for part in text.replace('/', ',').split(',')]
+        divisor = reduce(gcd, values, 0)
+        return [value // divisor for value in values] if divisor else values
+
+    ini = configparser.ConfigParser(interpolation=None)
+    with (ROOT / 'llama-models.ini').open() as handle:
+        ini.read_file(handle)
+    a = m.configured_args(['benchmark', '--model', '/tmp/a.gguf'])
+    assert ratio(a.tensor_split) == ratio(ini['*']['tensor-split'])
+    assert ratio(m.parser().parse_args(
+        ['benchmark', '--model', '/tmp/a.gguf']).tensor_split) == ratio(
+            ini['*']['tensor-split'])
 
 
 def test_gpu_selection_is_explicit():

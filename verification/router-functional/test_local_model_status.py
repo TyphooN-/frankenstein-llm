@@ -8,7 +8,11 @@ import sys
 import unittest
 from unittest.mock import patch
 
-MODULE = Path(__file__).resolve().parents[2] / "scripts" / "local_model_status.py"
+SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
+MODULE = SCRIPTS / "local_model_status.py"
+# Running the script puts scripts/ on sys.path; loading it out of band has to
+# arrange the same thing, or its shared display module is not importable.
+sys.path.insert(0, str(SCRIPTS))
 SPEC = importlib.util.spec_from_file_location("local_model_status", MODULE)
 assert SPEC is not None and SPEC.loader is not None
 status = importlib.util.module_from_spec(SPEC)
@@ -150,8 +154,46 @@ class LocalModelStatusTests(unittest.TestCase):
             }],
         }
         rendered = status.render_text(summary)
-        self.assertIn("heretic: unloaded [text -> text]", rendered)
+        self.assertIn("unloaded [text -> text]", rendered)
+        self.assertIn("[compatibility alias: heretic]", rendered)
         self.assertNotIn("--model", rendered)
+
+    def test_a_router_id_is_resolved_to_the_weight_file_it_loads(self):
+        # "heretic" is the alias; RVN-Q6_K-multilingual-mtp.gguf is the file.
+        replies = self._models_reply(("heretic", "loaded"), ("ridge", "unloaded"))
+        with patch.object(status.urllib.request, "urlopen", side_effect=lambda *_a, **_k: next(replies)):
+            result = status.collect_status()
+        by_id = {model["id"]: model for model in result["models"]}
+        self.assertEqual(
+            "RVN-Q6_K-multilingual-mtp.gguf (General-purpose Hermes agent and tool use)",
+            by_id["heretic"]["description"])
+        self.assertEqual(
+            ["RVN-Q6_K-multilingual-mtp.gguf (General-purpose Hermes agent and tool use)"
+             "  [compatibility alias: heretic]"],
+            result["loaded_descriptions"])
+        rendered = status.render_text(result)
+        # Identity leads every line; the router's own key trails it, labelled.
+        self.assertIn("  RVN-Q6_K-multilingual-mtp.gguf (General-purpose", rendered)
+        self.assertIn("Loaded: RVN-Q6_K-multilingual-mtp.gguf", rendered)
+        for line in rendered.splitlines():
+            self.assertFalse(line.strip().startswith("heretic:"), line)
+
+    def test_an_id_this_checkout_does_not_configure_is_said_so_not_hidden(self):
+        replies = self._models_reply(("not-a-preset", "unloaded"))
+        with patch.object(status.urllib.request, "urlopen", side_effect=lambda *_a, **_k: next(replies)):
+            result = status.collect_status()
+        self.assertEqual("not-a-preset (not a configured preset)",
+                         result["models"][0]["description"])
+
+    def test_unreadable_local_configuration_still_reports_the_router(self):
+        """A status read describes a live service; it is not a config gate."""
+        with patch.object(status, "local_registry", return_value=({}, {})):
+            replies = self._models_reply(("heretic", "loaded"))
+            with patch.object(status.urllib.request, "urlopen", side_effect=lambda *_a, **_k: next(replies)):
+                result = status.collect_status()
+        self.assertEqual(["heretic"], result["loaded_models"])
+        self.assertEqual("heretic (not a configured preset)",
+                         result["models"][0]["description"])
 
 
 if __name__ == "__main__":

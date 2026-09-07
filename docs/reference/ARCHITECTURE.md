@@ -10,6 +10,14 @@ Undated reference. It describes how the tracked code is built, not what the host
 happened to be running when it was written. Dated readings live in
 [the capability matrix](CAPABILITY-MATRIX.md) and the snapshots it links.
 
+**Backend: AMD ROCm/HIP, exclusively.** `upstream/llama-cpp.lock.json` pins
+`"backend": "ROCm/HIP"` with `"gpu_targets": ["gfx1030"]`, and
+`scripts/build-llama-cpp.sh` refuses a build whose `GPU_TARGETS` is anything else.
+Every layer below inherits that: device selectors are `ROCm<N>`, VRAM is read from
+`amdgpu` sysfs nodes, and the media stack is scoped with `HIP_VISIBLE_DEVICES`.
+There is no CUDA code path to fall back to. How placement works across the three
+cards is in [GPU execution and model loading](GPU-EXECUTION-AND-MODEL-LOADING.md).
+
 Related: [configuration reference](CONFIGURATION.md) ·
 [operations runbook](OPERATIONS.md) · [developer guide](DEVELOPER-GUIDE.md)
 

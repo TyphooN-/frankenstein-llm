@@ -109,39 +109,90 @@ PRIMARY_DEVICE = 1
 LISTEN = "127.0.0.1"
 PORT = 8188
 
-# "make -j45 LLVM=1" was this host's kernel build spelled out exactly, including
-# the job count of the machine it was written on. A rebuilt or resized host, or a
-# build that derives its parallelism from nproc, spells it differently and would
-# have gone unseen. Match the invocation rather than one machine's arithmetic.
-KERNEL_BUILD_NEEDLES = (
-    "make -j",
-    "link-vmlinux",
-    "ld.lld -m elf_x86_64",
-)
+# Task names as they appear in /proc/<pid>/comm, which the kernel truncates to
+# 15 characters. Deliberately broad: every compile or link job on this host
+# competes with a GPU gate for the same cores and memory bandwidth, whether or
+# not the tree it is building is the kernel. "kernel-build" below is the name of
+# that whole class rather than a claim that vmlinux specifically is being
+# linked. The mission supervisor's conflict_reason() holds the canonical list
+# and this one tracks it; test_media_policy asserts the two do not drift.
+BUILD_COMMANDS = frozenset({
+    "make", "gmake", "makepkg", "cmake", "ninja", "samu", "meson", "scons",
+    "ccache", "sccache", "cc", "c++", "gcc", "g++", "clang", "clang++",
+    "cc1", "cc1plus", "lto1", "lto-wrapper", "collect2", "as", "ar", "ranlib",
+    "strip", "objtool", "ld", "ld.bfd", "ld.gold", "ld.lld", "lld", "mold",
+    "cargo", "rustc", "go", "nvcc", "cicc", "ptxas", "hipcc",
+    "pacman", "paru", "yay", "dkms", "link-vmlinux.sh",
+})
+
+# A build is also named by where it runs, which is how a plain "sh" driving
+# link-vmlinux.sh is caught after the last compiler has exited. Matched as a
+# substring for the same reason the supervisor matches it that way: sibling
+# trees such as linux-tkg-git are the same build.
+KERNEL_TREE = "/linux-tkg"
+# A cwd whose directory was removed reads back as "<path> (deleted)".
+DELETED_SUFFIX = " (deleted)"
+UNAVAILABLE = "process-inspection-unavailable"
 
 
 def host_exclusive_blockers(proc_root: Path = Path("/proc")) -> list[str]:
-    """Return process fingerprints that must not overlap a GPU gate.
+    """Return the first build blocker, or why the scan could not tell.
 
     ``proc_root`` is injectable for the reason the mission supervisor's is: a
     classification checked against whatever the host happens to be running at
     the time is not really checked at all.
 
+    Only ``comm`` and the ``cwd`` symlink are read. Linux serves
+    ``/proc/<pid>/cmdline`` through ``access_remote_vm``, so a task holding its
+    own mmap write lock can wedge a reader that merely tried to inspect it --
+    and the wide parallel compile this function exists to notice is exactly such
+    a task. ``comm`` and ``cwd`` are kernel metadata; neither touches a target's
+    address space, and nothing here opens ``cmdline`` at all.
+
     The scan stops at the first match. One blocker already withholds
-    ``functional_gate_ready_now``, and a second adds nothing but a longer walk.
+    ``functional_gate_ready_now``, and a second adds nothing but a longer walk
+    across a host that is by definition busy. Pids are visited in numeric order
+    so the same host produces the same recorded blocker twice running.
+
+    Failing closed is applied where it distinguishes anything. A process table
+    that cannot be listed, and a ``comm`` that cannot be read for a task still
+    in it, are reported rather than skipped: "nothing to see" and "nowhere to
+    look" are the same empty list, and only one of them means the host is quiet.
+    An unreadable ``cwd`` is the opposite case -- ``readlink`` on another user's
+    process is refused as a matter of course, root's included, so treating that
+    as a blocker would report every host as permanently busy and never let a
+    gate run. ``comm`` stays world-readable there, so such a process is still
+    classified by name; only the kernel-tree signal is lost.
     """
-    blockers = []
-    for entry in proc_root.iterdir():
-        if not entry.name.isdigit():
+    try:
+        pids = sorted(int(entry.name) for entry in proc_root.iterdir()
+                      if entry.name.isdigit())
+    except OSError:
+        return [UNAVAILABLE]
+    for pid in pids:
+        if pid == os.getpid():
             continue
+        entry = proc_root / str(pid)
         try:
-            cmd = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
-        except (OSError, PermissionError):
+            command = (entry / "comm").read_bytes().decode(errors="replace").strip()
+        except (FileNotFoundError, ProcessLookupError):
+            # The task exited between listing the table and reading it.
             continue
-        if any(needle in cmd for needle in KERNEL_BUILD_NEEDLES):
-            blockers.append(f"pid={entry.name} kernel-build")
-            break
-    return blockers
+        except OSError:
+            return [f"pid={pid} {UNAVAILABLE}"]
+        if not command:
+            return [f"pid={pid} {UNAVAILABLE}"]
+        if command in BUILD_COMMANDS:
+            return [f"pid={pid} kernel-build"]
+        try:
+            cwd = os.readlink(entry / "cwd")
+        except OSError:
+            # Kernel threads have no cwd link and other users' processes do not
+            # expose theirs. Both are ordinary; see the docstring.
+            cwd = ""
+        if KERNEL_TREE in cwd.removesuffix(DELETED_SUFFIX):
+            return [f"pid={pid} kernel-build"]
+    return []
 
 
 def comfy_env() -> dict[str, str]:

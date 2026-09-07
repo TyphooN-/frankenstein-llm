@@ -7,6 +7,11 @@ measurements; no performance result is implied by its existence.
 How to set this workspace up, use it day to day, and tell the difference between
 a capability that is downloaded and one that actually works.
 
+**This is an AMD ROCm workspace.** All three GPUs are AMD, the pinned llama.cpp is
+built with `-DGGML_HIP=ON` for `gfx1030`, presets address devices as `ROCm0`,
+`ROCm1` and `ROCm2`, and ComfyUI runs under `HIP_VISIBLE_DEVICES`. Instructions
+written for CUDA/NVIDIA do not apply, and no CUDA build exists here.
+
 Undated. Where something depends on what the host is running right now, this
 guide gives you the command rather than an answer.
 
@@ -124,20 +129,26 @@ scripts/download-uncensored-models.sh          # obliterated + heretic
 scripts/download-writing-models.sh all         # fable + phr00ty
 ```
 
-**The phased queues** for everything else — 18 artifacts, 118 files, about
-219 GiB across four phases, pinned to repository revisions and exact sizes.
+**The chained download queues** for everything else — 18 artifacts, 118 files,
+about 219 GiB in four queues, pinned to repository revisions and exact sizes.
 LFS weight files carry SHA-256 values; some ancillary files have no SHA-256 in the
 queue. Do not describe those ancillary files as independently SHA-256 verified.
 
+All four have already completed on this host. Run them on a fresh checkout, or to
+re-verify: each revalidates finished files rather than refetching them.
+
 ```bash
-systemctl --user start local-ai-model-downloads.service         # embeddings, reranker, OCR, ASR, TTS, music, image, FIM
-systemctl --user start local-ai-model-downloads-phase2.service  # UI-TARS grounding
-systemctl --user start local-ai-model-downloads-phase3.service  # Qwen Image Edit
+systemctl --user start local-ai-model-downloads.service         # core capabilities: embeddings, reranker, OCR, ASR, TTS, music, image, FIM
+systemctl --user start local-ai-model-downloads-phase2.service  # computer-use grounding: UI-TARS
+systemctl --user start local-ai-model-downloads-phase3.service  # image editing: Qwen Image Edit
 systemctl --user start local-ai-model-downloads-phase4.service  # researched candidates
 ```
 
-Each phase waits for the previous phase's completion stamp to match an exact byte
-total. Transfers resume into `.partial` siblings, verify exact size and any
+Queues are named here by what they install. The unit, queue, state and stamp
+files keep their original `phaseN` names because those names appear in completion
+stamps that record what was actually downloaded; renaming them would rewrite
+evidence. Each queue waits for its predecessor's completion stamp to match an
+exact byte total. Transfers resume into `.partial` siblings, verify exact size and any
 published SHA-256 recorded in the queue,
 and promote only verified bytes with `os.replace`. Independent files run
 concurrently; model loading and qualification stay serialized. Interrupting is
@@ -189,18 +200,26 @@ python3 scripts/verify-router-models.py ridge heretic
 
 ## Picking a model
 
-| Alias | Use it for | Trade-off |
-|---|---|---|
-| `heretic` | recommended uncensored daily driver: private code review, offline debugging, general work | near-stock Qwen3.8 behaviour, still below frontier agents |
-| `obliterated` | when refusal and soft-deflection removal matters more than staying close to stock | publisher reports MMLU 82.3% vs 84.5% stock; STEM most affected |
-| `ridge` | compressed baseline option | quality and speed require separate qualification |
-| `fable` | unrestricted fantasy writing where plot logic, continuity and instruction following all matter | Qwen3.6 rather than Qwen3.8; 65,536-token preset |
-| `phr00ty` | voice, scene texture and prose-first roleplay | 65,536-token preset, no MTP, `temp 1.5` |
-| `qwen3-coder-next` | local repository-agent and tool work | 80B-A3B; Q4_K_M spills past GPU0+1, so its preset keeps a bounded GPU2 share |
-| `gemma4-heretic` | multimodal *reading* | low-privilege by policy: never give it executable tools |
+| Alias | Weight file it loads | Use it for | Trade-off |
+|---|---|---|---|
+| `heretic` | `RVN-Q6_K-multilingual-mtp.gguf` | recommended uncensored daily driver: private code review, offline debugging, general work | near-stock Qwen3.8 behaviour, still below frontier agents |
+| `obliterated` | `Qwen3.8-27B-OBLITERATED-Q6_K.gguf` | when refusal and soft-deflection removal matters more than staying close to stock | publisher reports MMLU 82.3% vs 84.5% stock; STEM most affected |
+| `ridge` | `Qwen3.8-27B-Ridge-3.7bpw.gguf` | compressed baseline option | quality and speed require separate qualification |
+| `fable` | `Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP-Q6_K.gguf` | unrestricted fantasy writing where plot logic, continuity and instruction following all matter | Qwen3.6 rather than Qwen3.8; 65,536-token preset |
+| `phr00ty` | `Phr00tyMix-v4-32B-imat-Q6_K.gguf` | voice, scene texture and prose-first roleplay | 65,536-token preset, no MTP, `temp 1.5` |
+| `qwen3-coder-next` | `Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf` | local repository-agent and tool work | 80B-A3B; 46.77 GiB across four shards is the only preset that needs all three cards — the two RX 6900 XTs fill first and the remainder goes to the V620 |
+| `gemma4-heretic` | `Gemma-4-12B-it-heretic-Q6_K.gguf` | multimodal *reading* | low-privilege by policy: never give it executable tools |
+
+The alias is what you type; the weight file is what loads. They are not the same
+string and, for `heretic`, not even the same name — the release is published as
+Qwen3.8-27B-Heretic-Abliterated-Uncensored and the artifact on disk is
+`RVN-Q6_K-multilingual-mtp.gguf`.
 
 `obliterated-vision` and `gemma4-heretic-vision` are the projector-bearing
-variants of their text presets.
+variants of their text presets: they load the same weight file plus
+`Qwen3.8-27B-OBLITERATED-mmproj-bf16.gguf` and
+`mmproj-Gemma-4-12B-it-BF16.gguf` respectively.
+`python3 scripts/serve-model.py --list` prints this mapping for every preset.
 
 Every alias, with its exact model file and runtime flags, is in
 [configuration → router presets](reference/CONFIGURATION.md#router-presets).

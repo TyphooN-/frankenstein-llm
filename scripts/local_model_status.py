@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 import json
+from model_catalog import ALIAS_LABEL, describe_alias, local_registry
 import socket
 import sys
 from typing import Any
@@ -62,6 +63,10 @@ def collect_status(timeout: float = DEFAULT_TIMEOUT) -> dict[str, Any]:
     if not isinstance(raw_models, list):
         raise StatusError("/models: missing data array")
 
+    # A router model id is an alias, and an alias alone does not say which
+    # weights it resolves to. Resolve it against this checkout's presets so the
+    # summary names the artifact, not just the label used to request it.
+    registry, catalog = local_registry()
     models = []
     for raw in raw_models:
         if not isinstance(raw, dict) or not isinstance(raw.get("id"), str):
@@ -79,18 +84,22 @@ def collect_status(timeout: float = DEFAULT_TIMEOUT) -> dict[str, Any]:
         models.append({
             "id": raw["id"],
             "status": value,
+            "description": describe_alias(raw["id"], registry, catalog),
             "input_modalities": inputs if isinstance(inputs, list) else [],
             "output_modalities": outputs if isinstance(outputs, list) else [],
         })
 
     models.sort(key=lambda model: model["id"])
     counts = Counter(model["status"] for model in models)
+    resident = [model for model in models if model["status"] in RESIDENT_STATUSES]
     return {
         "endpoint": BASE_URL,
         "health": "ok",
         "model_count": len(models),
         "status_counts": dict(sorted(counts.items())),
-        "loaded_models": [model["id"] for model in models if model["status"] in RESIDENT_STATUSES],
+        "loaded_models": [model["id"] for model in resident],
+        "loaded_descriptions": [
+            f"{model['description']}  [{ALIAS_LABEL}: {model['id']}]" for model in resident],
         "models": models,
         "loads_models": False,
     }
@@ -101,12 +110,17 @@ def render_text(summary: dict[str, Any]) -> str:
     lines = [
         f"Router: {summary['health']} ({summary['endpoint']})",
         f"Models: {summary['model_count']} ({counts or 'none'})",
-        f"Loaded: {', '.join(summary['loaded_models']) or 'none'}",
+        f"Loaded: {'; '.join(summary.get('loaded_descriptions') or summary['loaded_models']) or 'none'}",
     ]
     for model in summary["models"]:
         inputs = ",".join(model["input_modalities"]) or "unknown"
         outputs = ",".join(model["output_modalities"]) or "unknown"
-        lines.append(f"  {model['id']}: {model['status']} [{inputs} -> {outputs}]")
+        # The artifact leads. The router keys everything by alias, so the alias
+        # still has to appear -- but as the compatibility handle it is, on the
+        # detail line, not as the name of the thing.
+        lines.append(f"  {model.get('description') or model['id']}")
+        lines.append(f"    {model['status']} [{inputs} -> {outputs}]"
+                     f"  [{ALIAS_LABEL}: {model['id']}]")
     return "\n".join(lines)
 
 

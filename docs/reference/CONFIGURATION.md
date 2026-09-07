@@ -75,7 +75,7 @@ because `--help` never lists them.
 | `cache-type-k` / `cache-type-v` | `q4_0` | |
 | `parallel` | `1` | one slot; qualification is serialized |
 | `device` | `ROCm0,ROCm1,ROCm2` | |
-| `tensor-split` | `3,6,2` | matches 16 / 32 / 16 GiB; per ADR 0003 |
+| `tensor-split` | `1,1,1` | equal split; the safe default for a preset added without its own evaluation. Almost every preset overrides it — see [GPU execution](GPU-EXECUTION-AND-MODEL-LOADING.md) and ADR 0006 |
 | `jinja` | `1` | use the GGUF's own chat template |
 | `mmap` | `0` | |
 | `reasoning` | `off` | |
@@ -87,23 +87,43 @@ with that path.
 
 | Alias | Model | Overrides | Privilege |
 |---|---|---|---|
-| `ridge` | `models/Qwen3.8-27B-Ridge-3.7bpw.gguf` | `spec-type=draft-mtp`, `spec-draft-n-max=2` | tool-using |
+| `ridge` | `models/Qwen3.8-27B-Ridge-3.7bpw.gguf` | `spec-type=draft-mtp`, `spec-draft-n-max=2`, `tensor-split=1,0,1` | tool-using |
 | `heretic` | `models/RVN-Q6_K-multilingual-mtp.gguf` | same MTP pair | tool-using |
 | `obliterated` | `models/Qwen3.8-27B-OBLITERATED-Q6_K.gguf` | MTP pair, `temp=0.2`, `repeat-penalty=1.15` | tool-using |
-| `obliterated-vision` | same GGUF | adds `mmproj=…-mmproj-bf16.gguf`, `mmproj-device=ROCm1`, `ctx-size=32768` | tool-using |
+| `obliterated-vision` | same GGUF | adds `mmproj=…-mmproj-bf16.gguf`, `mmproj-device=ROCm0`, `ctx-size=32768`, `tensor-split=5,0,4` | tool-using |
 | `fable` | `models/Qwen3.6-27B-Fable-Fus-711-…-Q6_K.gguf` | MTP pair, `ctx-size=65536` | tool-using |
 | `phr00ty` | `models/Phr00tyMix-v4-32B-imat-Q6_K.gguf` | `ctx-size=65536`, `temp=1.5`, `min-p=0.1`; **no MTP** | tool-using |
-| `qwen3-embedding-8b` | `models/embedding/Qwen3-Embedding-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=4096`, `embedding=1`, `pooling=last`, `embd-normalize=2`, `flash-attn=off`, `cache-type-v=f16` | read-only |
-| `qwen3-reranker-8b` | `models/reranker/Qwen3-Reranker-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=1024`, `reranking=1`, `pooling=rank`, `flash-attn=off`, `cache-type-v=f16` | read-only |
-| `qwen25-coder-7b-fim` | `models/fim/qwen2.5-coder-7b-q8_0.gguf` | `ctx=32768`, `batch=1024`, `ubatch=512`, `cache-type-k/v=q8_0` | read-only |
-| `qwen3-coder-next` | `models/repository-agent/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf` | `ctx=65536`, `tensor-split=13,26,6`, `temp=0.2`, `repeat-penalty=1.05` | tool-using |
-| `gemma4-heretic` | `models/gemma4-heretic/Gemma-4-12B-it-heretic-Q6_K.gguf` | `ctx=32768`, `tensor-split=0,1,0`, `temp=0.7` | low |
-| `gemma4-heretic-vision` | same GGUF | adds `mmproj=mmproj-Gemma-4-12B-it-BF16.gguf`, `mmproj-device=ROCm1`, `ctx=16384`, `tensor-split=0,1,0`, `temp=0.7` | low |
+| `qwen3-embedding-8b` | `models/embedding/Qwen3-Embedding-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=4096`, `embedding=1`, `pooling=last`, `embd-normalize=2`, `flash-attn=off`, `cache-type-v=f16`, `tensor-split=1,0,0` | read-only |
+| `qwen3-reranker-8b` | `models/reranker/Qwen3-Reranker-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=1024`, `reranking=1`, `pooling=rank`, `flash-attn=off`, `cache-type-v=f16`, `tensor-split=1,0,0` | read-only |
+| `qwen25-coder-7b-fim` | `models/fim/qwen2.5-coder-7b-q8_0.gguf` | `ctx=32768`, `batch=1024`, `ubatch=512`, `cache-type-k/v=q8_0`, `tensor-split=1,0,0` | read-only |
+| `qwen3-coder-next` | `models/repository-agent/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf` | `ctx=65536`, `tensor-split=5,8,4`, `temp=0.2`, `repeat-penalty=1.05` | tool-using |
+| `gemma4-heretic` | `models/gemma4-heretic/Gemma-4-12B-it-heretic-Q6_K.gguf` | `ctx=32768`, `tensor-split=1,0,1`, `temp=0.7` | low |
+| `gemma4-heretic-vision` | same GGUF | adds `mmproj=mmproj-Gemma-4-12B-it-BF16.gguf`, `mmproj-device=ROCm0`, `ctx=16384`, `tensor-split=1,0,0`, `temp=0.7` | low |
+
+### Display names
+
+`config/model-catalog.json` carries one `source` and one `purpose` per alias.
+`purpose` is the intended use case; `source` is the publisher's release name and
+is **provenance, not identity**. The artifact filename in the table above is the
+identity, and all three strings genuinely differ: the handle is `heretic`, the
+file is `RVN-Q6_K-multilingual-mtp.gguf`, and the publisher's release is
+`Qwen3.8-27B-Heretic-Abliterated-Uncensored`. Every operator-facing listing is
+built by `scripts/model_catalog.py` as
+`weight-filename(s) (purpose)  [compatibility alias: handle]`, so the
+engineering identity is the primary label and the handle is labelled for what it
+is. Aliases remain valid input everywhere they were valid before. Adding an alias to
+`llama-models.ini` without a catalog entry fails `serve-model.py --list` and its
+test rather than printing an empty use case.
 
 `phr00ty` omits draft-MTP intentionally: its GGUF declares a 131,072-token native
-training context but carries no MTP tensors. `qwen3-coder-next` keeps a bounded
-GPU2 share because Q4_K_M weights are ~48 GB and pretending `0,1,0` would hold KV
-is worse than spending some display-GPU VRAM.
+training context but carries no MTP tensors.
+
+Every `tensor-split` above is computed, not chosen by hand. `scripts/gpu_placement.py`
+sizes each preset from its weight files and its GGUF attention dimensions, applies the
+policy in `config/gpu-placement.json`, and a test compares the result against this
+file. Edit the policy and regenerate rather than editing the INI; a hand edit is what
+the comparison reports. `qwen3-coder-next` is the only preset that requires the V620,
+at 46.77 GiB across four shards.
 
 **Adding an alias requires a privilege decision.** `candidate_policy` maps every
 alias to a tier; an alias it does not know returns `None` and is refused tools.
@@ -246,7 +266,7 @@ All four use 16 workers.
 `RIDGE_MODEL`, `LLAMA_HOST`, `LLAMA_PORT`, `LLAMA_CTX`, `SPEC_DRAFT_N_MAX`,
 `LLAMA_SERVER_BIN`, `LLAMA_LOG`. Defaults reproduce the historical Ridge-only
 configuration, including `--tensor-split 1,2,1` — which is the *rollback*
-proportion, not the router's `3,6,2`.
+proportion, not the placement the router preset carries (`1,0,1`).
 
 ### Download scripts
 

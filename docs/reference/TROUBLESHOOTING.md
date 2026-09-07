@@ -11,6 +11,8 @@ Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
 - [Quick triage](#quick-triage)
 - [Router will not start](#router-will-not-start)
 - [Router starts but a model will not load](#router-starts-but-a-model-will-not-load)
+- [A card is missing and the ROCm indices moved](#a-card-is-missing-and-the-rocm-indices-moved)
+- [Model loads but never answers](#model-loads-but-never-answers)
 - [Hermes cannot see local models](#hermes-cannot-see-local-models)
 - [Build failures](#build-failures)
 - [Download problems](#download-problems)
@@ -56,9 +58,58 @@ upstream/llama.cpp/build/bin/llama-server --version
 |---|---|---|
 | First request after a switch hangs for a long time | Expected. `--models-max 1` evicts the previous model and loads the requested GGUF; later requests avoid the initial model-load step | Wait; do not restart mid-load |
 | One alias fails, others work | The GGUF path in that preset is wrong or the file is gone. Weights are untracked, so a fresh clone has none | Check the `model =` path; re-run the download that installs it |
-| Load fails on a 16 GiB card | A `tensor-split` that does not reflect the model's size. `qwen3-coder-next` deliberately keeps a bounded GPU2 share because Q4_K_M is ~48 GB | Adjust the preset's `tensor-split`; do not assume `0,1,0` will hold KV |
+| Load fails on a 16 GiB card | A `tensor-split` that does not reflect the model's size, its KV cache at the configured context, or a projector pinned by `mmproj-device` | Run `python3 scripts/gpu_placement.py` — it sizes every preset and says which device is over budget. Change `config/gpu-placement.json` and regenerate rather than editing the INI by hand |
 | Odd sampling behaviour on Qwen3.8 | `split-mode = tensor` was added. Qwen3.8 MTP backend sampling is incompatible with that path | Remove it |
 | Vision alias returns text-only behaviour | The `mmproj` file is missing or the projector device is wrong | Check `mmproj` and `mmproj-device` in the preset |
+
+## A card is missing and the ROCm indices moved
+
+| Symptom | Cause | Action |
+|---|---|---|
+| `scripts/gpu_vram.py` lists two devices where it listed three | A card did not enumerate on this boot | Reboot. Confirm with `lspci -nn \| grep -Ei 'vga\|display'` and `journalctl -b -k \| grep 'initializing kernel modesetting'`, which names every card the driver bound |
+| The display card answers to a lower ROCm index than it used to | A ROCm index is a position in a list. Drop a card out of the middle and every card behind it moves up one | Do not retune `tensor-split` or `config/gpu-placement.json` to the short topology. Restore the card |
+| `gpu_placement.py` reports `DOES NOT FIT` for presets that fit yesterday | The same thing, measured: budgets are read from the cards actually present | Compare the device list at the top of its own output against the three the host is supposed to have |
+
+Observed on 2026-09-06: the V620 at `0000:07:00.0` was absent from one boot, and
+the second RX 6900 XT moved from `0000:0a:00.0` to `0000:08:00.0` as PCI
+renumbering closed the gap behind it. A later reboot brought all three back at
+their usual addresses. Nothing was reconfigured in between.
+
+The tools report this rather than absorb it, which is the intended behaviour and
+not a second fault to chase: `gpu_placement.py` recomputes against whatever is
+present and says which presets no longer fit,
+`configured_split` reads `None` when the INI's split has more positions than the
+host has devices, and the comparison test in
+`verification/gpu-placement/test_gpu_placement.py` skips with `needs the
+three-GPU host` instead of comparing against a topology nobody planned for. A
+positional `--tensor-split` is only meaningful against the device list it was
+sized for.
+
+## Model loads but never answers
+
+`local-model-status.sh` shows the model `loaded`, VRAM is allocated on every
+card, and the first request never returns.
+
+Check what the server process is actually waiting on:
+
+```bash
+pid=$(pgrep -n llama-server)
+grep ^State /proc/$pid/status
+cat /proc/$pid/wchan; echo
+cat /proc/pressure/memory /proc/pressure/io
+```
+
+`State: D` together with `amdgpu_amdkfd_gpuvm_map_memory_to_gpu` means the ROCm
+KFD mapping call has not returned. Observed on this host while a 13 GB `ld.lld`
+held memory: one thread parked in that call, 48 threads idle, generation never
+starting, memory pressure `some avg10≈18` and I/O pressure `some avg10≈34`.
+
+**Wait for the competing build to finish.** A `D`-state thread does not take
+SIGTERM, so killing the process does not release it any sooner, and restarting
+the router or the driver to force it is the wrong response — it risks the GPU
+state rather than fixing it. This is the same contention the qualification gates
+refuse to run through; see
+[GPU execution and model loading](GPU-EXECUTION-AND-MODEL-LOADING.md#a-stall-this-host-can-produce).
 
 ## Hermes cannot see local models
 

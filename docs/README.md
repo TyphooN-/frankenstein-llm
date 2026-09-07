@@ -8,6 +8,9 @@
 - [Architecture](reference/ARCHITECTURE.md): implementation layers, data flows, gates, supervision and evidence.
 - [Configuration](reference/CONFIGURATION.md): presets, manifests, environment variables, ports and schemas.
 - [Operations](reference/OPERATIONS.md): installation, downloads, services, qualification, updates and rollback.
+- [GPU execution and model loading](reference/GPU-EXECUTION-AND-MODEL-LOADING.md): which ROCm index is which card, how each preset's layer split was computed, why three cards add capacity rather than speed, and when a model is actually loaded.
+- [Larger-model shortlist](reference/MODEL-UPGRADE-SHORTLIST.md): provisional candidates, exact publisher sizes, and admission caveats.
+- [Model upgrade evaluation](reference/MODEL-UPGRADE-EVALUATION.md): quality versus resource cost, VRAM/RAM tiers, and controlled candidate benchmarks.
 - [Troubleshooting](reference/TROUBLESHOOTING.md): symptoms, diagnostic checks and recovery.
 - [Capability matrix](reference/CAPABILITY-MATRIX.md): what exists, what is admitted, and how to obtain current proof.
 - [Developer guide](reference/DEVELOPER-GUIDE.md): tests, extending capabilities and evidence contracts.

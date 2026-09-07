@@ -16,7 +16,7 @@ Related: [configuration](CONFIGURATION.md) · [operations](OPERATIONS.md) ·
 - [Adding a capability](#adding-a-capability)
 - [Writing a gate](#writing-a-gate)
 - [Writing an evidence artifact](#writing-an-evidence-artifact)
-- [Adding a download phase](#adding-a-download-phase)
+- [Adding a download queue](#adding-a-download-queue)
 - [Admitting a prompt corpus](#admitting-a-prompt-corpus)
 - [Documentation rules](#documentation-rules)
 - [Writing an ADR](#writing-an-adr)
@@ -102,15 +102,17 @@ only after builds and other host pressure have drained.
 | `verification/repository-agent/test_repo_agent.py` | write outside the allowlist, symlinked target, escaped path, rewritten oracle, sandbox that will not start, green run invalidated by a later write, evidence lifecycle, model selection |
 | `verification/computer-use-grounding/test_gate_logic.py` | coordinate mapping, action parsing, injection judging, scoring, telemetry aggregation, atomic artifacts, single-instance lock, signal semantics |
 | `.../test_grounding_contract.py` | the two checkpoints' geometry, action-space and injection-judging differences |
-| `verification/router-functional/test_gate_router_models.py` | per-preset check lists, privilege profile, model coverage, release accounting |
-| `.../test_local_model_status.py` | status classification and error handling against fake responses |
-| `verification/generative-media/test_media_policy.py` | GPU policy, kernel-build detection, workflow claims, graph reference resolution |
+| `verification/operator-runs/test_serve_model.py` | preset/catalog agreement, weight-filename listings, fail-closed catalog validation |
+| `verification/router-functional/test_gate_router_models.py` | per-preset check lists, privilege profile, model coverage, release accounting, contended-host detection without reading `cmdline` |
+| `.../test_local_model_status.py` | status classification, error handling against fake responses, alias-to-weight-file resolution |
+| `verification/generative-media/test_media_policy.py` | GPU policy, build detection from `comm`/`cwd`, fail-closed vs routine `/proc` errors, build-name agreement with the supervisor, workflow claims, graph reference resolution |
 | `.../test_functional_gate.py` | workflow graph construction |
 | `verification/tts-local/test_tts_gate.py` | round-trip scoring, admission rules, text normalisation |
+| `verification/qualitative-characterization/test_characterize.py` | corpus scope and tripwires, inert non-executable output, loopback-only transport, mechanical checks, truncation treated as inconclusive, refusal signal quoted rather than asserted |
 | `verification/prompt-corpus-admission/test_admit_corpus.py` | every rejection path in admission |
 | `verification/security-agents/strix-scaffold/test_strix_scaffold.py` | one negative test per policy control, plus offline scope denial |
 | `verification/glm53flash-local/test_gate_glm32.py` | VRAM telemetry contracts |
-| `verification/docs/test_documentation.py` | every tracked file appears in the coverage map; local links and anchors resolve |
+| `verification/docs/test_documentation.py` | every tracked file appears in the coverage map; local links and anchors resolve; model-choice docs name the weight file each alias loads |
 
 ## Adding a router preset
 
@@ -214,18 +216,31 @@ The ledger reads exactly these fields. Anything else is for humans.
 owns. Evidence older than its weights is `evidence-stale` — reported as "this
 evidence did not judge these bytes", not as a finding about the model.
 
-## Adding a download phase
+## Adding a download queue
 
-1. Generate `download-queue-phaseN.json` from collected metadata.
-2. Add `run_download_phaseN.py`, modelled on phase three or four: it waits on
-   every earlier phase's state **and** stamp, then `execve`s `download_queue.py`
-   with the five `HERMES_DOWNLOAD_*` paths set.
+Naming convention, so the mixture already in the tree is not mistaken for
+drift: **prose describes a queue by what it installs** ("the researched-candidate
+queue", "the image-editing queue"), while **on-disk identifiers keep the
+historical `phaseN` spelling**. Queue files, state files, completion stamps, unit
+names and the `SystemExit` strings that quote them all record what was actually
+downloaded and when; renaming them would rewrite evidence rather than clarify it.
+`docs/reference/TROUBLESHOOTING.md` therefore still quotes `phase-one stamp
+mismatch` verbatim, because that is the literal text
+`run_download_phase2.py` raises.
+
+1. Generate `download-queue-phaseN.json` from collected metadata, where `N` is
+   the next unused number.
+2. Add `run_download_phaseN.py`, modelled on the image-editing or
+   researched-candidate runner: it waits on every earlier queue's state **and**
+   stamp, then `execve`s `download_queue.py` with the five `HERMES_DOWNLOAD_*`
+   paths set.
 3. Add `local-ai-model-downloads-phaseN.service` with `After=` the previous
-   phase, `ProtectSystem=strict`, `ProtectHome=read-only` and `ReadWritePaths`
+   queue, `ProtectSystem=strict`, `ProtectHome=read-only` and `ReadWritePaths`
    limited to `models/` and the foundation directory.
-4. Add the phase to `run_functional_mission.UPSTREAM` with its exact byte total.
+4. Add the queue to `run_functional_mission.UPSTREAM` with its exact byte total.
 5. Extend `build_capability_ledger.QUEUES`.
 6. Extend `test_queue_manifests.py` so the new copies are reconciled.
+7. Describe it in the operator docs by its contents, not by its number.
 
 ## Admitting a prompt corpus
 

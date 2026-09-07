@@ -3,6 +3,7 @@
 import argparse
 import configparser
 import json
+from model_catalog import describe_width, listing_line, load_catalog, presets
 import os
 from pathlib import Path
 import socket
@@ -16,14 +17,6 @@ VALUE_FLAGS = {'model', 'mmproj', 'mmproj-device', 'ctx-size', 'gpu-layers', 'fl
                'cache-type-k', 'cache-type-v', 'parallel', 'device', 'tensor-split',
                'reasoning', 'spec-type', 'spec-draft-n-max', 'temp', 'repeat-penalty',
                'min-p', 'batch-size', 'ubatch-size', 'pooling', 'embd-normalize'}
-
-
-def presets(path):
-    ini = configparser.ConfigParser(interpolation=None)
-    with Path(path).open() as f:
-        ini.read_file(f)
-    common = dict(ini['*']) if '*' in ini else {}
-    return {name: {**common, **dict(ini[name])} for name in ini.sections() if name != '*'}
 
 
 def command(alias, values, serving):
@@ -65,16 +58,20 @@ def main(argv=None):
     try:
         registry = presets(a.presets)
         if a.list:
-            catalog = json.loads(a.catalog.read_text())
-            if not isinstance(catalog, dict) or set(registry) - set(catalog):
-                raise ValueError('every preset needs a full name and purpose in the model catalog')
+            catalog = load_catalog(a.catalog)
+            uncatalogued = sorted(set(registry) - set(catalog))
+            if uncatalogued:
+                raise ValueError('presets missing a source and purpose in the model '
+                                 'catalog: ' + ', '.join(uncatalogued))
+            width = describe_width(registry, catalog)
             for alias, preset in sorted(registry.items()):
-                row = catalog[alias]
-                if not isinstance(row, dict) or set(row) != {'name', 'purpose'} or not all(isinstance(v, str) and v.strip() for v in row.values()):
-                    raise ValueError(f'invalid catalog entry: {alias}')
-                print(f"{row['name']} ({row['purpose']})")
+                # Identity is the weight filename. The catalog source is only
+                # where the bytes came from and the alias is only a handle, so
+                # neither leads the line.
+                print(listing_line(alias, preset, catalog, width))
                 if a.details:
-                    print(f"  alias: {alias}\n  model: {preset['model']}")
+                    print(f"  source: {catalog[alias]['source']}")
+                    print(f"  model: {preset['model']}")
                     if preset.get('mmproj'):
                         print(f"  projector: {preset['mmproj']}")
             return 0

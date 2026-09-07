@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "_comment": [
+    "Placement policy for llama-models.ini presets. Edited by an operator, read",
+    "by scripts/gpu_placement.py. Reserves are in bytes and are subtracted from",
+    "a card's total VRAM before any model is considered to fit on it.",
+    "",
+    "'prefer' names ROCm indices that should carry work first. 'fallback' names",
+    "the ones that take what is left over. Indices are the runtime's own, as",
+    "reported by scripts/gpu_vram.py -- not sysfs card numbers.",
+    "",
+    "The display reserve is applied on top of the per-device reserve, and only",
+    "to a device with a connected output. It is not a guess: 1551 MiB was the",
+    "measured idle residency of the desktop on card2 on 2026-09-05, recorded in",
+    "docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md, and the remainder is",
+    "margin for a compositor or browser that grows after a model is resident."
+  ],
+  "per_device_reserve_bytes": 1073741824,
+  "display_reserve_bytes": 2684354560,
+  "min_slack_bytes": 1073741824,
+  "prefer": [
+    0,
+    2
+  ],
+  "fallback": [
+    1
+  ],
+  "equal_split_when_it_fits": true,
+  "split_scale": 96,
+  "_idle_baseline_comment": "card0 and card2 measured 2026-09-05 on an idle set of cards immediately before a cold load: 26 MiB and 1551 MiB, recorded in docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md. card1 re-measured 2026-09-06 on a freshly booted host with the router up and every preset unloaded, where it holds 26 MiB and not the 385 MiB first recorded; it drives no display, so it has no desktop allocation to keep out of a residual, and 385 MiB was residue from an earlier load rather than an idle floor. Keyed by ROCm index. Only used by --verify, which subtracts these from measured residency: an inflated baseline is charged to the desktop rather than to the model and makes the estimate look more conservative than it is, so every figure here is the lowest reading seen for its card.",
+  "idle_baseline_bytes": {
+    "0": 27262976,
+    "1": 27729920,
+    "2": 1626341376
+  },
+  "_min_slack_comment": "Working headroom every placement rule plans against, on top of the per-device reserve. Without it the rules fill a card to its last modelled byte and produce knife-edge splits for a figure --verify measures as roughly 5 percent conservative."
+}
