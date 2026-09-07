@@ -31,6 +31,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/decisions/0006-placement-policy-prefers-the-rx-6900-xts.md`](../../docs/decisions/0006-placement-policy-prefers-the-rx-6900-xts.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/ARCHITECTURE.md`](../../docs/reference/ARCHITECTURE.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/CAPABILITY-MATRIX.md`](../../docs/reference/CAPABILITY-MATRIX.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/reference/CANDIDATE-ADDITIONS-INVESTIGATION.md`](../../docs/reference/CANDIDATE-ADDITIONS-INVESTIGATION.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/CONFIGURATION.md`](../../docs/reference/CONFIGURATION.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/COVERAGE-MAP.md`](../../docs/reference/COVERAGE-MAP.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/DEVELOPER-GUIDE.md`](../../docs/reference/DEVELOPER-GUIDE.md) | [Reference](DEVELOPER-GUIDE.md) |
@@ -172,6 +173,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/local-coverage-foundation/research/build_download_queue.py`](../../verification/local-coverage-foundation/research/build_download_queue.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/research/collect_hf_metadata.py`](../../verification/local-coverage-foundation/research/collect_hf_metadata.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/research/hf-lfs-index.tsv`](../../verification/local-coverage-foundation/research/hf-lfs-index.tsv) | [Reference](ARCHITECTURE.md) |
+| [`verification/local-coverage-foundation/research/test_collect_hf_metadata.py`](../../verification/local-coverage-foundation/research/test_collect_hf_metadata.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/run_download_phase2.py`](../../verification/local-coverage-foundation/run_download_phase2.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/run_download_phase3.py`](../../verification/local-coverage-foundation/run_download_phase3.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/run_download_phase4.py`](../../verification/local-coverage-foundation/run_download_phase4.py) | [Reference](ARCHITECTURE.md) |

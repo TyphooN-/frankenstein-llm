@@ -49,6 +49,16 @@ The picker lists aliases; the filename after each one is the artifact that
 actually loads. `python3 /home/typhoon/git/frankenstein-llm/scripts/serve-model.py --list`
 prints the same mapping for every preset, including the vision pair.
 
+The picker shows the bare alias and not the artifact name, and that is a
+boundary rather than a defect. Desktop discovers models from the router
+(`discover_models` against `http://127.0.0.1:8080/v1`), and llama.cpp's
+OpenAI-compatible `/v1/models` returns an `id` per preset with no name or
+description field, so there is nothing richer for a client to show. Everything
+this repository owns — `serve-model.py --list`, `local-model-status.sh`, the
+tables in this file — leads with the artifact instead. Changing what the picker
+itself displays would mean editing the pinned upstream runtime or the Hermes
+configuration, neither of which is this repository's to change.
+
 `fable` and `phr00ty` use 65,536-token router presets. Phr00ty's GGUF declares a 131,072-token native training context but has no MTP tensors; its preset therefore omits draft-MTP intentionally.
 
 ## What happens during switching

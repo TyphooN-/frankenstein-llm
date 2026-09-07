@@ -32,6 +32,19 @@ The interrupted research suggested the 122B Q8_0 set was incomplete. The fresh A
 
 Require the [evaluation strategy](MODEL-UPGRADE-EVALUATION.md), exact backend/binary support, measured available RAM and per-device VRAM, and a healthy uncontended host before execution. No throughput results exist for this shortlist. No weights were downloaded during this assessment.
 
+## Separately queued additions
+
+Eleven further repositories were submitted after this shortlist was written and
+are investigated in [CANDIDATE-ADDITIONS-INVESTIGATION.md](CANDIDATE-ADDITIONS-INVESTIGATION.md),
+which resolves each one against the pinned runtime's architecture table rather
+than against its repository name. One is worth an isolated evaluation, three are
+waiting on capacity or access, and seven are rejected. None is admitted.
+
+That file also records a pagination defect in the metadata collector, found and
+fixed while collecting those eleven. It could truncate any repository listing
+above 50 entries. No repository in the table above reached that cap, so the
+sizes on this page are unaffected.
+
 ## Pinned metadata revisions
 
 - https://huggingface.co/unsloth/Qwen3.5-122B-A10B-GGUF/tree/51eab4d59d53f573fb9206cb3ce613f1d0aa392b
