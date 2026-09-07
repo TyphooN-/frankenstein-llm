@@ -16,7 +16,12 @@ BOOL_FLAGS = {'jinja': ('--jinja', '--no-jinja'), 'mmap': ('--mmap', '--no-mmap'
 VALUE_FLAGS = {'model', 'mmproj', 'mmproj-device', 'ctx-size', 'gpu-layers', 'flash-attn',
                'cache-type-k', 'cache-type-v', 'parallel', 'device', 'tensor-split',
                'reasoning', 'spec-type', 'spec-draft-n-max', 'temp', 'repeat-penalty',
-               'min-p', 'batch-size', 'ubatch-size', 'pooling', 'embd-normalize'}
+               'min-p', 'batch-size', 'ubatch-size', 'pooling', 'embd-normalize',
+               # Presets whose weights ship a chat template with no tools branch
+               # override it from config/chat-templates/. Serving a preset here
+               # with a different template than the router uses would make this
+               # tool reproduce a different model, so the key has to be carried.
+               'chat-template-file'}
 
 
 def command(alias, values, serving):

@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
@@ -61,6 +62,43 @@ def http_json(path: str, payload: dict | None = None, timeout: int = 900) -> dic
     )
     with urllib.request.urlopen(req, timeout=timeout) as response:
         return json.load(response)
+
+
+def arc_stats() -> dict[str, int]:
+    """ZFS ARC size and floor, in bytes; -1 for a field this host does not expose.
+
+    MemAvailable does not count the ARC. On this host the ARC is capped at 32 GiB
+    and fills as each multi-gigabyte GGUF is read, so a MemAvailable delta taken
+    across one model load is dominated by filesystem cache growth that belongs to
+    no model in particular. Reading arcstats is how the computer-use and media
+    gates already record it; the router gate needs the same fact to attribute a
+    RAM shortfall correctly.
+    """
+    values = {"size": -1, "c_min": -1}
+    try:
+        for line in Path("/proc/spl/kstat/zfs/arcstats").read_text().splitlines():
+            fields = line.split()
+            if len(fields) >= 3 and fields[0] in values:
+                values[fields[0]] = int(fields[-1])
+    except (OSError, ValueError):
+        pass
+    return values
+
+
+def arc_reclaimable(stats: dict[str, int]) -> int:
+    """The part of the ARC the kernel can hand back, i.e. everything above c_min."""
+    if stats.get("size", -1) < 0 or stats.get("c_min", -1) < 0:
+        return 0
+    return max(0, stats["size"] - stats["c_min"])
+
+
+def reclaimable_ram(state: dict) -> int:
+    """Available RAM plus whatever of the ARC the kernel can hand back.
+
+    A sample without ARC fields contributes nothing, so this degrades to exactly
+    the MemAvailable comparison it replaces rather than inventing headroom.
+    """
+    return state.get("mem_available_bytes", 0) + state.get("zfs_arc_reclaimable_bytes", 0)
 
 
 def meminfo() -> dict[str, int]:
@@ -124,10 +162,15 @@ def pressure() -> dict[str, str]:
 
 def sample(label: str) -> dict:
     mem = meminfo()
+    arc = arc_stats()
     return {
         "label": label,
         "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "mem_available_bytes": mem.get("MemAvailable", -1),
+        "zfs_arc_bytes": arc["size"],
+        "zfs_arc_min_bytes": arc["c_min"],
+        "zfs_arc_reclaimable_bytes": arc_reclaimable(arc),
+        "reclaimable_ram_bytes": mem.get("MemAvailable", -1) + arc_reclaimable(arc),
         "swap_used_bytes": mem.get("SwapTotal", 0) - mem.get("SwapFree", 0),
         "vram_used_bytes": vram_used(),
         "pressure": pressure(),
@@ -137,6 +180,25 @@ def sample(label: str) -> dict:
 def model_states() -> dict[str, str]:
     data = http_json("/models").get("data", [])
     return {item["id"]: item.get("status", {}).get("value", "unknown") for item in data}
+
+
+def template_caps(model: str) -> dict:
+    """What the chat template the router actually loaded can express.
+
+    The server reports this per loaded model. It is the difference between "the
+    model was offered tools and declined" and "the tools never reached the
+    model", which an empty ``tool_calls`` list cannot distinguish. obliterated
+    and phr00ty failed this gate on boot 1669f3ad for the second reason: both
+    ship a chat template with no tools branch, so the function signatures were
+    dropped before prompting and no native call was possible at any temperature.
+    """
+    try:
+        props = http_json(f"/props?model={urllib.parse.quote(model)}", timeout=120)
+    except Exception as error:                                  # noqa: BLE001
+        return {"error": f"{type(error).__name__}: {error}"[:300]}
+    template = props.get("chat_template") or ""
+    return {"chat_template_length": len(template),
+            "chat_template_caps": props.get("chat_template_caps")}
 
 
 def model_metadata(model: str) -> dict:
@@ -176,7 +238,8 @@ def chat(model: str, prompt: str | list[dict], *, schema: dict | None = None, to
         payload["tool_choice"] = "auto"
     response = http_json("/v1/chat/completions", payload)
     # Never persist timing/token-rate fields: this gate is functional only.
-    return {"message": response["choices"][0]["message"]}
+    choice = response["choices"][0]
+    return {"message": choice["message"], "finish_reason": choice.get("finish_reason")}
 
 
 def unload(model: str) -> None:
@@ -210,9 +273,29 @@ def record_release(result: dict, before: dict) -> None:
         delta = after["vram_used_bytes"][card] - base
         if delta > VRAM_TOLERANCE:
             problems.append(f"{card} retained {delta} bytes after unload")
-    ram_delta = before["mem_available_bytes"] - after["mem_available_bytes"]
+    # Judge RAM recovery on memory that is actually recoverable. MemAvailable
+    # alone charged this model for whatever the ZFS ARC absorbed while its weights
+    # were read, which is neither the model's memory nor lost: the ARC is
+    # reclaimable down to c_min. Measured on boot 1669f3ad across one nine-preset
+    # run, plain MemAvailable fell monotonically from 44.01 GiB to 37.89 GiB and
+    # then *rose* 3.58 GiB across qwen3-coder-next -- the largest preset in the
+    # catalog at 46.77 GiB. A per-model leak cannot give memory back, so the
+    # decline was cumulative cache growth and the model it happened to fail was
+    # decided by check order, not by behaviour. An anonymous-memory leak still
+    # fails here: it moves MemAvailable without moving the ARC.
+    ram_delta = reclaimable_ram(before) - reclaimable_ram(after)
+    result["ram_recovery"] = {
+        "reclaimable_delta_bytes": ram_delta,
+        "mem_available_delta_bytes": (before.get("mem_available_bytes", 0)
+                                      - after.get("mem_available_bytes", 0)),
+        "zfs_arc_delta_bytes": (after.get("zfs_arc_bytes", -1)
+                                - before.get("zfs_arc_bytes", -1)),
+        "tolerance_bytes": RAM_TOLERANCE,
+        "arc_accounted": (before.get("zfs_arc_bytes", -1) >= 0
+                          and after.get("zfs_arc_bytes", -1) >= 0),
+    }
     if ram_delta > RAM_TOLERANCE:
-        problems.append(f"available RAM remained {ram_delta} bytes below baseline")
+        problems.append(f"reclaimable RAM remained {ram_delta} bytes below baseline")
     swap_growth = after["swap_used_bytes"] - before["swap_used_bytes"]
     if swap_growth > RAM_TOLERANCE:
         problems.append(f"swap grew by {swap_growth} bytes")
@@ -277,7 +360,32 @@ def check_model(model: str) -> dict:
                 except json.JSONDecodeError:
                     args = None
                 valid_call = fn.get("name") == "lookup_ticket" and args == {"ticket_id": 4172}
-            result["checks"]["tool_call"] = {"pass": valid_call, "tool_calls": calls}
+            # An empty tool_calls list on its own says nothing about why. Record
+            # what the model actually emitted, and what the loaded template can
+            # express: a preset served by a chat template with no tools branch
+            # never sees the function signatures and answers in prose, which is
+            # indistinguishable in the artifact from a model that saw them and
+            # declined. This is evidence, not a relaxation -- the verdict is
+            # still a single well-formed native call.
+            served = template_caps(model)
+            result["checks"]["tool_call"] = {
+                "pass": valid_call,
+                "tool_calls": calls,
+                "content": (tool["message"].get("content") or "").strip()[:1000],
+                "finish_reason": tool.get("finish_reason"),
+                "template": served,
+            }
+            # Name the cause of a failure; never manufacture one. These caps come
+            # from llama.cpp introspecting the template, so a false negative on a
+            # preset that demonstrably emitted a well-formed native call would
+            # otherwise fail a model for the tool it just used correctly. A model
+            # that produced the call has exercised the contract whatever the
+            # introspection says, so the guard only speaks when the call is absent.
+            caps = served.get("chat_template_caps") or {}
+            if not valid_call and caps and not caps.get("supports_tools"):
+                result["problems"].append(
+                    f"{model} is offered tools but its loaded chat template does "
+                    f"not support them; the tool definitions never reach the model")
         else:
             result["tool_policy"] = (
                 "low-privilege candidate: no tools payload was sent, so no tool-call "

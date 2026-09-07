@@ -77,7 +77,7 @@ before evidence is even considered. `Decided by` is the artifact the ledger read
 | `reranking` | `reranker-qwen3-8b-source` | sidecar `:8082`, preset `qwen3-reranker-8b` | `evidence/gate-reranker.json` |
 | `ocr` | `ocr-hunyuanocr-bf16` | sidecar `:8083` (alias `hunyuan-ocr`) | `evidence/gate-ocr.json` |
 | `fim` | `fim-qwen2.5-coder-7b-q8` | sidecar `:8084`, preset `qwen25-coder-7b-fim` | `evidence/gate-fim.json` |
-| `asr` | `asr-qwen3-1.7b-hf` | `venvs/tts` Transformers | `evidence/gate-asr.json` |
+| `asr` | `asr-qwen3-1.7b-hf` | `venvs/asr` Transformers | `evidence/gate-asr.json` |
 | `tts` | `tts-qwen3-12hz-1.7b-base` | `venvs/tts` Transformers | `tts-local/evidence/gate-tts.json` |
 | `image` | `image-z-image-turbo-bf16` | ComfyUI `:8188` | `generative-media/evidence/media-functional.json` |
 | `music` | `music-acestep-1.5-turbo-aio` | ComfyUI `:8188` | same artifact |
@@ -126,7 +126,7 @@ service does not exist". They need different work.
 | Gap | Kind | What would close it |
 |---|---|---|
 | End-to-end computer control | **service** | A bounded screenshot → action → state-readback scaffold in the shape of the repository-agent and Strix scaffolds. Not a model download; the grounding model is already on disk. Blocked behind a grounding verdict, because without one there is nothing to build on. |
-| UI-Mate vs UI-TARS A/B | **baseline** | The UI-TARS grounding gate must finish. The shared contract in `groundlib.py` is ready; there is simply nothing to compare against. |
+| UI-Mate vs UI-TARS A/B | **baseline** | The UI-TARS grounding gate finished for the first time on 2026-09-07 and did not pass, so there is a baseline to compare against but not an admitted one. Scored: grounding 4/6 against a required 5; OCR 3 of 4 headers and 1 of 2 table rows, misreading `Cksum` and `nvme0n1`; the distractor case clicked outside screen bounds; unload left residue over tolerance. Decoding is greedy (`do_sample=False`), so this is the model, not a sampler or a chat template. The shared contract in `groundlib.py` is ready and UI-Mate can now be run against a real number. |
 | FLUX.2 Klein workflow | **gate** | A functional gate that actually submits the pinned FLUX.2 graph, plus an evidence declaration. |
 | Gemma-4 Heretic durable evidence | **gate** | A gate that writes an artifact for the text and vision presets, replacing the by-hand 2026-09-03 checks. |
 | WeMM image/video retrieval | **runtime** | `AutoProcessor` needs torchvision, which is not in the ROCm candidate runtime. Text-only is claimed; image/video is not. |

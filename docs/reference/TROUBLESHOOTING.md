@@ -13,6 +13,7 @@ Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
 - [Router starts but a model will not load](#router-starts-but-a-model-will-not-load)
 - [A card is missing and the ROCm indices moved](#a-card-is-missing-and-the-rocm-indices-moved)
 - [Model loads but never answers](#model-loads-but-never-answers)
+- [Model answers but never calls a tool](#model-answers-but-never-calls-a-tool)
 - [Hermes cannot see local models](#hermes-cannot-see-local-models)
 - [Build failures](#build-failures)
 - [Download problems](#download-problems)
@@ -111,6 +112,49 @@ state rather than fixing it. This is the same contention the qualification gates
 refuse to run through; see
 [GPU execution and model loading](GPU-EXECUTION-AND-MODEL-LOADING.md#a-stall-this-host-can-produce).
 
+## Model answers but never calls a tool
+
+The preset returns `PONG`, returns valid JSON for a schema request, and returns
+an empty `tool_calls` array for a request that carries `tools`. The content is
+coherent, so it looks like a model that understood the tools and declined.
+
+**Check the template before you suspect the weights or the sampler.** llama.cpp
+renders the tools payload through the chat template stored in the GGUF. If that
+template has no `tools` branch, the function signatures are dropped before the
+model is ever prompted, and no sampler setting and no amount of instruction will
+produce a call. Ask the server what it actually loaded:
+
+```bash
+curl -s 'http://127.0.0.1:8080/props?model=<alias>' |
+  python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d.get("chat_template") or "")); print(d.get("chat_template_caps"))'
+```
+
+`supports_tools: false` is the answer. Read the template out of the weights
+themselves to confirm it is the file and not the server:
+
+```bash
+PYTHONPATH=upstream/llama.cpp/gguf-py python3 -c '
+from gguf import GGUFReader
+f = GGUFReader("models/<file>.gguf", "r").fields["tokenizer.chat_template"]
+t = str(bytes(f.parts[f.data[0]]), "utf-8"); print(len(t)); print(t)'
+```
+
+This is a real defect in published community merges, not a rare one. Two of this
+catalog's presets shipped with it, and both were serving with it:
+
+| Preset | Shipped template | What it did |
+|---|---|---|
+| `obliterated` | 506 chars | Looped messages with no `tools` branch and no `tool` role branch, so tool definitions and tool results were both discarded |
+| `phr00ty` | 88 chars | Rendered `messages[0]` only and dropped every later turn, never emitted `<\|im_end\|>` although this model's EOS *is* `<\|im_end\|>`, and ignored `add_generation_prompt` |
+
+Both models were tool-trained: the `<tool_call>`, `</tool_call>`,
+`<tool_response>` and `</tool_response>` tokens are in their vocabularies. The
+fix is `chat-template-file` in the preset, pointing at a template taken from
+weights of the same architecture rather than one written by hand — see
+[configuration](CONFIGURATION.md#chat-templates). Do not reach for `temp` first:
+`phr00ty` serves at `temp = 1.5` and emits a correct native call at that setting
+once the template can express one.
+
 ## Hermes cannot see local models
 
 1. Confirm the backend answers:
@@ -200,6 +244,9 @@ Exit 75 from the unit means another supervisor holds the lock.
 | Runner exits 5 | Python exited 0 but the artifact is missing, stale or unreadable | Fail-closed by design; check the gate log |
 | Media runner reports `V620 retained excess VRAM after unload` | ComfyUI did not release residency within the 768 MiB tolerance | Check for a surviving ComfyUI process before re-running |
 | A gate passes but the ledger disagrees | The artifact's `gate` field does not match the expected identity, or `sections_missing` is non-empty | Compare against [the evidence contract](DEVELOPER-GUIDE.md#writing-an-evidence-artifact) |
+| Router gate reports `reclaimable RAM remained N bytes below baseline` | Host memory did not come back after the model was unloaded, and the ZFS ARC does not account for it | A real shortfall. Note this is measured as `MemAvailable + (ARC size - ARC c_min)`, because MemAvailable alone does not credit the ARC and charged whichever model was under test for cache the router had filled reading earlier presets. `ram_recovery` in the artifact separates the two deltas |
+| A gate exits -11 or 139 after its artifact says `"pass": true` | ROCm's HSA runtime segfaulting in its own process-exit teardown, after the verdict was computed and written. Seen three times on one boot, always `libhsa-runtime64.so.1.18.0`, always at finalization, with no kernel GPU fault, RCU stall, OOM or MCE beside it | Trust the artifact, not the exit code, and check `journalctl -k -b \| grep segfault`. Gates that drive ROCm leave through `gatelib.exit_after_verdict` so the verdict is what the process returns |
+| A ComfyUI node fails with `HIPBLAS_STATUS_INVALID_VALUE` from `hipblasLtMatmulAlgoGetHeuristic` | hipBLASLt has no algorithm for that problem shape on this architecture. These cards are gfx1030 and torch's own hipBLASLt support list is gfx9 | Not a model or workflow fault, and not a tolerance question. The media runner exports `TORCH_BLAS_PREFER_HIPBLASLT=0` to route matmuls through hipBLAS instead |
 | Grounding scores look confidently wrong | A geometry or action-space mismatch, not the model. This is exactly what `groundlib.py` exists to prevent | `python3 -m pytest verification/computer-use-grounding/test_grounding_contract.py` |
 
 ## Ledger says something unexpected

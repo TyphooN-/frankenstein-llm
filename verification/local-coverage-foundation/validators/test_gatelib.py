@@ -210,3 +210,63 @@ class ResidueArithmeticContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExitAfterVerdictTests(unittest.TestCase):
+    """The process must leave on the gate's verdict, not on ROCm's teardown.
+
+    ROCm's HSA runtime segfaults in its own exit teardown on this host. On boot
+    1669f3ad the ASR gate transcribed the fixture exactly, proved a clean unload,
+    wrote ``"pass": true`` to gate-asr.json, and *then* died with SIGSEGV -- and
+    the mission recorded exit -11 as the gate's answer. These tests pin the two
+    properties that keep that from happening again without softening anything:
+    the code the gate computed is the code the process returns, and stdout that
+    the gate printed is not lost to the bypassed finalization.
+    """
+
+    REPOSITORY = Path("/home/typhoon/git/frankenstein-llm")
+    ROCM_GATES = (
+        "verification/local-coverage-foundation/validators/gate_asr.py",
+        "verification/computer-use-grounding/gate_computer_use.py",
+    )
+
+    def run_child(self, code: int) -> "tuple[int, str]":
+        import subprocess
+        program = (
+            "import sys;"
+            f"sys.path.insert(0, {str(self.REPOSITORY / 'verification/local-coverage-foundation/validators')!r});"
+            "import gatelib;"
+            "print('verdict written');"
+            f"gatelib.exit_after_verdict({code})"
+        )
+        done = subprocess.run([sys.executable, "-c", program],
+                              capture_output=True, text=True, timeout=60)
+        return done.returncode, done.stdout
+
+    def test_a_pass_leaves_the_process_with_zero(self):
+        returncode, stdout = self.run_child(0)
+        self.assertEqual(0, returncode)
+        self.assertIn("verdict written", stdout)
+
+    def test_a_failure_code_is_preserved_exactly(self):
+        # The helper must not launder a failure into a pass; it only stops a
+        # teardown fault from overwriting whichever code the gate decided on.
+        for code in (1, 3, 5):
+            with self.subTest(code=code):
+                returncode, _ = self.run_child(code)
+                self.assertEqual(code, returncode)
+
+    def test_buffered_output_is_flushed_before_the_process_ends(self):
+        # os._exit skips the flush that interpreter shutdown would have done, so
+        # the helper has to do it. gate_tts.py reads a sibling gate's stdout to
+        # score intelligibility; silently truncating it would be a new failure.
+        returncode, stdout = self.run_child(0)
+        self.assertEqual(0, returncode)
+        self.assertEqual("verdict written\n", stdout)
+
+    def test_rocm_gates_do_not_exit_through_interpreter_finalization(self):
+        for relative in self.ROCM_GATES:
+            source = (self.REPOSITORY / relative).read_text()
+            with self.subTest(gate=relative):
+                self.assertIn("exit_after_verdict(main())", source)
+                self.assertNotIn("raise SystemExit(main())", source)

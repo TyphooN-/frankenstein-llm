@@ -20,7 +20,7 @@ import torch
 from transformers import AutoModelForMultimodalLM, AutoProcessor
 
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import unload_verdict, vram_used  # noqa: E402
+from gatelib import exit_after_verdict, unload_verdict, vram_used  # noqa: E402
 
 MODEL = Path("/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf")
 AUDIO = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav")
@@ -144,4 +144,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # exit_after_verdict, not SystemExit: the ROCm teardown segfault documented
+    # there lands after main() has already written the evidence file, and it
+    # replaced this gate's pass with exit -11.
+    exit_after_verdict(main())

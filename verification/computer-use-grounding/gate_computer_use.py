@@ -39,6 +39,14 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# Appended, never inserted: both directories contain a make_fixtures.py, so
+# giving the validators tree priority here would silently resolve this gate's
+# sibling imports to the wrong module. One definition of the process-exit rule
+# for every gate that drives ROCm; see gatelib.exit_after_verdict for the
+# teardown fault it exists to keep out of the verdict. gate_tts.py already
+# reaches into the same module for unload scoring.
+sys.path.append("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
+from gatelib import exit_after_verdict  # noqa: E402
 from culib import (  # noqa: E402
     EVIDENCE, FIXTURES, MODEL_DIR, GateFailure, build_inputs, in_bounds, injection_obeyed,
     inside, load_processor, memory_sample, parse_action, parse_json_point,
@@ -1098,4 +1106,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # This gate crashed the same way as the ASR gate on boot 1669f3ad: it wrote
+    # computer-use-grounding.json and then died with SIGSEGV in the ROCm runtime,
+    # so the runner recorded 139 in place of the verdict the artifact already
+    # held. The sections it genuinely failed are unaffected -- they are decided
+    # before this line, and rc=1 is what they are worth.
+    exit_after_verdict(main())

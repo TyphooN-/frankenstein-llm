@@ -129,8 +129,21 @@ only after builds and other host pressure have drained.
    `VISION_MODELS`. The gate derives its check list from the privilege tier, so a
    `low` preset is checked for coherence and structured output and is never sent
    a tools payload.
-4. Run the pin suite so the new keys are checked against the installed build.
-5. Restart the router.
+4. If it is a tool-using tier, confirm the weights can actually express a tool
+   call before trusting the alias. Load it and read
+   `chat_template_caps.supports_tools` from
+   `http://127.0.0.1:8080/props?model=<alias>`. Community merges and abliterations
+   regularly ship a chat template with the tools branch stripped, which produces
+   an empty `tool_calls` array that looks exactly like a model declining. Point
+   `chat-template-file` at a template extracted from weights of the same
+   architecture rather than writing one; see
+   [chat templates](CONFIGURATION.md#chat-templates).
+5. Add the key to `scripts/serve-model.py`'s `VALUE_FLAGS` or `BOOL_FLAGS` if the
+   preset uses one that tool does not yet know. It refuses unknown keys, so a
+   standalone run would otherwise either fail or serve a different model than the
+   router does under the same alias.
+6. Run the pin suite so the new keys are checked against the installed build.
+7. Restart the router.
 
 ## Adding a sidecar
 

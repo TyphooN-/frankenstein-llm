@@ -1,13 +1,92 @@
 # Candidate research closeout
 
-Research checked 2026-09-06. This is the current decision document. It supersedes
+Baseline research checked 2026-09-06; three explicit additions screened
+2026-09-07 below. This is the current decision document. It supersedes
 the adopt/wait/reject wording in
 [CANDIDATE-ADDITIONS-INVESTIGATION.md](CANDIDATE-ADDITIONS-INVESTIGATION.md)
 and the provisional ranking in
 [MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md). Those files retain
 useful header and pagination notes; they are not the current verdicts.
 
-## Scope and completion standard
+## Additional submitted candidates — 2026-09-07 screening
+
+These **three distinct repositories** are additional to the 11-repository
+baseline below. Screening is not runtime qualification or download admission.
+Pinned cards and complete paginated trees were inspected; no weights were
+downloaded and no serving aliases were changed. None currently justifies
+replacing RVN / `heretic` as the general Hermes driver.
+
+### TobDeBer/M8 — hold for provenance
+
+Submitted: <https://huggingface.co/TobDeBer/M8>.
+Inspected revision: `5a22c6b30f9572cacdb7af691f1f142005cf98b3`.
+The [pinned tree](https://huggingface.co/TobDeBer/M8/tree/5a22c6b30f9572cacdb7af691f1f142005cf98b3)
+contains mixed Qwen3-0.6B and Gemma-4-12B artifacts, REAP-labelled variants,
+and importance matrices; no readable model card was obtained. It does not
+establish a single instruction-tuned assistant named M8. Importance matrices
+are calibration artifacts, not standalone inference weights.
+
+`gemma-4-12b-it-UD-IQ3_XXS_REAP80.gguf` is 4,848,827,424 bytes;
+the `_down` sibling is 4,035,599,872 bytes. These API sizes do not establish
+retained quality or safe residency. Decision: **conditional compression
+research, hold for provenance**. Resolve source revision, license inheritance,
+transformation method and GGUF tensor/runtime compatibility before transfer.
+Only then compare against installed Gemma-4-12B on matching reader tasks;
+do not grant executable tools because an artifact loads.
+
+### TR-HASH pretraining — architecture watchlist, not a driver
+
+Submitted:
+<https://huggingface.co/AETHORIA-AI/TR-HASH-MoE-100M-125B-Agentic-Pretraining>.
+Inspected revision: `62d844123261ab58684030b99ef6bf352cd29d01`.
+The [pinned card](https://huggingface.co/AETHORIA-AI/TR-HASH-MoE-100M-125B-Agentic-Pretraining/blob/62d844123261ab58684030b99ef6bf352cd29d01/README.md)
+reports **100,366,720 parameters**, a 2,048-token context, and deterministic
+token-ID multi-hash expert routing. **125B is training-token volume, not model
+parameter count.** `final/model.safetensors` is 406,927,984 bytes; historical
+optimizer/checkpoint packs are not additional inference shards.
+
+The publisher explicitly says the checkpoint is not instruction tuned. Earlier
+refinement/SFT descendants were withdrawn after an optimizer-update mismatch;
+corrected refinement and replacement SFT are separate pending work. This does
+not invalidate the pretraining checkpoint. Decision: **defer architecture
+research; not a Hermes driver upgrade**. CC-BY-NC-4.0 and the custom framework
+require license/source review; CUDA/Triton training is not gfx1030 inference
+proof. Revisit a corrected instruction-tuned release with held-out evaluation,
+not the entire training archive.
+
+### OTel 2.0 GGUF — conditional telecom specialist
+
+Submitted: <https://huggingface.co/wfakhri/OTel-2.0-LLM-31B-IT-GGUF>.
+Inspected revision: `c476b7e66e21d438fba4248267d58781a7d7dcd5`.
+The [pinned card](https://huggingface.co/wfakhri/OTel-2.0-LLM-31B-IT-GGUF/blob/c476b7e66e21d438fba4248267d58781a7d7dcd5/README.md)
+identifies `farbodtavakkoli/OTel-2.0-LLM-31B-IT`, a Gemma-4-31B telecom OSFT
+derivative, as upstream—not its separate QLoRA sibling. The upstream checkpoint
+is advertised as frequently updated: pin its conversion source revision as
+well as the quant repository before evaluation.
+
+| Exact artifact | API-declared bytes |
+|---|---:|
+| `OTel-2.0-LLM-31B-IT-Q4_K_M.gguf` | 18,687,065,344 |
+| `OTel-2.0-LLM-31B-IT-Q6_K.gguf` | 25,201,487,104 |
+| `OTel-2.0-LLM-31B-IT-Q8_0.gguf` | 32,635,677,952 |
+| `mmproj-OTel-2.0-LLM-31B-IT-f16.gguf` | 1,198,957,344 |
+
+Decision: **conditional telecom specialist experiment**, not a general driver
+replacement. Q6_K is a text-first candidate if a concrete standards/RAG workload
+justifies it; budget KV/workspace and desktop reserves separately. Sizes are
+not downloaded checksum or fit evidence. Metadata says Apache-2.0 but links
+Gemma license terms: resolve the actual terms before admission. Verify installed
+llama.cpp and exact gfx1030 execution independently; MI355X training does not
+prove this backend. BF16 vision claims do not qualify this GGUF/projector pair.
+
+Compare held-out telecom QA, grounded citations, abstention and multi-turn
+native tools against official Gemma-4-31B and installed RVN, plus ordinary
+coding regression. Avoid calibration/training examples in the held-out set.
+The card explicitly excludes telecom-specific MCP/tool-call training despite
+including general tool examples. Keep generated network configuration inert;
+no real network changes are part of research.
+
+## Scope and completion standard — baseline research
 
 Fourteen submitted URLs deduplicate to **11 queued repositories**. All 11 have
 a disposition below. This pass also reviews six additional artifacts, the three

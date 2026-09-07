@@ -17,6 +17,7 @@ Related: [architecture](ARCHITECTURE.md) · [operations](OPERATIONS.md) ·
 
 - [Ownership](#ownership)
 - [Router presets](#router-presets)
+- [Chat templates](#chat-templates)
 - [Upstream dependency lock](#upstream-dependency-lock)
 - [Sidecar environment files](#sidecar-environment-files)
 - [systemd units](#systemd-units)
@@ -130,6 +131,49 @@ alias to a tier; an alias it does not know returns `None` and is refused tools.
 `uncovered_router_presets()` is the check, and the router gate asserts it is
 empty. See [developer guide](DEVELOPER-GUIDE.md#adding-a-router-preset).
 
+## Chat templates
+
+`config/chat-templates/` holds Jinja chat templates for presets whose weights ship
+a broken one. A preset selects one with `chat-template-file`, which llama-server
+reads in place of the template in the GGUF's `tokenizer.chat_template`.
+
+| File | Extracted from | sha256 | Used by |
+|---|---|---|---|
+| `qwen3.8-27b-tools.jinja` | `models/Qwen3.8-27B-Ridge-3.7bpw.gguf` | `c3cf9e34…7a81041` | `obliterated`, `obliterated-vision` |
+| `qwen2.5-tools.jinja` | `models/fim/qwen2.5-coder-7b-q8_0.gguf` | `cd8e9439…2330527f` | `phr00ty` |
+
+**These are extracted, not authored.** A hand-written chat template is a guess
+about a training format, and a wrong guess degrades a model quietly rather than
+loudly. Each file is copied byte-for-byte out of weights that share the target's
+architecture and special-token ids, so the provenance is checkable from this
+repository alone: `qwen3.8-27b-tools.jinja` is byte-identical to the template
+inside `heretic`'s weights as well as `ridge`'s, and `qwen2.5-tools.jinja` comes
+from `qwen2` weights whose `<|im_start|>`, `<|im_end|>`, `<tool_call>` and
+`</tool_call>` ids all match `phr00ty`'s exactly.
+
+Both replaced templates had no `tools` branch, so llama.cpp discarded the tool
+definitions before prompting and the presets could not emit a native tool call at
+any temperature. `phr00ty`'s was worse than that: 88 characters that rendered
+`messages[0]` and dropped every later turn, which truncated multi-turn serving
+silently. What each one did, and how to recognise the symptom, is in
+[troubleshooting](TROUBLESHOOTING.md#model-answers-but-never-calls-a-tool).
+
+Verify what the router actually loaded rather than assuming the override took:
+
+```bash
+curl -s 'http://127.0.0.1:8080/props?model=obliterated' |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["chat_template_caps"])'
+```
+
+`supports_tools` must be true for any preset the candidate policy grants tools.
+The router gate now fails a preset that is offered tools while its loaded template
+reports otherwise, so this cannot silently regress into an empty `tool_calls`
+array again.
+
+`scripts/serve-model.py` carries `chat-template-file` through to its own command
+line. It has to: a standalone run that dropped the key would serve a different
+model than the router does, under the same alias.
+
 ## Upstream dependency lock
 
 `upstream/llama-cpp.lock.json`, schema `frankenstein-upstream-dependency/1`:
@@ -207,7 +251,19 @@ Notable hardening: the download phases run `ProtectSystem=strict`,
 sandbox, but must also write `/tmp`, `/var/tmp`, `venvs/`, `tools/`, and
 `verification/tmp` (`TMPDIR`): `ProtectSystem=strict` otherwise remounts `/tmp`
 read-only and torch dies at import with `No usable temporary directory`. It
-adds `/run/user/%U` so it can reach the user bus. The computer-use unit deliberately
+adds `/run/user/%U` so it can reach the user bus. MIOpen's user database and
+compiled-kernel cache are redirected with `MIOPEN_USER_DB_PATH` to
+`verification/miopen` and `MIOPEN_CUSTOM_CACHE_DIR` to
+`verification/miopen/cache`. Both are already inside the writable verification
+tree; the unit does not make the default home-directory database writable.
+MIOpen needs to create database lock files even when reading cached data.
+
+The dedicated ASR gate and TTS round-trip transcription use `venvs/asr`, whose
+Transformers supports `AutoModelForMultimodalLM`; speech synthesis remains in
+`venvs/tts`. Do not substitute the TTS interpreter for the ASR interpreter merely
+because both process audio.
+
+The computer-use unit deliberately
 omits `[Install]` because it places ~15.5 GiB across all three GPUs and must
 never start at boot; it bounds restarts (`StartLimitBurst=3`), excludes its own
 verdict exit codes from restart (`RestartPreventExitStatus=1 3 5`), stops rather

@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import json
 import math
+import os
 from pathlib import Path
 import subprocess
+import sys
 import time
+import typing
 import urllib.error
 import urllib.request
 
@@ -214,6 +217,30 @@ def managed_sidecar(unit: str, base_url: str, timeout: int = 900) -> tuple[dict,
     check(result.returncode == 0, f"could not start {unit}: {result.stderr.strip()}")
     waited = wait_healthy(base_url, timeout)
     return baseline, waited
+
+
+def exit_after_verdict(code: int) -> typing.NoReturn:
+    """End the process on the gate's own verdict rather than on ROCm's teardown.
+
+    ROCm's HSA runtime segfaults inside its own process-exit teardown on this
+    host. Observed three times on boot 1669f3ad-9ef9-4a6e-a5aa-f61a9c4ba276,
+    always the same signature -- ``libhsa-runtime64.so.1.18.0``, error 4, at
+    interpreter finalization, with no accompanying kernel GPU fault, RCU stall,
+    OOM or MCE. The ASR gate hit it one second after it had transcribed the
+    fixture exactly, scored a clean unload, and written ``gate-asr.json`` with
+    ``"pass": true``; the supervisor then read ``Popen.wait() == -11`` and
+    recorded the gate as failed.
+
+    This does not soften any gate. Every assertion has already run and the
+    artifact is already on disk by the time this is called -- what is dropped is
+    only the interpreter finalization that follows the verdict. A crash *before*
+    the verdict still escapes as an exception, is recorded in the artifact, and
+    still fails the gate. Callers must therefore invoke this last, after the
+    evidence file is written.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
 
 
 def record(name: str, summary: dict) -> int:

@@ -481,9 +481,13 @@ Do not relax these.
 - **Authorized security work only.** Owned systems, lab or CTF targets, or
   explicit written authorization within the program's current scope. A model's
   willingness to answer is not authorization.
-- **No benchmarking.** Tokens/sec and comparative throughput are out of scope
-  until the user explicitly authorizes performance testing after confirming the intended kernel; reboot alone is insufficient
-  ([ADR 0002](decisions/0002-serialized-functional-qualification.md)).
+- **Functional qualification and throughput are separate.** The mission does
+  not measure tokens/sec. Explicitly authorized native benchmarks run separately
+  on a healthy, uncontended host after kernel confirmation; reboot alone does
+  not authorize them ([ADR 0002](decisions/0002-serialized-functional-qualification.md)).
+  [Published benchmark artifacts](benchmarks/README.md) record completed runs,
+  not current router speed or model-quality rankings. Use the
+  [model-run interface](MODEL-RUNS.md) and never overlap a benchmark with the mission.
 - **Preserve three 1 GiB HugeTLB pages** for XMRig, and do not retune ARC, swap,
   kernel or clock policy to make a candidate model fit.
 
