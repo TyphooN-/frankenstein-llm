@@ -253,5 +253,10 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`scripts/bench-reports.sh`](../../scripts/bench-reports.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/bench_report.py`](../../scripts/bench_report.py) | [Reference](../MODEL-RUNS.md) |
 | [`verification/operator-runs/test_bench_report.py`](../../verification/operator-runs/test_bench_report.py) | [Reference](../MODEL-RUNS.md) |
+| [`docs/AI-METAL-BAND.md`](../../docs/AI-METAL-BAND.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/benchmarks/qwen25-coder-7b-fim.md`](../../docs/benchmarks/qwen25-coder-7b-fim.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/qwen3-embedding-8b.md`](../../docs/benchmarks/qwen3-embedding-8b.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/qwen3-reranker-8b.md`](../../docs/benchmarks/qwen3-reranker-8b.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/reference/PLACEMENT-MEASUREMENTS.md`](../../docs/reference/PLACEMENT-MEASUREMENTS.md) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
 
-Inventory entries: 249. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 254. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import re
 import struct
 import sys
 import tempfile
@@ -30,6 +31,7 @@ def _load(name: str):
 
 gguf_header = _load("gguf_header")
 placement = _load("gpu_placement")
+model_catalog = _load("model_catalog")
 
 GIB = 1 << 30
 POLICY = {
@@ -910,6 +912,138 @@ class LivePresetTests(unittest.TestCase):
                     self.assertGreater(required, pair,
                                        f"{alias} used the fallback device while the "
                                        "preferred pair had headroom for all of it")
+
+
+class SidecarPlacementTests(unittest.TestCase):
+    """The sidecar units must place a model the way llama-models.ini does.
+
+    ``services/sidecar-*.env`` and ``llama-models.ini`` load the same weight
+    files through the same binary, so a placement that disagreed between them
+    meant one of the two was serving a split nothing had evaluated. That is not
+    hypothetical: the sidecars kept ``3,6,2`` after f2576ac moved the catalog off
+    it, which put the majority of an 8B model's layers on the throttling V620
+    even though the model fits on one card. Layer split is pipelined, so the
+    only thing those extra devices bought was two device hops per token --
+    measured on 2026-09-07 as 34.63 against 65.32 tok/s of decode for the
+    embedding preset.
+    """
+
+    ROOT = Path(__file__).resolve().parents[2]
+    # Sidecar instance name -> the llama-models.ini alias serving the same file.
+    SHARED = {"embeddings": "qwen3-embedding-8b",
+              "reranker": "qwen3-reranker-8b",
+              "fim": "qwen25-coder-7b-fim"}
+
+    @staticmethod
+    def _split(text: str) -> str:
+        found = re.search(r"--tensor-split\s+(\S+)", text)
+        assert found is not None, "sidecar declares no --tensor-split"
+        return found.group(1)
+
+    @staticmethod
+    def _ratio(text: str) -> tuple:
+        values = [float(part) for part in re.split(r"[/,]", text.strip()) if part]
+        total = sum(values)
+        return tuple(value / total for value in values)
+
+    def setUp(self):
+        self.presets = model_catalog.presets(self.ROOT / "llama-models.ini")
+
+    def _env(self, name: str) -> str:
+        return (self.ROOT / f"services/sidecar-{name}.env").read_text()
+
+    def test_sidecar_split_matches_the_preset_that_serves_the_same_file(self):
+        for name, alias in self.SHARED.items():
+            with self.subTest(sidecar=name):
+                env = self._env(name)
+                model = re.search(r"^SIDECAR_MODEL=(.+)$", env, re.M).group(1)
+                self.assertEqual(
+                    Path(model).resolve(),
+                    Path(self.presets[alias]["model"]).resolve(),
+                    f"sidecar {name} and preset {alias} no longer load one file")
+                self.assertEqual(
+                    self._ratio(self._split(env)),
+                    self._ratio(self.presets[alias]["tensor-split"]),
+                    f"sidecar {name} serves a placement {alias} does not")
+
+    def test_no_sidecar_splits_a_model_that_fits_on_one_card(self):
+        """Rule 1 of the placement policy, applied to the sidecars.
+
+        Every sidecar here loads a model the scanner sizes onto a single card.
+        A split across more than one device is therefore pure pipeline cost, and
+        the fallback V620 carrying any share of it is the specific regression
+        this guards.
+        """
+        for name in sorted(set(self.SHARED) | {"ocr"}):
+            with self.subTest(sidecar=name):
+                shares = self._ratio(self._split(self._env(name)))
+                self.assertEqual(
+                    1, sum(1 for share in shares if share > 0),
+                    f"sidecar {name} splits a single-card model across devices")
+                self.assertEqual(
+                    0, shares[1],
+                    f"sidecar {name} places layers on the fallback V620")
+
+
+class MeasuredOverrideTests(unittest.TestCase):
+    """A measured residency may replace the estimate, but only on its own terms.
+
+    The estimate is an upper bound on purpose. Letting a measurement replace it
+    is what keeps a sliding-window model off a card it does not need, and is
+    also the obvious way to smuggle in a flattering number, so the guards matter
+    more than the feature.
+    """
+
+    def record(self, context=32768, required=16 * GIB):
+        return {"alias": "preset", "notes": [], "context": context,
+                "required_bytes": required}
+
+    def policy(self, **entry):
+        base = {"bytes": 10 * GIB, "context": 32768, "measured_at": "2026-09-07",
+                "method": "loaded alone and read from sysfs"}
+        base.update(entry)
+        return {"measured_required_bytes": {"preset": base}}
+
+    def test_a_matching_measurement_replaces_the_estimate(self):
+        record = self.record()
+        placement.measured_override("preset", {}, record, self.policy())
+        self.assertEqual(10 * GIB, record["required_bytes"])
+        self.assertEqual(16 * GIB, record["estimated_required_bytes"])
+        self.assertTrue(any("residency measured" in note for note in record["notes"]))
+
+    def test_a_measurement_at_another_context_is_refused(self):
+        """Editing ctx-size must retire the measurement, not carry it forward."""
+        record = self.record(context=65536)
+        placement.measured_override("preset", {}, record, self.policy())
+        self.assertEqual(16 * GIB, record["required_bytes"])
+        self.assertNotIn("estimated_required_bytes", record)
+        self.assertTrue(any("was taken at context" in note for note in record["notes"]))
+
+    def test_a_malformed_measurement_is_refused_rather_than_coerced(self):
+        for bad in ({"bytes": "10"}, {"bytes": 0}, {"bytes": -1},
+                    {"context": "32768"}, {"bytes": 10.5}):
+            with self.subTest(entry=bad):
+                record = self.record()
+                placement.measured_override("preset", {}, record, self.policy(**bad))
+                self.assertEqual(16 * GIB, record["required_bytes"])
+
+    def test_a_preset_with_no_entry_keeps_its_estimate_silently(self):
+        record = self.record()
+        placement.measured_override("preset", {}, record, {})
+        self.assertEqual(16 * GIB, record["required_bytes"])
+        self.assertEqual([], record["notes"])
+
+    def test_the_shipped_measurement_is_net_of_the_idle_baseline(self):
+        """The committed entry has to be a real reading, not a round number."""
+        policy = json.loads((Path(__file__).resolve().parents[2]
+                             / "config/gpu-placement.json").read_text())
+        entry = (policy.get("measured_required_bytes") or {}).get("gemma4-heretic")
+        self.assertIsNotNone(entry, "the gemma4-heretic measurement was dropped")
+        self.assertEqual(32768, entry["context"])
+        self.assertIn("mem_info_vram_used", entry["method"])
+        # Smaller than the full-context bound it replaces, and not a guess at 0.
+        self.assertLess(entry["bytes"], 14 * GIB)
+        self.assertGreater(entry["bytes"], 9 * GIB)
 
 
 if __name__ == "__main__":

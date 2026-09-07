@@ -626,7 +626,10 @@ class MissionPolicyTests(SupervisorTestCase):
         steps = dict(self.supervisor.STEPS)
         names = list(steps)
         self.assertIn("asr", steps)
-        self.assertEqual(str(self.supervisor.TTS_PYTHON), steps["asr"][0])
+        # The interpreter itself is asserted by
+        # test_asr_gate_runs_in_the_venv_that_can_import_its_model; this step
+        # only has to be the dedicated ASR gate, ahead of the round trip.
+        self.assertEqual(str(self.supervisor.ASR_PYTHON), steps["asr"][0])
         self.assertTrue(steps["asr"][-1].endswith("validators/gate_asr.py"))
         self.assertLess(names.index("asr"), names.index("tts-asr-roundtrip"))
 
@@ -639,6 +642,62 @@ class MissionPolicyTests(SupervisorTestCase):
                          ledger.CAPABILITY_EVIDENCE["asr"])
         self.assertEqual("asr", ledger.EXPECTED_EVIDENCE_GATES[
             ledger.EVIDENCE / "gate-asr.json"])
+
+    def test_mission_unit_gives_miopen_a_writable_cache(self):
+        """MIOpen must not be pointed at $HOME while ProtectHome is read-only.
+
+        MIOpen takes a lock beside its user database before reading it. Under
+        ProtectHome=read-only that create fails, and MIOpen surfaces it as
+        miopenStatusUnknownError from whatever convolution ran first -- which is
+        how one sandbox setting failed wemm-embeddings, computer-use-grounding
+        and generative-media-functional at once on 2026-09-07, each looking like
+        an unrelated model bug. Both paths have to land somewhere ReadWritePaths
+        already covers.
+        """
+        unit = (self.supervisor.ROOT / "services/systemd/local-ai-functional-mission.service").read_text()
+        self.assertIn("ProtectHome=read-only", unit)
+        writable = unit.split("ReadWritePaths=", 1)[1].splitlines()[0].split()
+        for key in ("MIOPEN_USER_DB_PATH", "MIOPEN_CUSTOM_CACHE_DIR"):
+            with self.subTest(variable=key):
+                line = next((row for row in unit.splitlines()
+                             if row.startswith(f"Environment={key}=")), None)
+                self.assertIsNotNone(line, f"{key} is not set for the mission")
+                target = line.split("=", 2)[2]
+                self.assertFalse(
+                    target.startswith(str(Path.home()) + "/."),
+                    f"{key} points into the read-only home at {target}")
+                self.assertTrue(
+                    any(target == root or target.startswith(root + "/")
+                        for root in writable),
+                    f"{key} at {target} is not under any ReadWritePaths entry")
+                self.assertIn(f"mkdir -p {target}",
+                              unit.replace("/cache", "/cache").replace(
+                                  "ExecStartPre=/usr/bin/", ""),
+                              f"{key} is never created before the mission runs")
+
+    def test_asr_gate_runs_in_the_venv_that_can_import_its_model(self):
+        """The ASR gate needs venvs/asr, not the TTS one.
+
+        Qwen3-ASR declares model_type qwen3_asr, which only the newer
+        transformers in venvs/asr registers. Running the gate under the TTS venv
+        fails at import, before any GPU work, and reads in the mission log as an
+        ASR capability failure rather than as the wrong interpreter.
+        """
+        step = dict(self.supervisor.STEPS)["asr"]
+        self.assertEqual(str(self.supervisor.ASR_PYTHON), step[0])
+        self.assertNotEqual(str(self.supervisor.TTS_PYTHON), step[0])
+        self.assertIn("venvs/asr", step[0])
+
+    def test_tts_roundtrip_spawns_the_asr_venv_not_its_own(self):
+        """gate_tts.py runs under the TTS venv and must not reuse it for ASR.
+
+        The round trip loads the same Qwen3-ASR weights the ASR gate does, so
+        sys.executable -- the TTS interpreter -- cannot import them either.
+        """
+        gate = (self.supervisor.ROOT / "verification/tts-local/gate_tts.py").read_text()
+        self.assertIn('ASR_PYTHON = ROOT.parents[1] / "venvs" / "asr" / "bin" / "python"', gate)
+        self.assertIn('[str(ASR_PYTHON), str(ROOT / "asr_roundtrip.py")', gate)
+        self.assertNotIn('[sys.executable, str(ROOT / "asr_roundtrip.py")', gate)
 
     def test_mission_unit_keeps_a_writable_temp_dir(self):
         unit = (self.supervisor.ROOT / "services/systemd/local-ai-functional-mission.service").read_text()

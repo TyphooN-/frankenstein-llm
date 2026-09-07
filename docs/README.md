@@ -9,6 +9,7 @@
 - [Configuration](reference/CONFIGURATION.md): presets, manifests, environment variables, ports and schemas.
 - [Operations](reference/OPERATIONS.md): installation, downloads, services, qualification, updates and rollback.
 - [GPU execution and model loading](reference/GPU-EXECUTION-AND-MODEL-LOADING.md): which ROCm index is which card, how each preset's layer split was computed, why three cards add capacity rather than speed, and when a model is actually loaded.
+- [Placement, measured](reference/PLACEMENT-MEASUREMENTS.md): the live three-GPU placement A/B ADR 0006 was decided without. What including the V620 costs, what splitting a single-card model costs, and which presets a context change could move.
 - [Larger-model shortlist](reference/MODEL-UPGRADE-SHORTLIST.md): provisional candidates, exact publisher sizes, and admission caveats.
 - [Model upgrade evaluation](reference/MODEL-UPGRADE-EVALUATION.md): quality versus resource cost, VRAM/RAM tiers, and controlled candidate benchmarks.
 - [Candidate research closeout](reference/CANDIDATE-RESEARCH-CLOSEOUT.md): current dispositions for the eleven queued additions, upgrade families, and extra artifacts. Research is not admission.
@@ -22,6 +23,7 @@
 - [Repository checks](REPOSITORY-CHECKS.md): verification commands and host-safety caveats.
 - [Native throughput artifacts](benchmarks/README.md): measured `llama-bench` prompt/generation rates per weight file, with the placement, kernel and MTP caveats each figure was measured under. Each artifact is a dated measurement of one run, not a live reading and not a quality ranking.
 - [Decisions](decisions/README.md): durable architectural rationale.
+- [SALINE LOOP](AI-METAL-BAND.md): an operator creative brief for a war metal / blackened death / deathgrind project, mapped to the local weights that would produce each asset, including what character-consistent music video this stack can and cannot do. A concept note, not a capability claim.
 
 ## Reading status correctly
 

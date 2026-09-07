@@ -44,6 +44,10 @@ __pycache__/
 /verification/**/download-state*.json
 /verification/**/mission-state.json
 /verification/tmp/
+# MIOpen's user performance database and compiled-kernel cache. Redirected
+# here by the mission unit because ProtectHome=read-only blocks the default
+# under $HOME; it is a rebuildable runtime cache, not repository state.
+/verification/miopen/
 /verification/**/lane.json
 /verification/prompt-corpus-admission/corpora/
 /verification/qwen38-obliterated-functional/*.json

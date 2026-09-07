@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStartPre=/usr/bin/mkdir -p /home/typhoon/git/frankenstein-llm/verification/tmp
+ExecStartPre=/usr/bin/mkdir -p /home/typhoon/git/frankenstein-llm/verification/miopen/cache
 ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/mission-supervisor/run_functional_mission.py
 TimeoutStartSec=infinity
 Nice=5
@@ -20,6 +21,18 @@ ReadWritePaths=/home/typhoon/git/frankenstein-llm/verification /home/typhoon/git
 Environment=TMPDIR=/home/typhoon/git/frankenstein-llm/verification/tmp
 Environment=TMP=/home/typhoon/git/frankenstein-llm/verification/tmp
 Environment=TEMP=/home/typhoon/git/frankenstein-llm/verification/tmp
+# MIOpen keeps a user performance database and a compiled-kernel cache under
+# $HOME by default, and takes a lock file beside the database before it reads
+# either. ProtectHome=read-only makes creating that lock fail, and MIOpen
+# reports the failure as miopenStatusUnknownError from whatever convolution
+# happened to run first. That is not a model or a weights problem: it took out
+# wemm-embeddings, computer-use-grounding and generative-media-functional in
+# the 2026-09-07 00:38 run, each with the same opaque code. Redirect both paths
+# into the checkout, which ReadWritePaths already covers, rather than opening a
+# hole in ProtectHome. The cache persists between runs on purpose: recompiling
+# kernels on every mission is minutes of GPU time for no benefit.
+Environment=MIOPEN_USER_DB_PATH=/home/typhoon/git/frankenstein-llm/verification/miopen
+Environment=MIOPEN_CUSTOM_CACHE_DIR=/home/typhoon/git/frankenstein-llm/verification/miopen/cache
 
 [Install]
 WantedBy=default.target

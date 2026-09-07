@@ -608,6 +608,46 @@ def charge_projector(record: dict, proposal: dict, margin: int = 0) -> None:
                 "reserve once the projector is charged")
 
 
+def measured_override(alias: str, preset: dict, record: dict, policy: dict) -> None:
+    """Replace the KV upper bound with a residency somebody actually measured.
+
+    The KV column charges every block the full context. For sliding-window
+    models that is an over-estimate by design, and for ``gemma4-heretic`` it is
+    large enough to decide the placement: the estimate says two cards, a load
+    says one. This is the escape hatch for that, and it is deliberately narrow.
+
+    An entry is only honoured when it names the context it was measured at and
+    that context still matches the preset. Editing ``ctx-size`` therefore
+    invalidates the measurement instead of silently carrying it forward onto a
+    configuration nobody loaded. The estimate is kept beside it so a reader can
+    see both numbers rather than only the flattering one.
+    """
+    entry = (policy.get("measured_required_bytes") or {}).get(alias)
+    if not isinstance(entry, dict):
+        return
+    measured, context = entry.get("bytes"), entry.get("context")
+    if type(measured) is not int or measured <= 0 or type(context) is not int:
+        record["notes"].append(
+            f"measured residency for {alias} is malformed and was ignored")
+        return
+    if context != record.get("context"):
+        record["notes"].append(
+            f"measured residency was taken at context {context}, but this preset "
+            f"is configured for {record.get('context')}; the estimate is used")
+        return
+    estimate = record.get("required_bytes")
+    if estimate is not None:
+        record["estimated_required_bytes"] = estimate
+    record["required_bytes"] = measured
+    record["measured_required_bytes"] = measured
+    record["notes"].append(
+        f"residency measured at {measured / (1 << 30):.2f} GiB on "
+        f"{entry.get('measured_at', 'an unrecorded date')}"
+        + (f", against a {estimate / (1 << 30):.2f} GiB upper bound"
+           if estimate is not None else "")
+        + f": {entry.get('method', 'no method recorded')}")
+
+
 def evaluate_preset(alias: str, preset: dict, rows: list[dict], policy: dict) -> dict:
     """Size one preset and place it, projector included.
 
@@ -617,6 +657,7 @@ def evaluate_preset(alias: str, preset: dict, rows: list[dict], policy: dict) ->
     """
     margin = policy.get("min_slack_bytes", policy["per_device_reserve_bytes"])
     record = measure(alias, preset)
+    measured_override(alias, preset, record, policy)
     record["configured_split"] = configured_split(preset, len(rows))
     record["configured_devices"] = preset.get("device")
     record["proposal"] = propose(record.get("required_bytes"), rows, policy,

@@ -38,6 +38,13 @@ REF_AUDIO = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage
 REF_TEXT = ("Mr. Quilter is the apostle of the middle classes, "
             "and we are glad to welcome his gospel.")
 
+# asr_roundtrip.py loads Qwen3-ASR, which needs a transformers new enough to
+# register model_type qwen3_asr. This gate's own TTS stack pins an older one,
+# so sys.executable -- the tts venv -- cannot import AutoModelForMultimodalLM
+# and the round trip fails on import before it transcribes anything. The two
+# venvs are kept apart on purpose; the round trip is spawned in the ASR one.
+ASR_PYTHON = ROOT.parents[1] / "venvs" / "asr" / "bin" / "python"
+
 # TTS runs on GPU0: the 32 GB GPU1 is reserved for the large gates and GPU2 drives
 # the display, so the small model takes the idle mid-size card.
 TTS_DEVICE = 0
@@ -358,7 +365,7 @@ def main() -> int:
         # artifact at all, which is the one outcome this gate may not produce.
         try:
             rt = subprocess.run(
-                [sys.executable, str(ROOT / "asr_roundtrip.py"),
+                [str(ASR_PYTHON), str(ROOT / "asr_roundtrip.py"),
                  "--pairs", json.dumps([{"path": g["path"], "text": g["text"],
                                          "name": g["name"]} for g in summary["generated"]])],
                 capture_output=True, text=True, timeout=ASR_ROUNDTRIP_TIMEOUT)

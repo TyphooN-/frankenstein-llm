@@ -27,6 +27,14 @@ LOG = HERE / "mission.log"
 LOCK = HERE / "mission.lock"
 FOUNDATION = ROOT / "verification" / "local-coverage-foundation"
 TTS_PYTHON = ROOT / "venvs" / "tts" / "bin" / "python"
+# Qwen3-ASR-1.7B declares Qwen3ASRForConditionalGeneration and model_type
+# qwen3_asr, which the tts venv's transformers 4.57 does not register at all:
+# gate_asr.py imports AutoModelForMultimodalLM from it and dies on ImportError
+# before it reaches a GPU. venvs/asr carries transformers 5.16 and does have
+# both. The two environments are kept apart because the TTS stack pins the
+# older transformers, so the fix is to run the ASR gate in the venv built for
+# it rather than to move either pin.
+ASR_PYTHON = ROOT / "venvs" / "asr" / "bin" / "python"
 SCRATCH = ROOT / "verification" / "tmp"
 MIN_AVAILABLE = 32 << 30
 POLL_SECONDS = 30
@@ -77,7 +85,7 @@ STEPS = (
     ("embeddings", [sys.executable, str(FOUNDATION / "validators/gate_embeddings.py")]),
     ("reranker", [sys.executable, str(FOUNDATION / "validators/gate_reranker.py")]),
     ("fim", [sys.executable, str(FOUNDATION / "validators/gate_fim.py")]),
-    ("asr", [str(TTS_PYTHON), str(FOUNDATION / "validators/gate_asr.py")]),
+    ("asr", [str(ASR_PYTHON), str(FOUNDATION / "validators/gate_asr.py")]),
     ("computer-use-grounding", ["/usr/bin/bash", str(ROOT / "verification/computer-use-grounding/run_when_idle.sh")]),
     ("tts-asr-roundtrip", ["/usr/bin/bash", str(ROOT / "verification/tts-local/run_serialized.sh")]),
     ("repository-agent", ["/usr/bin/bash", str(ROOT / "verification/repository-agent/run_serialized.sh")]),

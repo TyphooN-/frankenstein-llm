@@ -118,7 +118,7 @@ context. Regenerate with `python3 scripts/gpu_placement.py`.
 | `fable` | 26.95 GiB | `1,1,1` | equal |
 | `obliterated-vision` | 23.18 GiB | `5,0,4` | 6900 XT pair |
 | `ridge` | 20.87 GiB | `1,0,1` | 6900 XT pair |
-| `gemma4-heretic` | 14.88 GiB | `1,0,1` | 6900 XT pair |
+| `gemma4-heretic` | 14.88 GiB (9.88 GiB measured) | `1,0,0` | single card, measured |
 | `gemma4-heretic-vision` | 12.00 GiB | `1,0,0` | single card |
 | `qwen25-coder-7b-fim` | 8.47 GiB | `1,0,0` | single card |
 | `qwen3-embedding-8b` | 5.79 GiB | `1,0,0` | single card |
@@ -140,8 +140,25 @@ Two caveats belong with this table rather than under it:
   every block the full context. The real allocation is smaller by several
   gigabytes. Over-estimating is the safe direction for a budget, and the tool
   labels it rather than smoothing it.
+
+  For `gemma4-heretic` that gap decides the placement, so it was measured rather
+  than argued: loaded alone on ROCm0 at 32,768 context the preset holds
+  **9.88 GiB**, against the 14.88 GiB the column charges and the 13.98 GiB of
+  working headroom that card has. It fits, it unloads to its baseline, and rule 1
+  applies. The preset is therefore configured `1,0,0` while this tool still
+  proposes `1,0,1`; the divergence is the over-estimate, not a second policy, and
+  `--verify` is the check that keeps it honest. The gain is large enough to be
+  worth the exception -- decode runs 23.60 tok/s split against 40.30 tok/s on one
+  card, a 70.8% gain, with prefill unchanged at 935.8 against 928.3 -- because
+  layer split is pipelined and every decoded token pays a device hop. See
+  [the benchmark artifacts](../benchmarks/README.md) and
+  [PLACEMENT-MEASUREMENTS.md](PLACEMENT-MEASUREMENTS.md).
 - **`qwen3-coder-next` is the only preset that needs the V620**, and it needs it
-  for capacity, not preference.
+  for capacity, not preference. Four more presets -- `heretic`, `obliterated`,
+  `fable` and `phr00ty` -- take the equal three-way split because their
+  *configured context* pushes them past the pair, not because their weights do.
+  What that costs is now measured rather than assumed; see
+  [PLACEMENT-MEASUREMENTS.md](PLACEMENT-MEASUREMENTS.md).
 
 ### What the estimate is worth
 

@@ -33,5 +33,15 @@
     "GPU-a21e268c0b0a73d7": 27729920,
     "GPU-4d1c68aee3a84b64": 1626341376
   },
-  "_min_slack_comment": "Working headroom every placement rule plans against, on top of the per-device reserve. Without it the rules fill a card to its last modelled byte and produce knife-edge splits for a figure --verify measures as roughly 5 percent conservative."
+  "_min_slack_comment": "Working headroom every placement rule plans against, on top of the per-device reserve. Without it the rules fill a card to its last modelled byte and produce knife-edge splits for a figure --verify measures as roughly 5 percent conservative.",
+  "_measured_comment": "Residency somebody loaded and read, for the few presets where the KV upper bound decides the placement and is wrong in the safe direction. Only consulted by scripts/gpu_placement.py when 'context' still matches the preset's configured ctx-size, so editing ctx-size retires the measurement rather than carrying it onto a configuration nobody loaded. 'bytes' is net of the card's idle baseline, the same convention --verify uses. Adding an entry here is a claim that a model was loaded alone on the named device and the number was read from sysfs; it is not a place for estimates.",
+  "measured_required_bytes": {
+    "gemma4-heretic": {
+      "bytes": 10604765184,
+      "context": 32768,
+      "measured_at": "2026-09-07",
+      "method": "loaded alone on ROCm0 at ctx 32768 with flash-attn on and q4_0 KV; card0 mem_info_vram_used 10632601600 less its 27836416 idle baseline; unloaded back to baseline",
+      "note": "Gemma 4's 1024-token sliding window is why the 14.88 GiB full-context bound overstates this by about 5 GiB. The measured figure fits ROCm0's 13.98 GiB of working headroom, so rule 1 applies and the preset serves 1,0,0."
+    }
+  }
 }
