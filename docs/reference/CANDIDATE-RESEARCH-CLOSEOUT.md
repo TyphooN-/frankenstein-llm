@@ -389,12 +389,40 @@ Apache-2.0, static quants of `junafinity/Qwen-3.8-27B-Uncensored`, also
 These are the same 27B uncensored/abliterated role as installed
 `Qwen3.8-27B-OBLITERATED-Q6_K.gguf` (and `heretic`). Filename and imatrix
 label are not quality or refusal-removal proof. Operator authorization:
-**isolated slot A/B on speed and usefulness** against those two occupants,
+*slot A/B on speed and usefulness* against those two occupants,
 Q6_K only, after the functional mission releases the GPU. Queue:
 [download-queue-slot-uncensored-27b.json](../../verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json).
 Do not add production aliases first. Disclose MTP/speculative differences;
 heretic and obliterated use `draft-mtp`. Read GGUF headers on the challengers
 before attributing tok/s to the weights.
+
+## 2026-09-07 quantization comparisons
+
+Two 27B GGUF candidates were investigated for possible Hermes driver upgrades.
+Neither is admitted yet.
+
+### ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF
+
+GSQ-RCO IQ3_S 10.963 GiB. Small enough for a single 16 GiB card, but IQ3_S is
+a low-precision quant and the repository is a research artifact, not a
+production distribution. No quality comparison has been run against installed
+`heretic` or `obliterated`. Decision: **conditional research, not a driver
+upgrade**.
+
+### unsloth/Qwen3.8-27B-GGUF
+
+UD-IQ3_S 11.214 GiB. Same size class, same low-precision caveat, and the
+template supports leading developer messages but has not been verified against
+this repository's chat templates or tool policy. Decision: **conditional
+research, not a driver upgrade**.
+
+### wfakhri/OTel-2.0-LLM-31B-IT-GGUF
+
+Telecom specialist, not a general driver. Q6_K 25.201 GiB; Q4_K_M 18.687 GiB.
+See the OTel 2.0 section above for the full disposition.
+
+These comparisons are research, not admission. A quantization label is not a
+quality or execution guarantee.
 
 ## Evaluation order
 

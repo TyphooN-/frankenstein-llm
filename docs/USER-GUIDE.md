@@ -32,6 +32,7 @@ guide gives you the command rather than an answer.
 - [Everyday chat](#everyday-chat)
 - [Picking a model](#picking-a-model)
 - [Tools and structured output](#tools-and-structured-output)
+- [Sharing the host with the qualification mission](#sharing-the-host-with-the-qualification-mission)
 - [Vision](#vision)
 - [Embeddings, reranking and RAG](#embeddings-reranking-and-rag)
 - [Code completion](#code-completion)
@@ -248,6 +249,43 @@ Tool authorization is policy, not convention. Three tiers:
 An alias the policy does not know is refused, not defaulted. Adding a preset
 without a privilege decision fails the router gate — that is the intended
 behaviour, not an obstacle.
+
+## Sharing the host with the qualification mission
+
+The mission is serialized and fail-closed, but it does not pause when you start
+using the router. It also does not require the router to be stopped between
+steps. You can use `heretic` for a short session while no mission step is
+running.
+
+Before switching to a local model, check whether a step is live:
+
+```bash
+python3 -c \"import json;s=json.load(open('verification/mission-supervisor/mission-state.json'));print(s['status'],s.get('current_step'))\"
+```
+
+If `current_step` is empty or `None`, the host is between steps. You can use
+the router normally. If it names a step, wait for that step to finish or
+accept that the step may be invalidated by your request.
+
+To use `heretic` safely:
+
+1. Keep the router the only model owner. Do not run a second `llama-server`,
+   a benchmark, a download, or a ComfyUI/TTS/grounding gate alongside it.
+2. Start a fresh chat after switching families; do not hand a local model a
+   long history written under a different model.
+3. Keep the session short if the mission still needs to run. The mission will
+   resume from the first failed or pending step, not from a partially
+   invalidated step.
+4. If the mission is the priority, stop the router before the next step starts:
+
+   ```bash
+   systemctl --user stop llama-router.service
+   # … wait for the step to finish …
+   systemctl --user start llama-router.service
+   ```
+
+Stopping the router is not required for stability in all cases, but it removes
+one owner from the GPU and RAM equation.
 
 ## Vision
 

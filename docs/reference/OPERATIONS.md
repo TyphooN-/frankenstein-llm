@@ -20,6 +20,7 @@ Related: [user guide](../USER-GUIDE.md) · [configuration](CONFIGURATION.md) ·
 - [Installing the user units](#installing-the-user-units)
 - [Checking the backend](#checking-the-backend)
 - [Service control](#service-control)
+- [Sharing the host with the mission](#sharing-the-host-with-the-mission)
 - [Sidecars](#sidecars)
 - [GPU handoff](#gpu-handoff)
 - [Downloading weights](#downloading-weights)
@@ -133,6 +134,38 @@ the installed build's `--help`:
 ```bash
 python3 -m pytest verification/upstream-pin/test_llama_cpp_pin.py
 ```
+
+## Sharing the host with the mission
+
+Starting or stopping the router for interactive use does not stop the mission.
+The two can share the host while a model is not being loaded.
+
+1. Check whether a step is running:
+
+   ```bash
+   python3 -c \"import json;s=json.load(open('verification/mission-supervisor/mission-state.json'));print(s['status'],s.get('current_step'))\"
+   ```
+
+   `current_step` is the only live GPU step. If it names a step, do not start
+   an interactive chat at the same time. The mission runner owns the GPU handoff
+   and restores the router afterward.
+
+2. If no step is running, start or use the router normally. The supervisor does
+   not treat a resident router as a blocker, and the router's quiet wait is
+   between steps, not during them.
+
+3. Avoid work that confounds the next gate while a model is loading, unloaded,
+   or measured. Large builds, downloads, other model servers, and a new
+   interactive request can all change memory or GPU residency during
+   qualification. Stop that work before starting the mission if you can.
+
+4. If you need to use `heretic` immediately, prefer a short request and keep
+   the router the only model owner. Do not run a second `llama-server`, a
+   benchmark, a download, or a ComfyUI/TTS/grounding gate alongside it.
+
+5. If the mission is the priority, stop the router and wait for the step to
+   finish before another GPU experiment. Stopping the router is not required to
+   avoid all instability, but it removes one owner from the equation.
 
 ## Sidecars
 
