@@ -294,6 +294,25 @@ Apache-2.0, custom MLX implementation. Decision: **hold exact MLX artifact**
 on this AMD production stack. Use the GGUF community quants plus IFM fork
 path above if K2 is pursued.
 
+### Later 27B uncensored GGUFs (2026-09-07)
+
+`mradermacher/Qwen3.8-27B-Abliterated-Uncensored-i1-GGUF` revision
+`e236aa77635a`, Apache-2.0, architecture `qwen35` (pinned runtime lists it).
+Imatrix quants of `Madras1/Qwen3.8-27B-Abliterated-Uncensored`. Useful sizes:
+i1-Q4_K_M 16,547,401,312 bytes / 15.41 GiB; i1-Q6_K 22,082,530,912 bytes /
+20.57 GiB.
+
+`mradermacher/Qwen-3.8-27B-Uncensored-GGUF` revision `e0935c1167a9`,
+Apache-2.0, static quants of `junafinity/Qwen-3.8-27B-Uncensored`, also
+`qwen35`. Q6_K 22,431,000,768 bytes / 20.89 GiB; Q8_0 29,047,085,248 bytes /
+27.05 GiB; optional mmproj-f16 927,607,392 bytes.
+
+These are the same 27B uncensored/abliterated role as installed
+`Qwen3.8-27B-OBLITERATED-Q6_K.gguf` (and `heretic`). Filename and imatrix
+label are not quality or refusal-removal proof. Decision: **hold; do not
+download** while the installed 27B pair is unproven as product workflows. An
+isolated A/B would need a named gap those two do not already cover.
+
 ## Evaluation order
 
 1. Finish functional qualification of already downloaded workflows.
