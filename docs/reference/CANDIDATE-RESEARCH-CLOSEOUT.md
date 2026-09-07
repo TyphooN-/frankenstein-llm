@@ -309,9 +309,13 @@ Apache-2.0, static quants of `junafinity/Qwen-3.8-27B-Uncensored`, also
 
 These are the same 27B uncensored/abliterated role as installed
 `Qwen3.8-27B-OBLITERATED-Q6_K.gguf` (and `heretic`). Filename and imatrix
-label are not quality or refusal-removal proof. Decision: **hold; do not
-download** while the installed 27B pair is unproven as product workflows. An
-isolated A/B would need a named gap those two do not already cover.
+label are not quality or refusal-removal proof. Operator authorization:
+**isolated slot A/B on speed and usefulness** against those two occupants,
+Q6_K only, after the functional mission releases the GPU. Queue:
+[download-queue-slot-uncensored-27b.json](../../verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json).
+Do not add production aliases first. Disclose MTP/speculative differences;
+heretic and obliterated use `draft-mtp`. Read GGUF headers on the challengers
+before attributing tok/s to the weights.
 
 ## Evaluation order
 

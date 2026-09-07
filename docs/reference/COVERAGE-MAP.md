@@ -161,6 +161,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/local-coverage-foundation/download-queue-phase2.json`](../../verification/local-coverage-foundation/download-queue-phase2.json) | [Reference](CONFIGURATION.md) |
 | [`verification/local-coverage-foundation/download-queue-phase3.json`](../../verification/local-coverage-foundation/download-queue-phase3.json) | [Reference](CONFIGURATION.md) |
 | [`verification/local-coverage-foundation/download-queue-phase4.json`](../../verification/local-coverage-foundation/download-queue-phase4.json) | [Reference](CONFIGURATION.md) |
+| [`verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json`](../../verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json) | [Reference](CONFIGURATION.md) |
 | [`verification/local-coverage-foundation/download-queue.json`](../../verification/local-coverage-foundation/download-queue.json) | [Reference](CONFIGURATION.md) |
 | [`verification/local-coverage-foundation/download_queue.py`](../../verification/local-coverage-foundation/download_queue.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav`](../../verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav) | [Reference](ARCHITECTURE.md) |

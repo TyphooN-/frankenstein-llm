@@ -7,6 +7,8 @@ Scope: frankenstein-llm local stack. Targeted upgrade benchmarks require explici
 
 Choose models that improve an existing workflow enough to justify their resource cost. Filling memory is not the objective. Compare every candidate against the installed model serving the same role: general assistant/tool use, repository coding, reasoning, or multimodal work. Bigger weights or a newer release are not proof of a capability upgrade.
 
+When two or more artifacts share a role (for example the 27B uncensored/abliterated chat slot), evaluate them against each other on **speed and usefulness** before adding another download or alias. Usefulness is task-level quality on the role's real work, not refusal rate or a filename. Speed is llama-bench prompt/decode under identical settings, with MTP/speculative paths disclosed rather than silently credited to the weights. Keep the current occupant until a challenger wins both a useful quality delta and an acceptable resource/latency tradeoff.
+
 Consider both a stronger architecture at a useful quantization and a higher-fidelity quantization of an existing family. Preserve exact lineage and artifact identity; results from a base model do not automatically transfer to a quantized or abliterated derivative.
 
 ## Two resource tiers
@@ -44,7 +46,7 @@ Expect diminishing speed returns as offload grows, potentially abrupt degradatio
 
 ## Benchmark boundary and method
 
-The user's later request explicitly permits targeted benchmarks of larger upgrade candidates, including RAM-offloaded candidates. It does not blanket-enable every existing throughput mission. Preserve the distinction in execution controls and require explicit benchmark execution rather than a permissive config default.
+The user's later request explicitly permits targeted benchmarks of larger upgrade candidates, including RAM-offloaded candidates. A further operator request authorizes a same-slot speed and usefulness A/B of the two mradermacher 27B Q6_K GGUFs against installed `heretic` and `obliterated`. It does not blanket-enable every existing throughput mission. Preserve the distinction in execution controls and require explicit benchmark execution rather than a permissive config default. Do not run that A/B while the functional mission lock is held.
 
 Run timing comparisons only on a healthy, uncontended host with verified kernel/backend provenance, no competing build or GPU mission, and one inference owner. Do not change voltage, clocks, security settings, or the production router to manufacture a favorable result.
 

@@ -1,0 +1,50 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-07T00:05:00-0400",
+  "source_of_truth": "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/research/hf",
+  "policy": {
+    "single_writer": true,
+    "resume": "aria2 bounded multi-range continuation with its piece map; curl fallback",
+    "promotion": "fsync content, replace, and fsync parent only after exact size and SHA-256 when published",
+    "hash_available": "LFS files use publisher SHA-256",
+    "selection": "one Q6_K per same-slot 27B uncensored candidate for isolated speed/usefulness A/B; not a production alias"
+  },
+  "notes": "Do not start while local-ai-functional-mission.service holds the mission lock. Do not add these files to llama-models.ini until the slot comparison finishes.",
+  "total_bytes": 44513531680,
+  "artifacts": [
+    {
+      "key": "slot-madras1-abliterated-i1-q6k",
+      "capability": "uncensored-27b-slot-comparison",
+      "repository": "mradermacher/Qwen3.8-27B-Abliterated-Uncensored-i1-GGUF",
+      "revision": "e236aa77635a5c546e6985df2bfe5e00354f4bba",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 22082530912,
+      "files": [
+        {
+          "repo_path": "Qwen3.8-27B-Abliterated-Uncensored.i1-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/slot-uncensored-27b/Qwen3.8-27B-Abliterated-Uncensored.i1-Q6_K.gguf",
+          "size": 22082530912,
+          "sha256": "3b6380af5f20a0ad976a8039bafe4b50f74f0dd549aa1bfc62c9a8338c2faf78"
+        }
+      ]
+    },
+    {
+      "key": "slot-junafinity-uncensored-q6k",
+      "capability": "uncensored-27b-slot-comparison",
+      "repository": "mradermacher/Qwen-3.8-27B-Uncensored-GGUF",
+      "revision": "e0935c1167a9f1235ea8a3c0561b5bc28d00b46b",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 22431000768,
+      "files": [
+        {
+          "repo_path": "Qwen-3.8-27B-Uncensored.Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/slot-uncensored-27b/Qwen-3.8-27B-Uncensored.Q6_K.gguf",
+          "size": 22431000768,
+          "sha256": "e39d15861f4a19ff1536e868d6905a6bc7a00e70740b67e01b8834f5437b2390"
+        }
+      ]
+    }
+  ]
+}
