@@ -354,6 +354,115 @@ scripts/local-model-status.sh --json   # same, machine-readable
 resident slot; `downloaded` only means weights reached local disk. See
 [operations → checking the backend](OPERATIONS.md#checking-the-backend).
 
+## Several agents, one router
+
+Nothing in this stack is single-client. Two editors, a shell script and an agent
+loop can all point at `127.0.0.1:8080` at once. What they get depends entirely on
+whether they name the *same preset*.
+
+All line references are into the pinned submodule, llama.cpp `v0.4.0`
+(`upstream/llama-cpp.lock.json`, commit `5266f24da`), which
+`verification/upstream-pin/test_llama_cpp_pin.py` holds the staged gitlink to.
+
+**One preset, many callers: one load.** Three separate guards, all under the
+router's single mutex, make concurrent requests for one alias produce exactly one
+child process:
+
+1. `ensure_model_ready` returns immediately when the entry is already `loaded` or
+   `sleeping` (`tools/server/server-models.cpp:1374-1379`).
+2. Callers that arrive while it is coming up share one queue entry —
+   "requests wanting the same model share one entry, so they all need only one
+   slot and all get unblocked by the single load that entry performs"
+   (`server_lru_sched::join`, `server-models.cpp:103-114`). Only the entry at the
+   head of the queue calls `load()` (`try_claim`, `server-models.cpp:132-142`).
+3. `load()` itself returns without spawning anything if the entry is not
+   `unloaded`, and re-checks `models_max` under the lock before it spawns
+   (`server-models.cpp:986-1006`).
+
+**Different presets: a queue, then an eviction.** `has_capacity` is
+`count_running() < models_max` (`server-models.cpp:77-80`), and this router runs
+`--models-max 1`. A second agent asking for a second alias does not fail and does
+not get a second model: it waits. The header says so directly — "if models_max is
+reached, the request waits in a queue until a slot frees up"
+(`server-models.h:284-289`). The eviction it waits for will not take a model that
+is mid-request: `pick_victim` skips any entry whose `req_count` is non-zero or
+which is not `is_ready_or_sleep()` (`server-models.cpp:88-100`), and `req_count`
+is held up for the whole proxied request including a streamed reply
+(`proxy_request`, `server-models.cpp:1503`). So the second agent waits out the
+first agent's generation *and then* pays a full unload plus a full load. Two
+agents alternating between two aliases reload the model on every turn.
+
+**Same weights, two aliases, two loads.** The router keys its model map by preset
+*section name*, and `add_model` rejects a name that collides with an existing name
+or alias (`server-models.cpp:432-478`). Two INI sections are therefore two
+entries, two child processes and two independent loads even when their `model =`
+lines name the identical file on disk. This checkout already contains two such
+pairs:
+
+| Preset pair | Shared weight file |
+|---|---|
+| `obliterated`, `obliterated-vision` | `Qwen3.8-27B-OBLITERATED-Q6_K.gguf` |
+| `gemma4-heretic`, `gemma4-heretic-vision` | `Gemma-4-12B-it-heretic-Q6_K.gguf` |
+
+Under `--models-max 1` those pairs cannot be co-resident. Asking for the second
+member evicts the first and re-reads the same bytes from disk. If the goal is for
+several agents to share one *loaded* model, they must send the same `model`
+string — or a name added through that preset's own `alias =` key, which
+registers extra names that resolve to the one entry (`server-models.cpp:445-451`,
+`has_model` at `server-models.cpp:889-896`). A second section is a second model
+as far as the router is concerned.
+
+**`parallel = 1`: requests are serialized inside the child, not refused.** The
+`[*]` block in `llama-models.ini` sets `parallel = 1`, and the router renders
+preset keys into the child's argv, so every preset gets one slot
+(`for (int i = 0; i < params_base.n_parallel; i++)`,
+`tools/server/server-context.cpp:1254`). When a task arrives and that slot is
+busy, `get_available_slot` returns `nullptr` and the task is deferred rather than
+rejected (`server-context.cpp:2388-2394`), then re-queued when the slot frees
+(`server-queue.cpp:90-109`). Two agents on one loaded model both get answers; the
+second waits for the first's *entire* generation, not for a time slice. The
+sidecar unit passes `--parallel 1` explicitly for the same reason.
+
+**Context cache: one slot means one KV cache.** Reuse within the slot is
+longest-common-prefix only —
+`slot.prompt.tokens.get_common_prefix(input_tokens)` (`server-context.cpp:3203`).
+Two agents with different system prompts or different histories share no prefix
+past whatever preamble is byte-identical, so each turn re-prefills from the point
+they diverge. There is a second, RAM-backed prompt cache: when a task takes over
+a slot holding another conversation, the displaced state is saved and a matching
+one is restored (`prompt_save`/`prompt_load` in `get_available_slot`,
+`server-context.cpp:1636-1653`), bounded by `--cache-ram`, default 8192 MiB
+(`common/common.h:632`). That reduces the cost of alternating agents; it does not
+remove it, it is host RAM rather than VRAM, and it is evicted under its own
+budget. `--slot-prompt-similarity` (default `0.1`, `common/common.h:695`) picks
+*which* slot to reuse and therefore changes nothing when there is only one.
+
+No throughput claim is made here. None of the above was measured; it is read from
+the pinned runtime's source. What it costs on this host is not recorded anywhere,
+and [the benchmark artifacts](../benchmarks/README.md) are single-client
+`llama-bench` runs that do not exercise any of these paths.
+
+**Separate server processes.** Every load spawns a child `llama-server` on its own
+free loopback port and the router proxies to it (`load()`,
+`server-models.cpp:1010-1046`). Sidecars are separate again: independent
+`llama-sidecar@.service` instances on ports 8081-8084, started with
+`--load-mode none`, never counted against the router's `models_max` and never
+evicted by it. A sidecar and the router are genuinely two resident models on the
+same cards, which is why a sidecar left resident by a failed gate is a mission
+blocker in its own right — see
+[architecture → sidecars](ARCHITECTURE.md#sidecars).
+
+**What this means in practice.** Point every agent that can share a model at one
+preset. Expect a second alias to serialize behind the first, not to run beside
+it. Treat a preset switch as a cold load, not a context switch. And read the
+current occupant from the router rather than from any client's idea of what it
+selected:
+
+```bash
+scripts/local-model-status.sh
+scripts/local-model-status.sh --host-sharing   # adds the mission and host view
+```
+
 ## Reading this correctly
 
 - Nothing here was measured. Sequential layer execution is read from the

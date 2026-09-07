@@ -69,7 +69,8 @@ See:
 The download queues preserve one writer per resolved artifact, resume into an
 ignored `.partial` sibling, verify exact size and SHA-256, and durably promote
 only verified bytes. Independent files run concurrently according to
-`HERMES_DOWNLOAD_WORKERS` (default 4, service policy 16).
+`HERMES_DOWNLOAD_WORKERS` (default 16, range 1-64; the download units set 16
+explicitly).
 
 When `aria2c` is installed, each file can also use bounded HTTP range
 connections. `HERMES_DOWNLOAD_CONNECTION_BUDGET` is shared across active files

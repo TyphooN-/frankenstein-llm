@@ -160,9 +160,28 @@ installed. The full preset table is in
 `services/sidecar-<instance>.env` and starts an independent `llama-server` bound
 to its own loopback port with `--load-mode none`. Sidecars are deliberately *not*
 bound to the router unit: they are small, single-purpose and pinned to their own
-GPU share, so a router restart must not cycle them. They run at `Nice=5` and
-best-effort I/O priority so they never win a resource fight against the
-interactive router.
+GPU share, so a router restart must not cycle them.
+
+They run at `Nice=5` with `IOSchedulingClass=best-effort` and
+`IOSchedulingPriority=6`, which the unit comments as keeping them from winning a
+resource fight against the interactive router. Read that as intent, not as a
+mechanism that prevents contention:
+
+- `Nice=` weights **CPU** scheduling only. The contention that matters between a
+  sidecar and the router is VRAM residency, and a resident sidecar holds its
+  share of a card whatever its nice value. GPU command submission is not ordered
+  by a CPU nice value either.
+- `Nice=5` is also what `local-ai-functional-mission.service` runs at, so it does
+  not order the sidecars against the mission.
+- The I/O settings are one notch below the kernel default — best-effort priority
+  4 (`systemd.exec(5)`) — and take effect at all only "in conjunction with an I/O
+  scheduler that supports I/O priorities" (`ioprio_set(2)`). Which scheduler a
+  device uses is readable per device:
+  `cat /sys/block/<device>/queue/scheduler`.
+
+The real serialization is elsewhere: `--models-max 1` on the router, the
+supervisor's quiet-host wait, and the fact that a resident sidecar is classified
+as an `inference` conflict and therefore blocks a mission step outright.
 
 | Instance | Port | Alias | Purpose |
 |---|---|---|---|

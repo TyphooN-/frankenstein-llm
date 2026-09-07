@@ -221,15 +221,28 @@ The supervisor logs why it is waiting to
 | `status` | Meaning | Action |
 |---|---|---|
 | `waiting-artifacts` | One or more phases are not `complete`, or a stamp mismatches | Finish the downloads; the log names the file and the reason |
-| `waiting-safe-host` | A conflicting process, `MemAvailable < 32 GiB`, or load > 6.0 | The log line names counts by reason and up to eight sample tasks |
+| `waiting-safe-host` | A **blocking** conflict (`kernel-build` or `inference`) or `MemAvailable < 32 GiB`. Load average is not read at all | The log line names counts by reason and up to eight sample tasks |
 | `blocked-policy` | The candidate policy gate failed; nothing model-backed ran | Read `candidate-qualification/evidence/candidate-policy.json` → `problems` |
 | `interrupted` | An operator stop or a signal | Re-run; passed steps are skipped, the interrupted step repeats |
 | `failed` with `host did not become quiet` | The bounded wait expired | The message lists the blockers actually observed |
 
-Common quiet-host blockers: a compiler or `makepkg`; a transfer; a **sidecar left
-resident by a failed gate**; `llama-server` started by hand, which is a conflict
-even though the managed router is not — the router is excused by its cgroup, not
-its name.
+Only two classified reasons actually hold the mission
+(`MISSION_BLOCKING_REASONS`): a build whose `cwd` is inside a kernel tree
+(`kernel-build`), and any inference process that is not the managed router
+(`inference`) — a **sidecar left resident by a failed gate**, or `llama-server`
+started by hand. The router is excused by its cgroup, not its name, so a
+hand-started `llama-server` blocks even though the unit does not.
+
+Everything else the classifier names is reported and not gating: a generic
+compiler or `makepkg` outside a kernel tree, a transfer such as `aria2c` or
+`curl`, and workspace Python. Deliberately so — those are not a missing kernel
+and must not hold a mission after a new-kernel boot. Seeing them in a
+`waiting-safe-host` log line does not explain the wait; look for a `kernel-build`
+or `inference` count, or for `MemAvailable`.
+
+```bash
+scripts/local-model-status.sh --host-sharing   # separates blocking from advisory
+```
 
 Exit 75 from the unit means another supervisor holds the lock.
 
@@ -237,7 +250,7 @@ Exit 75 from the unit means another supervisor holds the lock.
 
 | Symptom | Cause | Action |
 |---|---|---|
-| A runner exits 75 immediately | Its opening `--preflight-only --max-load 6.0` check found the host no longer idle | Wait for the host to drain and re-run |
+| A runner exits 75 immediately | Its opening `gate_computer_use.py --preflight-only` check found a **hard** blocker. Only the available-RAM floor is hard; load and heavy processes are advisory and pass unless `--require-quiet-host` was given | Read `hard_blockers` in `computer-use-grounding/evidence/computer-use-preflight.json`; free RAM and re-run |
 | Repository-agent gate refuses to start | `bwrap` is missing or not executable. There is deliberately no unisolated fallback | Install bubblewrap |
 | Repository-agent aborts mid-run with a sandbox error | The boundary failed, which is a host problem, not a candidate mistake. It aborts rather than returning a retryable tool error | Check namespace limits and host pressure; the in-progress artifact remains fail-closed |
 | `oracle_tampered` in the artifact | The fixed test suite was modified or removed during the run | The run does not count. Investigate the candidate's behaviour |

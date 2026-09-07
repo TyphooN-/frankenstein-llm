@@ -46,3 +46,4 @@ Presets served without speculative decoding, by measured generation rate:
 - The repository's functional gates emit a handful of tokens per check. Their timings are not throughput and are never quoted as a rate: a two-token `PONG` measures whether a preset answers, not how fast it runs.
 - Functional pass/fail comes from `verification/router-functional/`. A fast preset that failed a gate is reported as failed.
 - Native JSON stays in `logs/model-runs/`, which git ignores. Each artifact names the report directory it was written from.
+- The `Split` column is the `-ts` each run was measured with, not the split its preset serves today. `gemma4-heretic` was retuned to `1,0,0` after the `1/0/1` row below was recorded, so that row is evidence for the comparison in [placement, measured](../reference/PLACEMENT-MEASUREMENTS.md) rather than a description of the current preset. The live values are in [configuration → aliases](../reference/CONFIGURATION.md#aliases).

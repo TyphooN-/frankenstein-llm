@@ -37,6 +37,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/reference/CANDIDATE-ADDITIONS-INVESTIGATION.md`](../../docs/reference/CANDIDATE-ADDITIONS-INVESTIGATION.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md`](../../docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/candidate-research-inventory.json`](../../docs/reference/candidate-research-inventory.json) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/reference/documentation-audit-2026-09-07.json`](../../docs/reference/documentation-audit-2026-09-07.json) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/CONFIGURATION.md`](../../docs/reference/CONFIGURATION.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/COVERAGE-MAP.md`](../../docs/reference/COVERAGE-MAP.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/DEVELOPER-GUIDE.md`](../../docs/reference/DEVELOPER-GUIDE.md) | [Reference](DEVELOPER-GUIDE.md) |

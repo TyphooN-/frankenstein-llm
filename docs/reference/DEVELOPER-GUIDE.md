@@ -104,7 +104,7 @@ only after builds and other host pressure have drained.
 | `.../test_grounding_contract.py` | the two checkpoints' geometry, action-space and injection-judging differences |
 | `verification/operator-runs/test_serve_model.py` | preset/catalog agreement, weight-filename listings, fail-closed catalog validation |
 | `verification/router-functional/test_gate_router_models.py` | per-preset check lists, privilege profile, model coverage, release accounting, contended-host detection without reading `cmdline` |
-| `.../test_local_model_status.py` | status classification, error handling against fake responses, alias-to-weight-file resolution |
+| `.../test_local_model_status.py` | status classification, error handling against fake responses, alias-to-weight-file resolution; the `--host-sharing` report — absent/corrupt/unknown-schema mission state never read as idle, `current_step` excluded from the verdict in both directions, every supervisor status classified exactly once, blocking vs advisory conflicts, an unreadable process table downgrading the verdict, and exit 0 for every verdict |
 | `verification/generative-media/test_media_policy.py` | GPU policy, build detection from `comm`/`cwd`, fail-closed vs routine `/proc` errors, build-name agreement with the supervisor, workflow claims, graph reference resolution |
 | `.../test_functional_gate.py` | workflow graph construction |
 | `verification/tts-local/test_tts_gate.py` | round-trip scoring, admission rules, text normalisation |
@@ -112,7 +112,7 @@ only after builds and other host pressure have drained.
 | `verification/prompt-corpus-admission/test_admit_corpus.py` | every rejection path in admission |
 | `verification/security-agents/strix-scaffold/test_strix_scaffold.py` | one negative test per policy control, plus offline scope denial |
 | `verification/glm53flash-local/test_gate_glm32.py` | VRAM telemetry contracts |
-| `verification/docs/test_documentation.py` | every tracked file appears in the coverage map; local links and anchors resolve; model-choice docs name the weight file each alias loads |
+| `verification/docs/test_documentation.py` | every tracked file appears in the coverage map; local links and anchors resolve; model-choice docs name the weight file each alias loads; the CONFIGURATION alias table matches `llama-models.ini`; the documentation audit covers every tracked documentation file exactly once and its declared count is the real one |
 
 ## Adding a router preset
 

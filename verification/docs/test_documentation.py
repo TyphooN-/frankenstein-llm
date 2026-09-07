@@ -1,4 +1,5 @@
 """Offline documentation link and inventory checks; no services or host probes."""
+import configparser
 from pathlib import Path
 import json
 import re
@@ -74,6 +75,72 @@ def test_model_choice_documents_name_the_weight_file_each_alias_loads():
     assert errors == [], errors
 
 
+def _configuration_alias_rows():
+    """The `### Aliases` table in CONFIGURATION.md, keyed by preset name."""
+    text = (ROOT / "docs/reference/CONFIGURATION.md").read_text()
+    section = text.partition("### Aliases")[2].partition("\n### ")[0]
+    rows = {}
+    for line in section.splitlines():
+        match = re.match(r"^\| `([a-z0-9][\w.-]*)` \| (.*?) \| (.*?) \| (.*?) \|$", line)
+        if match:
+            rows[match.group(1)] = {"model": match.group(2), "overrides": match.group(3),
+                                    "privilege": match.group(4)}
+    return rows
+
+
+def test_configuration_alias_table_matches_the_router_presets():
+    """The preset table is a copy of `llama-models.ini`, so it can silently rot.
+
+    It did: `gemma4-heretic` was retuned from `1,0,1` to `1,0,0` on a measured
+    residency, and `qwen3-coder-next` moved into a per-model subdirectory, while
+    this table went on printing the old values. Both are the kind of drift a
+    reader acts on -- one names weights that are not there, the other describes a
+    placement the router does not use -- and neither is caught by a link check.
+    """
+    registry = model_catalog.presets(ROOT / "llama-models.ini")
+    # presets() merges the shared [*] block into every alias and drops the "*"
+    # key, which is right for serving and wrong for this comparison: it would
+    # report the inherited 131072 context as an override the table failed to
+    # print. Read the raw sections too, so "the alias sets this" and "the alias
+    # inherits this" stay distinguishable.
+    raw = configparser.ConfigParser(interpolation=None)
+    with (ROOT / "llama-models.ini").open() as handle:
+        raw.read_file(handle)
+    rows = _configuration_alias_rows()
+    assert set(rows) == {name for name in registry if name != "*"}, {
+        "undocumented": sorted({n for n in registry if n != "*"} - set(rows)),
+        "not a preset": sorted(set(rows) - set(registry)),
+    }
+    errors = []
+    for name, preset in registry.items():
+        if name == "*":
+            continue
+        row = rows[name]
+        # A row may say "same GGUF" where a pair shares one weight file; that is
+        # the case this repository has two of, and it is not a missing filename.
+        if "same GGUF" not in row["model"]:
+            expected = preset["model"].replace("/home/typhoon/git/frankenstein-llm/", "")
+            documented = row["model"].strip("`")
+            head = documented.split("\u2026")[0]
+            if not expected.startswith(head) or (
+                    "\u2026" not in documented and documented != expected):
+                errors.append((name, "model", expected, documented))
+        for key, pattern in (("tensor-split", r"tensor-split=([0-9,]+)"),
+                             ("ctx-size", r"ctx(?:-size)?=(\d+)")):
+            match = re.search(pattern, row["overrides"])
+            documented = match.group(1) if match else None
+            override = dict(raw[name]).get(key)
+            if override is not None:
+                # The alias sets it: the table must print that value.
+                if documented != override:
+                    errors.append((name, key, override, documented))
+            elif documented is not None and documented != preset.get(key):
+                # The alias inherits it: the table may omit it, but must not
+                # print a value that contradicts what the router would use.
+                errors.append((name, key, preset.get(key), documented))
+    assert errors == [], errors
+
+
 def test_candidate_research_closeout_covers_queued_repositories():
     closeout = (ROOT / "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md").read_text()
     missing = [repo for repo in QUEUED_ADDITIONS if repo not in closeout]
@@ -89,6 +156,24 @@ def test_coverage_map_contains_all_outer_tracked_files():
     coverage = (ROOT / "docs/reference/COVERAGE-MAP.md").read_text()
     mapped = set(re.findall(r"\| \[`([^`]+)`\]", coverage))
     assert tracked == mapped, {"missing": sorted(tracked - mapped), "obsolete": sorted(mapped - tracked)}
+
+
+def test_documentation_audit_inventory_and_disposition_counts():
+    audit = json.loads((ROOT / "docs/reference/documentation-audit-2026-09-07.json").read_text())
+    tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")
+    expected = {path for path in tracked if path.endswith(".md") or (
+        path.startswith("docs/reference/") and path.endswith(".json"))}
+    entries = audit["entries"]
+    paths = [entry["path"] for entry in entries]
+    assert len(paths) == len(set(paths)) == audit["inventory_count"]
+    assert set(paths) == expected
+    counts = {}
+    for entry in entries:
+        disposition = entry["disposition"]
+        assert disposition in audit["dispositions"]
+        assert entry["source_evidence"] and entry["finding"] and entry["change"]
+        counts[disposition] = counts.get(disposition, 0) + 1
+    assert counts == audit["disposition_counts"]
 
 
 def test_gate_output_directories_are_not_tracked():

@@ -89,7 +89,8 @@ and restarts on a five-second timer.
 ```bash
 systemctl --user is-active llama-router.service
 scripts/local-model-status.sh
-scripts/local-model-status.sh --json     # bounded machine-readable summary
+scripts/local-model-status.sh --json             # bounded machine-readable summary
+scripts/local-model-status.sh --host-sharing     # + mission state and host conflicts
 ```
 
 `local-model-status.sh` execs `scripts/local_model_status.py`. It accepts
@@ -106,6 +107,13 @@ An id this checkout does not configure is reported as `not a configured preset`
 rather than shown bare; unreadable local configuration degrades the description
 but never fails the status read, which describes a live service rather than
 gating configuration.
+
+`--host-sharing` answers the second question — whether the qualification mission
+is about to take the GPU — by combining that router read with the mission's
+durable state and the supervisor's own `/proc` classifier, which it imports
+rather than reimplements so the report cannot drift from the decision it
+describes. It is read-only and advisory; see
+[sharing the host with the mission](#sharing-the-host-with-the-mission).
 
 It classifies each model by llama.cpp's own six-state vocabulary rather than
 guessing. `loading`, `loaded` and `sleeping` occupy the single resident slot;
@@ -137,35 +145,83 @@ python3 -m pytest verification/upstream-pin/test_llama_cpp_pin.py
 
 ## Sharing the host with the mission
 
-Starting or stopping the router for interactive use does not stop the mission.
-The two can share the host while a model is not being loaded.
+Starting or stopping the router for interactive use does not stop the mission,
+and the mission does not stop for you. The two share the host by default.
 
-1. Check whether a step is running:
+Read the situation with the status helper, which reports the router, the
+mission's durable state and the supervisor's own host classification in one
+bounded, read-only pass:
 
-   ```bash
-   python3 -c \"import json;s=json.load(open('verification/mission-supervisor/mission-state.json'));print(s['status'],s.get('current_step'))\"
-   ```
+```bash
+scripts/local-model-status.sh --host-sharing
+scripts/local-model-status.sh --host-sharing --json
+```
 
-   `current_step` is the only live GPU step. If it names a step, do not start
-   an interactive chat at the same time. The mission runner owns the GPU handoff
-   and restores the router afterward.
+**Its answer is advisory and is not an admission guarantee.** The report carries
+`"advisory": true` and `"atomic_admission": false` for that reason, and the CLI
+exits `0` when the report is produced, regardless of verdict. Do not use
+`… && start-something`: it would start even when the report finds conflicts.
+Conflict details are capped at eight samples per category; accompanying counts
+retain the complete classified totals. Nothing in this report reserves the GPU: the mission
+unit is `WantedBy=default.target` and can begin, or finish its own quiet-host
+wait, between your read and your next request.
 
-2. If no step is running, start or use the router normally. The supervisor does
-   not treat a resident router as a blocker, and the router's quiet wait is
-   between steps, not during them.
+Three verdicts, taken from the mission's `status` field:
 
-3. Avoid work that confounds the next gate while a model is loading, unloaded,
-   or measured. Large builds, downloads, other model servers, and a new
-   interactive request can all change memory or GPU residency during
-   qualification. Stop that work before starting the mission if you can.
+| Verdict | Mission `status` | Reading |
+|---|---|---|
+| `mission-step-running` | `running`, `running-with-failures` | Last write recorded an executing step; not live process proof |
+| `mission-may-take-the-gpu` | `starting`, `waiting-artifacts`, `waiting-safe-host`, or unclassifiable | Last write recorded preparation, or state/host inspection is unavailable |
+| `mission-idle-per-last-write` | `blocked-policy`, `failed`, `interrupted`, `functional-foundation-complete`, `functional-foundation-incomplete` | The last durable write was terminal |
 
-4. If you need to use `heretic` immediately, prefer a short request and keep
-   the router the only model owner. Do not run a second `llama-server`, a
-   benchmark, a download, or a ComfyUI/TTS/grounding gate alongside it.
+**`current_step` is not a liveness signal**, and a state read that treats it as
+one inverts the answer in the dangerous direction. Three properties of
+`run_functional_mission.py` are why:
 
+- `run_step` sets it *after* `wait_for_quiet` has already returned, so during the
+  quiet-host wait it still names the previous step — or, before the first step,
+  nothing at all.
+- It is cleared to `None` only at the three whole-mission exits, never when an
+  individual step ends. Between steps it goes on naming a step that has finished.
+- A freshly initialised state has no such key, so a supervisor in
+  `waiting-safe-host` counting the two polls that release it — the moment it is
+  closest to claiming the GPU — reads as "no step running".
+
+**A missing, truncated or unparseable state file means unknown, never idle.**
+`verification/mission-supervisor/mission-state.json` is ignored runtime state
+(`.gitignore`), written by the supervisor and by nothing else. A supervisor
+killed outright never gets to correct it, and a host that has never run the
+mission has no file at all. The helper classifies all of those as `unknown` and
+reports `mission-may-take-the-gpu`. It does the same when the process table
+cannot be read: a host that cannot be inspected is not a quiet one.
+
+Given that, the working rules are:
+
+1. If the verdict is anything but `mission-idle-per-last-write`, expect
+   contention. The mission runner owns the GPU handoff for its own steps and
+   restores the router afterwards; your request is what is unaccounted for.
+2. If the verdict is `mission-idle-per-last-write`, check the reported host
+   conflicts and current service/process ownership before starting work. A saved
+   terminal status alone does not establish that the host is free. The supervisor
+   exempts the managed router by cgroup; that exemption does not protect an
+   interactive request from a subsequent mission step.
+3. Avoid work that confounds the next gate while a model is loading, unloaded or
+   being measured. Large builds, downloads, other model servers and a new
+   interactive request all change memory or GPU residency during qualification.
+   Note that only some of those actually *hold* the mission (below); the rest
+   are recorded and proceed anyway, which is exactly why they are your problem
+   and not the supervisor's.
+4. If you must use a model immediately, prefer a short request and keep the
+   router the only model owner. Do not run a second `llama-server`, a benchmark,
+   a download, or a ComfyUI/TTS/grounding gate alongside it.
 5. If the mission is the priority, stop the router and wait for the step to
-   finish before another GPU experiment. Stopping the router is not required to
-   avoid all instability, but it removes one owner from the equation.
+   finish before another GPU experiment. Stopping the router removes one owner
+   from the equation; it does not make the host quiet, and it is not durable —
+   `router-reload-presets` restarts the router as a mission step.
+
+For several clients sharing one router, see
+[GPU execution → several agents, one router](GPU-EXECUTION-AND-MODEL-LOADING.md#several-agents-one-router).
+
 
 ## Sidecars
 
@@ -276,10 +332,19 @@ tail -f verification/mission-supervisor/mission.log
 ```
 
 The supervisor waits, without a deadline, for all four download stamps. It then
-waits for a quiet host — two consecutive polls with `MemAvailable ≥ 32 GiB`, load
-≤ 6.0 and no conflicting build, transfer or unmanaged model server — bounded by
-`HERMES_MISSION_QUIET_TIMEOUT` (default six hours). Its per-step logs are
-`verification/mission-supervisor/<step>.log`.
+waits for a quiet host — two consecutive polls with `MemAvailable ≥ 32 GiB` and
+no *blocking* conflict — bounded by `HERMES_MISSION_QUIET_TIMEOUT` (default six
+hours). Its per-step logs are `verification/mission-supervisor/<step>.log`.
+
+Only two of the classifier's reasons block: `kernel-build` (a task whose `cwd`
+is inside a kernel tree) and `inference` (a model server that is not the managed
+router, identified by cgroup rather than by name). Generic builds, transfers and
+workspace Python are classified and reported, but they do not hold the mission —
+`MISSION_BLOCKING_REASONS` in `run_functional_mission.py` is the list, and
+[architecture → layer 5](ARCHITECTURE.md#layer-5--supervision)
+explains why unrelated `cargo`/`rustc`, a download re-hash and desktop load must
+not delay a mission after a new-kernel boot. **Load average is not part of this
+check at all**; the supervisor never reads `/proc/loadavg`.
 
 To read progress, use the durable state:
 
@@ -356,9 +421,15 @@ python3 verification/local-coverage-foundation/scripts/inspect_gguf.py <file.ggu
 ```
 
 The four serialized runners each begin by re-running the computer-use preflight
-with `--max-load 6.0` and exit **75** if the host is no longer idle, so a gate
-started into a newly busy machine refuses rather than producing a confounded
-result.
+and exit **75** if it fails. What that preflight refuses on is narrower than its
+`--max-load 6.0` flag suggests: `gate_computer_use.preflight` separates advice
+from refusal, and only the available-RAM floor is a hard blocker. Load average
+and heavy-process activity are recorded into `advisory_blockers` and do not fail
+the check unless `--require-quiet-host` is passed, because these gates never
+measure throughput and a concurrent compile does not invalidate a functional
+verdict. The floor that does refuse exists because staging weights under a memory
+shortage is how a host ends up thrashing swap, and `--ignore-preflight` does not
+waive it.
 
 ### Isolated runtimes
 

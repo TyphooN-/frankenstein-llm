@@ -1,0 +1,446 @@
+{
+  "schema": "frankenstein-documentation-audit/1",
+  "audit_date": "2026-09-07",
+  "base_commit": "5caff833fd21e0b7e6651405e10aea3da377ad06",
+  "scope": "Every tracked outer-repository documentation file: all tracked *.md outside the upstream/llama.cpp submodule, plus the two tracked reference JSON documents under docs/reference/. Submodule internals are out of scope; upstream source is cited as evidence but not audited.",
+  "dispositions": {
+    "updated": "A disagreement with the implementation was found and the document was corrected in this pass.",
+    "aligned": "Checked against the named implementation evidence in this pass and found consistent. Not a claim that every line was independently re-derived.",
+    "historical": "A dated record of a past observation. Preserved unchanged, and deliberately NOT re-verified against current implementation, because it does not describe current state."
+  },
+  "limits": [
+    "This is a documentation-consistency audit. It makes no quality, performance or model-capability claim.",
+    "No model was loaded, no GPU was touched, no service was started or stopped, and no throughput was measured while producing it.",
+    "It reports no current runtime health. The mission state, router residency and host conflicts observed during the pass are runtime facts that change, and none are recorded here.",
+    "'aligned' means no disagreement was found by the checks named in each entry, not that the document is proven correct."
+  ],
+  "mechanical_checks": [
+    "Every relative markdown link and heading anchor across all tracked documentation resolves.",
+    "Every repository path named in a fenced command block exists on disk, excluding two documented placeholders (an experimental worktree the runbook tells the operator to create, and an ignored evidence filename template).",
+    "Every *.service name resolves to a tracked unit under services/systemd/, excluding the phaseN template placeholder.",
+    "Every HERMES_* variable named in documentation appears in tracked code.",
+    "Every 127.0.0.1:<port> in documentation matches a port in a tracked unit, env file or script.",
+    "The CONFIGURATION.md alias table is compared field by field against llama-models.ini by an added test."
+  ],
+  "inventory_count": 59,
+  "disposition_counts": {
+    "aligned": 26,
+    "historical": 22,
+    "updated": 11
+  },
+  "entries": [
+    {
+      "path": "README.md",
+      "disposition": "updated",
+      "finding": "HERMES_DOWNLOAD_WORKERS was documented as 'default 4, service policy 16'.",
+      "source_evidence": "verification/local-coverage-foundation/download_queue.py:25 sets DEFAULT_WORKERS = 16 and MAX_WORKERS = 64; services/systemd/local-ai-model-downloads*.service set HERMES_DOWNLOAD_WORKERS=16.",
+      "change": "Corrected to default 16, range 1-64. Connection-budget, per-file cap and phase-four artifact claims were re-checked and left unchanged."
+    },
+    {
+      "path": "docs/AI-METAL-BAND.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Operator concept recorded 2026-09-07; self-declared as a creative brief and not a capability claim.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Self-declared historical research snapshot from 2026-09-02, pointing at CANDIDATE-STATUS-2026-09-06.md for current state.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/CANDIDATE-STATUS-2026-09-03.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Self-declared historical snapshot from 2026-09-03.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/CANDIDATE-STATUS-2026-09-06.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated status snapshot; the most recent one, and the file the others defer to. Left as the dated reading it declares itself to be.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/HANDOFF-2026-09-07.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Reboot handoff written 2026-09-07, already carrying its own 'superseded in part' banner and correcting two predictions.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/HERMES-DESKTOP-LOCAL-MODELS.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Alias list checked against llama-models.ini by test_model_choice_documents_name_the_weight_file_each_alias_loads; the load-on-first-request description matches server-models.h ensure_model_ready(). Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/LOCAL-AI-MODEL-STRATEGY.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Dated 2026-09-06 decision record; its operative claims (--models-max 1, one resident model, loopback router on 8080) match llama-router.service. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/LOCAL-HERMES-CAPABILITY-COVERAGE-PLAN.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Dated 2026-09-06 roadmap; its --models-max 1 and eviction statements match the router unit. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/MODEL-RUNS.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Entry points and the preview/--execute boundary; every referenced script and config path exists. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/README.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Index. Every entry resolves to a tracked file; the 'reading status correctly' framing matches how the dated files declare themselves. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/REPOSITORY-CHECKS.md",
+      "disposition": "updated",
+      "finding": "No entry described the host-sharing report or the documentation audit.",
+      "source_evidence": "scripts/local_model_status.py --host-sharing and verification/docs/test_documentation.py.",
+      "change": "Added a bounded read-only host-sharing section and folded the audit into the documentation checks."
+    },
+    {
+      "path": "docs/USER-GUIDE.md",
+      "disposition": "updated",
+      "finding": "The host-sharing section told the reader to decide from mission-state.json's current_step, and said an empty value means 'the host is between steps'.",
+      "source_evidence": "verification/mission-supervisor/run_functional_mission.py: run_step() sets current_step only after wait_for_quiet() returns; it is cleared to None at the three whole-mission exits and nowhere else; load_state() returns a default with no current_step key. /verification/**/mission-state.json is gitignored runtime state.",
+      "change": "Replaced with the scripts/local-model-status.sh --host-sharing verdict table, an explicit statement that current_step is not a liveness signal in either direction, and that missing or unreadable state means unknown rather than idle. Added a 'Sharing one model between several agents' section."
+    },
+    {
+      "path": "docs/benchmarks/README.md",
+      "disposition": "updated",
+      "finding": "The Split column could be read as the split each preset serves now.",
+      "source_evidence": "llama-models.ini [gemma4-heretic] serves tensor-split = 1,0,0; the table records the 1/0/1 run it was measured under.",
+      "change": "Added a caveat that Split is the measured -ts, naming gemma4-heretic explicitly and pointing at the live values. The dated measurements themselves are unchanged."
+    },
+    {
+      "path": "docs/benchmarks/fable.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/gemma4-heretic-vision.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/gemma4-heretic.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory; records the 1,0,1 placement that ADR-0006 follow-up work later replaced.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/heretic.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/obliterated-vision.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/obliterated.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/phr00ty.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/qwen25-coder-7b-fim.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/qwen3-coder-next.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory; its full weight path is the one CONFIGURATION.md was corrected to.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/qwen3-embedding-8b.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/qwen3-reranker-8b.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/benchmarks/ridge.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Dated llama-bench artifact naming its kernel, boot id and report directory.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/decisions/0001-git-tracked-workspace-without-weights.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "ADR; the no-weights rule matches .gitignore /models/ and the tracked-file inventory check. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/decisions/0002-serialized-functional-qualification.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "ADR; serialization and the no-throughput rule match run_functional_mission.py, which records benchmarking_performed and throughput_measured false per step. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/decisions/0003-hardware-allocation-and-memory-policy.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "ADR, amended by 0006; the single-resident-model rule matches --models-max 1 in llama-router.service. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/decisions/0004-prompt-corpus-admission.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "ADR; matches verification/prompt-corpus-admission/ policy and its gitignored corpora directory. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/decisions/0005-track-llama-cpp-submodule.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "ADR; the v0.4.0 pin matches .gitmodules, the staged gitlink and upstream/llama-cpp.lock.json, which test_llama_cpp_pin.py compares. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/decisions/0006-placement-policy-prefers-the-rx-6900-xts.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "ADR; the computed-placement rule matches scripts/gpu_placement.py and config/gpu-placement.json. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/decisions/README.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Index; all six ADRs resolve. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/local-hermes-models.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Dated 2026-09-06 ledger; the --models-max 1 eviction description and the llama-ridge/llama-router port conflict match the two units. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/ARCHITECTURE.md",
+      "disposition": "updated",
+      "finding": "Sidecars 'run at Nice=5 and best-effort I/O priority so they never win a resource fight against the interactive router'.",
+      "source_evidence": "services/systemd/llama-sidecar@.service sets Nice=5, IOSchedulingClass=best-effort, IOSchedulingPriority=6; local-ai-functional-mission.service also sets Nice=5. systemd.exec(5): the kernel default is best-effort priority 4. ioprio_set(2): the calls 'have an effect only when used in conjunction with an I/O scheduler that supports I/O priorities'.",
+      "change": "Kept the unit's intent and qualified the mechanism: Nice weights CPU scheduling only and does not arbitrate VRAM residency or GPU submission, the mission runs at the same Nice, the ionice setting is one notch below default and inert under a scheduler that ignores priorities. Names --models-max 1, the quiet-host wait and inference-conflict classification as the actual serialization."
+    },
+    {
+      "path": "docs/reference/CANDIDATE-ADDITIONS-INVESTIGATION.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Superseded-by-closeout framing is stated in the file and in docs/README.md; the eleven repositories are held by test_candidate_research_closeout_covers_queued_repositories. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Current decision document; the eleven queued repositories and the inventory JSON agree under the same test. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/CAPABILITY-MATRIX.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Capability/admission separation; references resolve and no capability is asserted as proven. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/CONFIGURATION.md",
+      "disposition": "updated",
+      "finding": "The alias table gave qwen3-coder-next a model path missing its per-model subdirectory, and gemma4-heretic a tensor-split of 1,0,1.",
+      "source_evidence": "llama-models.ini: [qwen3-coder-next] model = .../models/repository-agent/Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf; [gemma4-heretic] tensor-split = 1,0,0.",
+      "change": "Both corrected. verification/docs/test_documentation.py::test_configuration_alias_table_matches_the_router_presets now holds the whole table to the INI and was mutation-checked against both original values."
+    },
+    {
+      "path": "docs/reference/COVERAGE-MAP.md",
+      "disposition": "updated",
+      "finding": "The new audit artifact was not in the tracked-file inventory.",
+      "source_evidence": "verification/docs/test_documentation.py::test_coverage_map_contains_all_outer_tracked_files compares the map against git ls-files.",
+      "change": "Added the row for docs/reference/documentation-audit-2026-09-07.json."
+    },
+    {
+      "path": "docs/reference/DEVELOPER-GUIDE.md",
+      "disposition": "updated",
+      "finding": "The test inventory did not cover the new checks.",
+      "source_evidence": "verification/docs/test_documentation.py and verification/router-functional/test_local_model_status.py.",
+      "change": "Extended the two inventory rows to name the preset-table check, the audit checks and the host-sharing report tests."
+    },
+    {
+      "path": "docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md",
+      "disposition": "updated",
+      "finding": "Nothing documented what happens when more than one client uses the router.",
+      "source_evidence": "Pinned llama.cpp v0.4.0 (upstream/llama-cpp.lock.json): server-models.cpp join()/try_claim()/pick_victim()/load(), server-models.h ensure_model_ready(), server-context.cpp slot allocation and prompt cache, common/common.h cache_ram_mib and slot_prompt_similarity defaults. Every cited line range was re-read at the pinned commit.",
+      "change": "Added 'Several agents, one router': duplicate-load protection, --models-max 1 queueing and eviction, distinct aliases over identical weight paths, parallel = 1 task deferral, context-cache behaviour, and separate child/sidecar processes. States explicitly that none of it was measured."
+    },
+    {
+      "path": "docs/reference/MODEL-UPGRADE-EVALUATION.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Policy document; states its own non-measured scope and the mission-lock constraint, which matches the supervisor's flock. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/MODEL-UPGRADE-SHORTLIST.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Provisional assessment; states that publisher claims are not local results and admits no candidate. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/OPERATIONS.md",
+      "disposition": "updated",
+      "finding": "Three claims did not match the implementation: the current_step reading, 'load <= 6.0 and no conflicting build, transfer or unmanaged model server' as the quiet-host condition, and 'exit 75 if the host is no longer idle' for the serialized runners.",
+      "source_evidence": "run_functional_mission.py wait_for_quiet() reads only conflicts() filtered to MISSION_BLOCKING_REASONS = {kernel-build, inference} and mem_available() against MIN_AVAILABLE (32 GiB); it never reads /proc/loadavg. gate_computer_use.py preflight() puts load and heavy processes in advisory_blockers and only the RAM floor in hard_blockers; run_preflight_only() passes on 'clear' unless --require-quiet-host is given.",
+      "change": "Host-sharing section rewritten around the three verdicts and the current_step correction; quiet-host description corrected to the two blocking reasons plus the memory floor with load explicitly excluded; runner preflight corrected to the RAM floor; --host-sharing documented under 'Checking the backend'."
+    },
+    {
+      "path": "docs/reference/PLACEMENT-MEASUREMENTS.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Dated A/B; its gemma4-heretic 1,0,1 -> 1,0,0 move is the change CONFIGURATION.md had not followed, and it records the move correctly. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/TROUBLESHOOTING.md",
+      "disposition": "updated",
+      "finding": "The waiting-safe-host row named load > 6.0, the blocker list presented compilers and transfers as blocking, and the exit-75 row attributed the refusal to load.",
+      "source_evidence": "Same sources as OPERATIONS.md above: MISSION_BLOCKING_REASONS and the advisory/hard split in gate_computer_use.preflight().",
+      "change": "All three corrected, with the advisory reasons kept and labelled as reported-not-gating so a reader is not sent chasing a cargo build."
+    },
+    {
+      "path": "docs/reference/candidate-research-inventory.json",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Machine-readable inventory; its queued set is compared against the closeout by test_candidate_research_closeout_covers_queued_repositories. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "docs/reference/documentation-audit-2026-09-07.json",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "This audit. Its inventory, count and dispositions are enforced by verification/docs/test_documentation.py. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "verification/OBLITERATUS-CATALOG-ASSESSMENT-2026-08-31.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Assessment dated 2026-08-31 against a named inventory snapshot.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "verification/QWEN38-OBLITERATED-FUNCTIONAL-TEST-PLAN.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Test plan; the target weight and projector paths exist and match the obliterated/obliterated-vision presets. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "verification/candidate-qualification/README.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Phase-four qualification contract; matches gate_candidate_policy.py and the phase-four queue's five repositories. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "verification/candidate-qualification/WEMM-REMOTE-CODE-REVIEW.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Remote-code review dated 2026-09-03, pinned to one reviewed revision and its digests.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "verification/glm53flash-local/BUILD-AND-FUNCTIONAL-RUNBOOK.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Runbook; GLM_SRC and GLM_BINARY defaults match gate_glm32.py exactly. The worktree it tells the operator to create is deliberately absent. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "verification/local-coverage-foundation/docs/CAPABILITY-STATUS-2026-09-02.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Self-declared historical 2026-09-02 recovery snapshot.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "verification/local-coverage-foundation/docs/GAP-DECISIONS-2026-09-02.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Self-declared historical 2026-09-02 gap verdict, already annotated with what later phases changed.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "verification/prompt-corpus-admission/README.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Policy README; source-catalog.json and admit_corpus.py match its description. The evidence/NAME.json path in its command block is a placeholder under an ignored directory. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "verification/qualitative-characterization/README.md",
+      "disposition": "aligned",
+      "finding": "No disagreement with the implementation found in this pass.",
+      "source_evidence": "Describes characterize.py's two-question split, loopback-only transport and inert output; matches the module and its tests. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "change": "None."
+    },
+    {
+      "path": "verification/security-agents/SECURITY-AGENT-STACK-ASSESSMENT-2026-09-01.md",
+      "disposition": "historical",
+      "finding": "Dated record of a past observation; preserved unchanged.",
+      "source_evidence": "Assessment dated 2026-09-01 against three named upstream projects.",
+      "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    }
+  ]
+}

@@ -33,6 +33,7 @@ guide gives you the command rather than an answer.
 - [Picking a model](#picking-a-model)
 - [Tools and structured output](#tools-and-structured-output)
 - [Sharing the host with the qualification mission](#sharing-the-host-with-the-qualification-mission)
+- [Sharing one model between several agents](#sharing-one-model-between-several-agents)
 - [Vision](#vision)
 - [Embeddings, reranking and RAG](#embeddings-reranking-and-rag)
 - [Code completion](#code-completion)
@@ -253,29 +254,57 @@ behaviour, not an obstacle.
 ## Sharing the host with the qualification mission
 
 The mission is serialized and fail-closed, but it does not pause when you start
-using the router. It also does not require the router to be stopped between
-steps. You can use `heretic` for a short session while no mission step is
-running.
+using the router, and it does not require the router to be stopped between steps.
+Sharing the host is normal. What follows is how to read the risk, not a
+guarantee that any particular moment is free.
 
-Before switching to a local model, check whether a step is live:
+Ask the status helper rather than a hand-written state read:
 
 ```bash
-python3 -c \"import json;s=json.load(open('verification/mission-supervisor/mission-state.json'));print(s['status'],s.get('current_step'))\"
+scripts/local-model-status.sh --host-sharing
 ```
 
-If `current_step` is empty or `None`, the host is between steps. You can use
-the router normally. If it names a step, wait for that step to finish or
-accept that the step may be invalidated by your request.
+It reports one of three verdicts, and none of them means "safe":
 
-To use `heretic` safely:
+| Verdict | What it means |
+|---|---|
+| `mission-step-running` | The supervisor's last write says a step was executing. Treat it as potentially active until process state is checked. |
+| `mission-may-take-the-gpu` | The last write records preparation for a step, **or** state/host inspection is unavailable. This is not proof of a live supervisor. |
+| `mission-idle-per-last-write` | The last thing the supervisor durably wrote was a terminal status. Nothing is reserved by that. |
 
-1. Keep the router the only model owner. Do not run a second `llama-server`,
-   a benchmark, a download, or a ComfyUI/TTS/grounding gate alongside it.
-2. Start a fresh chat after switching families; do not hand a local model a
-   long history written under a different model.
-3. Keep the session short if the mission still needs to run. The mission will
-   resume from the first failed or pending step, not from a partially
-   invalidated step.
+The command reads the router over loopback, the mission's state file and the
+process table. It starts nothing, stops nothing and loads nothing, and it exits
+`0` when it produces a report, regardless of verdict. **Do not** chain it into
+`… && load-a-model`: that would launch the model even when conflicts are reported.
+JSON conflict details are capped at eight samples per category; the accompanying
+counts report the complete classified totals.
+
+**Do not read `current_step` yourself.** It is the field that looks like the
+answer and is not: it is set only after the supervisor's quiet-host wait has
+already succeeded, it is never cleared when an individual step ends, and it does
+not exist at all in a freshly initialised state. So it is empty exactly when the
+supervisor is starting up and closest to claiming the GPU, and it goes on naming
+a step for as long as the mission has nothing else to write. A missing,
+truncated or unreadable state file means *unknown*, never *idle* — the file is
+untracked runtime state and a supervisor killed outright never gets to correct
+it. The mechanism is in
+[operations → sharing the host](reference/OPERATIONS.md#sharing-the-host-with-the-mission).
+
+**The status is advisory, not an admission ticket.** It describes the instant it
+was read. The mission unit is `WantedBy=default.target`, so it can start — or
+reach the end of its own quiet-host wait — in the gap between the check and your
+next request. Nothing you can read reserves the GPU.
+
+To use a local model alongside the mission:
+
+1. Keep the router the only model owner. Do not run a second `llama-server`, a
+   benchmark, a download, or a ComfyUI/TTS/grounding gate alongside it. A
+   sidecar left resident by a failed gate counts as a second owner.
+2. Start a fresh chat after switching families; do not hand a local model a long
+   history written under a different model.
+3. Keep the session short if the mission still needs to run. The mission resumes
+   from the first step that is not recorded `passed` with a matching input
+   fingerprint.
 4. If the mission is the priority, stop the router before the next step starts:
 
    ```bash
@@ -284,8 +313,38 @@ To use `heretic` safely:
    systemctl --user start llama-router.service
    ```
 
-Stopping the router is not required for stability in all cases, but it removes
-one owner from the GPU and RAM equation.
+Stopping the router is not required for stability in every case, and it does not
+make the host quiet by itself — it removes one owner from the GPU and RAM
+equation. Note that the mission restarts the router itself as its
+`router-reload-presets` step, so a stop is not durable across a mission run.
+
+## Sharing one model between several agents
+
+Several clients can use `127.0.0.1:8080` at once. What they get depends on
+whether they name the same preset.
+
+- **Same alias:** one load, shared. Concurrent callers for one alias join a
+  single queue entry and are all released by the one load it performs, so no
+  duplicate child process is spawned.
+- **Different aliases:** serialized, not parallel. The router runs
+  `--models-max 1`, so a second alias waits for the first to go idle, then pays a
+  full unload and a full load. Two agents alternating between two aliases reload
+  the model on every turn.
+- **Same weights under two aliases is still two models.** `obliterated` and
+  `obliterated-vision` name the same GGUF, and so do `gemma4-heretic` and
+  `gemma4-heretic-vision`; switching between the pair still evicts and reloads.
+  To share a loaded model, send the same `model` string.
+- **`parallel = 1` means one request at a time per model.** A second request to
+  an already-loaded model is deferred, not refused: it waits for the first
+  reply to finish completely.
+- **The context cache is per slot, and there is one slot.** Two agents with
+  different histories do not share a cached prefix beyond whatever preamble is
+  byte-identical, so each turn re-prefills from where they diverge.
+
+No cost figure is published for any of this; it has not been measured. The
+mechanism and its source references are in
+[GPU execution → several agents, one router](reference/GPU-EXECUTION-AND-MODEL-LOADING.md#several-agents-one-router).
+
 
 ## Vision
 

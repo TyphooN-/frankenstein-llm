@@ -97,8 +97,8 @@ with that path.
 | `qwen3-embedding-8b` | `models/embedding/Qwen3-Embedding-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=4096`, `embedding=1`, `pooling=last`, `embd-normalize=2`, `flash-attn=off`, `cache-type-v=f16`, `tensor-split=1,0,0` | read-only |
 | `qwen3-reranker-8b` | `models/reranker/Qwen3-Reranker-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=1024`, `reranking=1`, `pooling=rank`, `flash-attn=off`, `cache-type-v=f16`, `tensor-split=1,0,0` | read-only |
 | `qwen25-coder-7b-fim` | `models/fim/qwen2.5-coder-7b-q8_0.gguf` | `ctx=32768`, `batch=1024`, `ubatch=512`, `cache-type-k/v=q8_0`, `tensor-split=1,0,0` | read-only |
-| `qwen3-coder-next` | `models/repository-agent/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf` | `ctx=65536`, `tensor-split=5,8,4`, `temp=0.2`, `repeat-penalty=1.05` | tool-using |
-| `gemma4-heretic` | `models/gemma4-heretic/Gemma-4-12B-it-heretic-Q6_K.gguf` | `ctx=32768`, `tensor-split=1,0,1`, `temp=0.7` | low |
+| `qwen3-coder-next` | `models/repository-agent/Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf` | `ctx=65536`, `tensor-split=5,8,4`, `temp=0.2`, `repeat-penalty=1.05` | tool-using |
+| `gemma4-heretic` | `models/gemma4-heretic/Gemma-4-12B-it-heretic-Q6_K.gguf` | `ctx=32768`, `tensor-split=1,0,0`, `temp=0.7` | low |
 | `gemma4-heretic-vision` | same GGUF | adds `mmproj=mmproj-Gemma-4-12B-it-BF16.gguf`, `mmproj-device=ROCm0`, `ctx=16384`, `tensor-split=1,0,0`, `temp=0.7` | low |
 
 ### Display names
