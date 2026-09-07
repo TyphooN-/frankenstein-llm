@@ -34,11 +34,11 @@ Require the [evaluation strategy](MODEL-UPGRADE-EVALUATION.md), exact backend/bi
 
 ## Separately queued additions
 
-Eleven further repositories were submitted after this shortlist was written and
-are investigated in [CANDIDATE-ADDITIONS-INVESTIGATION.md](CANDIDATE-ADDITIONS-INVESTIGATION.md),
-which resolves each one against the pinned runtime's architecture table rather
-than against its repository name. One is worth an isolated evaluation, three are
-waiting on capacity or access, and seven are rejected. None is admitted.
+Eleven further repositories were submitted after this shortlist was written.
+Current dispositions live in
+[CANDIDATE-RESEARCH-CLOSEOUT.md](CANDIDATE-RESEARCH-CLOSEOUT.md). The earlier
+additions investigation remains a source notebook; its wait/reject counts are
+not current. None of these candidates is admitted.
 
 That file also records a pagination defect in the metadata collector, found and
 fixed while collecting those eleven. It could truncate any repository listing

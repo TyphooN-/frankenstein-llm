@@ -6,9 +6,14 @@ and `inclusionAI/Ling-3.0-flash-Fin` were each submitted twice). Every one
 resolved — there were **no lookup errors and no unavailable identifiers**, so
 nothing here is a substitution for something that could not be found.
 
-This document records what the publishers' own metadata says, what the pinned
-runtime in `upstream/llama.cpp` can actually execute, and what each artifact
-would cost on this host. **No weights were downloaded and nothing was loaded.**
+Current adopt/wait/reject wording is in
+[CANDIDATE-RESEARCH-CLOSEOUT.md](CANDIDATE-RESEARCH-CLOSEOUT.md). This file
+keeps the pagination bug write-up, GGUF header reads, and first-pass inventory.
+
+This document records what the publishers' own metadata said at collection
+time, what the pinned runtime in `upstream/llama.cpp` can actually execute, and
+what each artifact would cost on this host. **No weights were downloaded and
+nothing was loaded.**
 Every "fits" below is arithmetic from [the placement
 policy](GPU-EXECUTION-AND-MODEL-LOADING.md), not a load. No throughput figure
 appears anywhere in this file, and none of these candidates is admitted,
