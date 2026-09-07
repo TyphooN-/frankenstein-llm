@@ -180,6 +180,69 @@ Exit status: 0 success or valid preview, 2 invalid configuration/acknowledgement
 75 preflight/lock refusal, 124 timeout, 130 interrupt, otherwise native child
 failure (or 1 for report/cleanup failures). Reports never overwrite prior runs.
 
+## Publish measured throughput as markdown
+
+Throughput is deliberately not part of `local-ai-functional-mission.service`,
+which records `throughput_measured: false`. The mission answers "does this
+preset work"; this lane answers "how fast was it in one measured run", and the
+two are kept apart so a rate can never stand in for a gate.
+
+`scripts/bench_report.py` turns run directories that already exist under
+`logs/model-runs/` into one markdown file per weight file under
+[`docs/benchmarks/`](benchmarks/README.md). It never loads a model, never
+touches a GPU and never starts or stops a service:
+
+```bash
+bash scripts/bench-reports.sh \
+  logs/model-runs/benchmark-XXXXXXXX \
+  gemma4-heretic-vision=logs/model-runs/benchmark-YYYYYYYY
+```
+
+A run directory usually identifies its own preset from the weight path in the
+recorded argv. `alias=directory` is required only where two presets share one
+GGUF, which is every vision sibling: the projector is the difference, and
+`llama-bench` does not load it.
+
+The writer refuses rather than approximating:
+
+- **No native JSON, no artifact.** A run whose `report.json` is missing, is not
+  `passed`, recorded no `native_results`, or whose `stdout.log` does not parse
+  into complete rows produces a refusal and exit status 2. Nothing is estimated
+  from a wall clock, and an interrupted run stays a recorded interruption.
+- **No ranking across serving-MTP classes.** `ridge`, `heretic`, `obliterated`
+  and `fable` serve with `spec-type = draft-mtp`; `llama-bench` applies no draft
+  model to any of them. Ordering an MTP-served preset against a non-MTP-served
+  one by rates that were all measured without MTP would read as a ranking of the
+  weights, so it is refused. The index orders only within one class, and its
+  table is alphabetical.
+- **No two runs under one alias.** The surviving file would carry the other
+  run's argv.
+- **No placement the alias does not serve.** The `-ts` in the recorded argv is
+  compared with `llama-models.ini` by ratio, so `6/6/6` and `1,1,1` agree while
+  `1,1,1` and `5,8,4` do not.
+
+Usability notes are read from `verification/router-functional/evidence/` as
+pass/fail with the gate's own timestamp. No quality score is computed, a gate
+failure is never restated as a pass, and a model absent from that evidence is
+reported as absent rather than as passing.
+
+VRAM and RAM are reported only when they were measured. Sample them beside a run
+by pointing the sampler at the report directory the benchmark printed:
+
+```bash
+python3 scripts/bench_report.py sample --into logs/model-runs/benchmark-XXXXXXXX &
+# ... the benchmark runs ...
+kill -TERM %1
+```
+
+It republishes peaks atomically on every tick, so stopping it at any moment
+leaves a valid file. Without it, an artifact says the residency was not measured
+rather than reporting the allocation request as though it were.
+
+Artifacts are tracked, so a newly benchmarked model needs a row in
+[`docs/reference/COVERAGE-MAP.md`](reference/COVERAGE-MAP.md) before the
+documentation suite passes.
+
 ## Asking an agent to operate this
 
 Examples:

@@ -20,6 +20,7 @@
 - [Developer guide](reference/DEVELOPER-GUIDE.md): tests, extending capabilities and evidence contracts.
 - [Coverage map](reference/COVERAGE-MAP.md): outer-repository file inventory and reference ownership.
 - [Repository checks](REPOSITORY-CHECKS.md): verification commands and host-safety caveats.
+- [Native throughput artifacts](benchmarks/README.md): measured `llama-bench` prompt/generation rates per weight file, with the placement, kernel and MTP caveats each figure was measured under. Each artifact is a dated measurement of one run, not a live reading and not a quality ranking.
 - [Decisions](decisions/README.md): durable architectural rationale.
 
 ## Reading status correctly

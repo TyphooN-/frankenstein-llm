@@ -240,5 +240,18 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/tts-local/run_serialized.sh`](../../verification/tts-local/run_serialized.sh) | [Reference](ARCHITECTURE.md) |
 | [`verification/tts-local/test_tts_gate.py`](../../verification/tts-local/test_tts_gate.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/upstream-pin/test_llama_cpp_pin.py`](../../verification/upstream-pin/test_llama_cpp_pin.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`docs/benchmarks/README.md`](../../docs/benchmarks/README.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/fable.md`](../../docs/benchmarks/fable.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/gemma4-heretic-vision.md`](../../docs/benchmarks/gemma4-heretic-vision.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/gemma4-heretic.md`](../../docs/benchmarks/gemma4-heretic.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/heretic.md`](../../docs/benchmarks/heretic.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/obliterated-vision.md`](../../docs/benchmarks/obliterated-vision.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/obliterated.md`](../../docs/benchmarks/obliterated.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/phr00ty.md`](../../docs/benchmarks/phr00ty.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/qwen3-coder-next.md`](../../docs/benchmarks/qwen3-coder-next.md) | [Reference](../MODEL-RUNS.md) |
+| [`docs/benchmarks/ridge.md`](../../docs/benchmarks/ridge.md) | [Reference](../MODEL-RUNS.md) |
+| [`scripts/bench-reports.sh`](../../scripts/bench-reports.sh) | [Reference](../MODEL-RUNS.md) |
+| [`scripts/bench_report.py`](../../scripts/bench_report.py) | [Reference](../MODEL-RUNS.md) |
+| [`verification/operator-runs/test_bench_report.py`](../../verification/operator-runs/test_bench_report.py) | [Reference](../MODEL-RUNS.md) |
 
-Inventory entries: 230. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 249. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
