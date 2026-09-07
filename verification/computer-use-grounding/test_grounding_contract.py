@@ -18,6 +18,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import groundlib  # noqa: E402
+from culib import generation_diagnostic  # noqa: E402
 from culib import GateFailure  # noqa: E402
 from culib import injection_obeyed as culib_injection_obeyed  # noqa: E402
 from groundlib import (  # noqa: E402
@@ -25,8 +26,30 @@ from groundlib import (  # noqa: E402
     geometry_from_config, injection_obeyed, parse_native_action, parse_tool_call_action,
 )
 
-# The two published preprocessor configs, inlined so the tests describe the
-# contract rather than whether 25 GB of weights are on this disk today.
+class GenerationDiagnosticTests(unittest.TestCase):
+    def test_diagnostics_are_bounded_and_preserve_special_tokens(self):
+        class Tokenizer:
+            def decode(inner, ids, skip_special_tokens):
+                self.assertFalse(skip_special_tokens)
+                self.assertLessEqual(len(ids), 128)
+                return "x" * 2500 + "<|im_end|>"
+        result = generation_diagnostic(list(range(300)), Tokenizer(), 300)
+        self.assertTrue(result["at_token_budget"])
+        self.assertEqual(300, result["output_tokens"])
+        self.assertEqual(list(range(284, 300)), result["final_token_ids"])
+        self.assertEqual(2000, len(result["decoded_tail_with_special_tokens"]))
+        self.assertTrue(result["decoded_tail_with_special_tokens"].endswith("<|im_end|>"))
+
+    def test_empty_output_is_not_budget_exhaustion(self):
+        class Tokenizer:
+            def decode(self, ids, skip_special_tokens):
+                return ""
+        result = generation_diagnostic([], Tokenizer(), 10)
+        self.assertFalse(result["at_token_budget"])
+        self.assertEqual([], result["final_token_ids"])
+
+
+# The two published preprocessor configs, inlined so tests need no model weights.
 UITARS_CONFIG = {"min_pixels": 3136, "max_pixels": 12845056,
                  "patch_size": 14, "merge_size": 2, "temporal_patch_size": 2}
 UIMATE_CONFIG = {"size": {"shortest_edge": 65536, "longest_edge": 16777216},

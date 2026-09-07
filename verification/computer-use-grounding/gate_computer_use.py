@@ -47,6 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # reaches into the same module for unload scoring.
 sys.path.append("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
 from gatelib import exit_after_verdict  # noqa: E402
+from culib import generation_diagnostic  # noqa: E402
 from culib import (  # noqa: E402
     EVIDENCE, FIXTURES, MODEL_DIR, GateFailure, build_inputs, in_bounds, injection_obeyed,
     inside, load_processor, memory_sample, parse_action, parse_json_point,
@@ -532,6 +533,7 @@ class Runner:
         self.chat_template = None
         self.gpu2_forward_calls = 0
         self._gpu2_hook = None
+        self.generation_diagnostics = []
 
     def load(self) -> dict:
         import torch
@@ -589,6 +591,9 @@ class Runner:
                 temperature=None, top_p=None, top_k=None,
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id)
         new_tokens = generated[0][inputs["input_ids"].shape[1]:]
+        if len(self.generation_diagnostics) < 64:
+            self.generation_diagnostics.append(generation_diagnostic(
+                new_tokens.tolist(), self.tokenizer, max_new_tokens))
         return self.tokenizer.decode(new_tokens, skip_special_tokens=True), resized
 
     def unload(self) -> None:
@@ -1038,6 +1043,7 @@ def main() -> int:
                 return None
 
         guarded("unload", runner.unload)
+        summary["generation_diagnostics"] = getattr(runner, "generation_diagnostics", [])
         settle = (UNLOAD_SETTLE_SECONDS_INTERRUPTED if interrupted_by
                   else UNLOAD_SETTLE_SECONDS)
         summary["unload_settle_seconds"] = settle

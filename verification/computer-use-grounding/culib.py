@@ -297,6 +297,18 @@ def load_processor(model_dir: Path = MODEL_DIR):
     return image_processor, tokenizer, chat_template
 
 
+def generation_diagnostic(token_ids, tokenizer, budget: int) -> dict:
+    """Bounded evidence; reaching the budget does not prove why decoding stopped."""
+    return {
+        "output_tokens": len(token_ids),
+        "max_new_tokens": budget,
+        "at_token_budget": len(token_ids) >= budget,
+        "final_token_ids": list(token_ids[-16:]),
+        "decoded_tail_with_special_tokens": tokenizer.decode(
+            token_ids[-128:], skip_special_tokens=False)[-2000:],
+    }
+
+
 def image_token_count(grid: list[int], merge_size: int) -> int:
     """Merged vision tokens for one image, matching Qwen2_5_VLProcessor's arithmetic."""
     return grid[0] * grid[1] * grid[2] // (merge_size ** 2)
