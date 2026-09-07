@@ -38,6 +38,14 @@ __pycache__/
 /verification/workspace-move-report.json
 /verification/obliterated-mmproj-download.log
 /verification/**/evidence/
+# Waveforms the TTS gate synthesises on every run. Same class as evidence: gate
+# output, not repository state, and not a fixture -- the gate's inputs are the
+# tracked reference clips under local-coverage-foundation/fixtures/asr/. Four of
+# them were swept into e86383b by an unscoped `git add`, where they broke the
+# tracked-file coverage check and made each gate run dirty the tree the mission
+# fingerprints. Named exactly rather than as `*.wav`, which would also swallow
+# those fixtures.
+/verification/tts-local/artifacts/
 /verification/**/build-*/
 /verification/glm53flash-local/build-*/
 /verification/**/transcript-*.jsonl

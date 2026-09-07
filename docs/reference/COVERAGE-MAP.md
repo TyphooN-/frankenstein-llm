@@ -5,6 +5,8 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | Tracked file | Documentation |
 |---|---|
 | [`config/gpu-placement.json`](../../config/gpu-placement.json) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
+| [`config/chat-templates/qwen2.5-tools.jinja`](../../config/chat-templates/qwen2.5-tools.jinja) | [Reference](CONFIGURATION.md#chat-templates) |
+| [`config/chat-templates/qwen3.8-27b-tools.jinja`](../../config/chat-templates/qwen3.8-27b-tools.jinja) | [Reference](CONFIGURATION.md#chat-templates) |
 | [`config/model-catalog.json`](../../config/model-catalog.json) | [Reference](../MODEL-RUNS.md) |
 | [`.gitignore`](../../.gitignore) | [Reference](ARCHITECTURE.md) |
 | [`.gitmodules`](../../.gitmodules) | [Reference](ARCHITECTURE.md) |
@@ -226,6 +228,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/repository-agent/run_serialized.sh`](../../verification/repository-agent/run_serialized.sh) | [Reference](ARCHITECTURE.md) |
 | [`verification/repository-agent/test_repo_agent.py`](../../verification/repository-agent/test_repo_agent.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/router-functional/gate_router_models.py`](../../verification/router-functional/gate_router_models.py) | [Reference](ARCHITECTURE.md) |
+| [`verification/router-functional/test_chat_templates.py`](../../verification/router-functional/test_chat_templates.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/router-functional/test_gate_router_models.py`](../../verification/router-functional/test_gate_router_models.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/router-functional/test_local_model_status.py`](../../verification/router-functional/test_local_model_status.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/run_qwen38_obliterated_core_gates.py`](../../verification/run_qwen38_obliterated_core_gates.py) | [Reference](ARCHITECTURE.md) |

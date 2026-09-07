@@ -19,6 +19,8 @@ Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
 - [Download problems](#download-problems)
 - [Mission never starts](#mission-never-starts)
 - [Gate problems](#gate-problems)
+- [A failed process outranks a passing artifact](#a-failed-process-outranks-a-passing-artifact)
+- [A gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting)
 - [Ledger says something unexpected](#ledger-says-something-unexpected)
 - [Test suite problems](#test-suite-problems)
 - [Storage and power loss](#storage-and-power-loss)
@@ -244,10 +246,70 @@ Exit 75 from the unit means another supervisor holds the lock.
 | Runner exits 5 | Python exited 0 but the artifact is missing, stale or unreadable | Fail-closed by design; check the gate log |
 | Media runner reports `V620 retained excess VRAM after unload` | ComfyUI did not release residency within the 768 MiB tolerance | Check for a surviving ComfyUI process before re-running |
 | A gate passes but the ledger disagrees | The artifact's `gate` field does not match the expected identity, or `sections_missing` is non-empty | Compare against [the evidence contract](DEVELOPER-GUIDE.md#writing-an-evidence-artifact) |
-| Router gate reports `reclaimable RAM remained N bytes below baseline` | Host memory did not come back after the model was unloaded, and the ZFS ARC does not account for it | A real shortfall. Note this is measured as `MemAvailable + (ARC size - ARC c_min)`, because MemAvailable alone does not credit the ARC and charged whichever model was under test for cache the router had filled reading earlier presets. `ram_recovery` in the artifact separates the two deltas |
-| A gate exits -11 or 139 after its artifact says `"pass": true` | ROCm's HSA runtime segfaulting in its own process-exit teardown, after the verdict was computed and written. Seen three times on one boot, always `libhsa-runtime64.so.1.18.0`, always at finalization, with no kernel GPU fault, RCU stall, OOM or MCE beside it | Trust the artifact, not the exit code, and check `journalctl -k -b \| grep segfault`. Gates that drive ROCm leave through `gatelib.exit_after_verdict` so the verdict is what the process returns |
+| Router gate reports `reclaimable RAM remained N bytes below baseline` | Host memory did not come back after the model was unloaded, and the ZFS ARC does not account for it | A real shortfall. Note this is measured as `MemAvailable + (ARC size - ARC c_min)`, because MemAvailable alone does not credit the ARC and charged whichever model was under test for cache the router had filled reading earlier presets. `ram_recovery` in the artifact separates the two deltas. A shortfall is real memory, which is not the same as the model's: confirm the host is not retiring corrupt pages first, see [a gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting) |
+| A gate exits -11 or 139 after its artifact says `"pass": true` | Two causes look identical here and only one is benign: ROCm's HSA runtime segfaulting in its own process-exit teardown *after* the verdict was written, or a crash *during* the gate that left an artifact from an earlier run in place | The run failed until you prove otherwise; see [a failed process outranks a passing artifact](#a-failed-process-outranks-a-passing-artifact) |
 | A ComfyUI node fails with `HIPBLAS_STATUS_INVALID_VALUE` from `hipblasLtMatmulAlgoGetHeuristic` | hipBLASLt has no algorithm for that problem shape on this architecture. These cards are gfx1030 and torch's own hipBLASLt support list is gfx9 | Not a model or workflow fault, and not a tolerance question. The media runner exports `TORCH_BLAS_PREFER_HIPBLASLT=0` to route matmuls through hipBLAS instead |
 | Grounding scores look confidently wrong | A geometry or action-space mismatch, not the model. This is exactly what `groundlib.py` exists to prevent | `python3 -m pytest verification/computer-use-grounding/test_grounding_contract.py` |
+
+## A failed process outranks a passing artifact
+
+A gate that exits non-zero or on a signal has **failed**. That is the default and
+it is not negotiable by reading the artifact, because the artifact is a file that
+persists between runs and a crashed run does not necessarily overwrite it. This is
+the same rule `Runner exits 5` already enforces: an artifact that is missing,
+stale or unreadable fails closed rather than being interpreted.
+
+The one benign explanation on this host is ROCm's HSA runtime segfaulting inside
+its own interpreter finalization, after the gate has already computed and written
+its verdict. It was observed three times on boot `1669f3ad`, always
+`libhsa-runtime64.so.1.18.0`, always at finalization. Three things must all hold
+before that explanation applies:
+
+1. **The artifact is from this run.** Its `recorded_at` falls between the step's
+   `started_at` and `finished_at` in `mission-state.json`, and its `boot_id`, where
+   the gate records one, is the current `/proc/sys/kernel/random/boot_id`. An older
+   timestamp means you are reading a previous verdict and the crash destroyed this
+   one.
+2. **The only fault is that userspace segfault.** `journalctl -k -b` must show the
+   `libhsa-runtime64` segfault and nothing else for the window. No
+   `BUG: Bad page state`, no general protection fault, no GPU ring timeout or
+   reset, no RCU stall, no OOM kill, no MCE. Any of those makes every result from
+   that window suspect, the passing ones included.
+3. **The gate does not already route around it.** `gate_asr.py` and
+   `gate_computer_use.py` exit through `gatelib.exit_after_verdict`, which returns
+   the computed code by design. If one of *those* still exits -11 or 139, the crash
+   may have landed before or after the artifact write but before process exit.
+   The artifact is not necessarily old; the run still failed.
+
+If any of the three does not hold, re-run the gate on a healthy host. Do not edit
+the state file, and do not carry the artifact forward as a verdict.
+
+## A gate fails while the kernel is faulting
+
+Symptoms that arrive together: gates that pass and fail across consecutive runs
+with no change to weights, configuration or presets; the router gate reporting
+`reclaimable RAM remained N bytes below baseline` for whichever preset happened to
+be under test; the mission restarting from the top every few minutes.
+
+Check the host before the model:
+
+```bash
+uptime
+journalctl --list-boots | tail -12
+journalctl -k -b | grep -E "BUG: Bad page state|general protection|Tainted:|Oops"
+```
+
+`BUG: Bad page state` and general protection faults establish a kernel-integrity
+problem, not its root cause. Hardware instability, firmware configuration, and
+kernel or module defects remain possible. Neither these messages nor the
+`CPU_OUT_OF_SPEC` taint alone proves an overclock or explains a measured RAM
+shortfall. Record the first fault and surrounding boot messages before assigning
+causality. Host-wide memory deltas also do not isolate a particular model leak.
+
+**Do not raise tolerances to hide the failure.** Preserve the gate and kernel
+evidence, investigate the host-integrity problem, and qualify models again on a
+healthy host. Results from the faulting window remain useful diagnostic evidence,
+but cannot establish reliable model admission or isolate a model defect.
 
 ## Ledger says something unexpected
 

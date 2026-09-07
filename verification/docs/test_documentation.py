@@ -89,3 +89,61 @@ def test_coverage_map_contains_all_outer_tracked_files():
     coverage = (ROOT / "docs/reference/COVERAGE-MAP.md").read_text()
     mapped = set(re.findall(r"\| \[`([^`]+)`\]", coverage))
     assert tracked == mapped, {"missing": sorted(tracked - mapped), "obsolete": sorted(mapped - tracked)}
+
+
+def test_gate_output_directories_are_not_tracked():
+    """Gate output is evidence about one run, not repository state.
+
+    Every ``evidence/`` directory is ignored, and so is the TTS gate's
+    ``artifacts/``, which holds waveforms it re-synthesises on every run. Four of
+    those were committed by an unscoped ``git add`` in e86383b. Two things broke:
+    the tracked-file inventory above went red, and -- less visibly -- the gate
+    started dirtying the working tree that
+    ``run_functional_mission.mission_inputs_fingerprint`` hashes, so running it
+    invalidated every step that had already passed.
+
+    The coverage map alone does not catch this; a second unscoped commit that
+    also added a row would satisfy it. Tracked-ness is the property that matters.
+    """
+    tracked = set(subprocess.check_output(
+        ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")) - {""}
+    generated = sorted(
+        path for path in tracked
+        if re.search(r"(^|/)(evidence|verification/tts-local/artifacts)/", path))
+    assert generated == [], generated
+
+    # The ignore rule has to be narrow enough to leave the gate's *inputs* alone:
+    # the reference clips the TTS gate clones a voice from are tracked fixtures.
+    fixtures = sorted(path for path in tracked if path.endswith(".wav"))
+    assert fixtures == [
+        "verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav",
+        "verification/local-coverage-foundation/fixtures/asr/qwen-asr-en.wav",
+    ], fixtures
+    # check-ignore echoes only the paths it would ignore, so an empty result is
+    # the assertion. --quiet is not usable here: it takes a single pathname.
+    ignored = subprocess.run(["git", "check-ignore", *fixtures],
+                             cwd=ROOT, check=False, capture_output=True, text=True)
+    assert ignored.stdout == "", ignored.stdout
+
+
+def test_signalled_gate_exit_is_not_documented_as_a_pass():
+    """A non-zero or signalled exit is a failed run until proven otherwise.
+
+    An artifact persists between runs, so a gate that crashes can leave an older
+    ``"pass": true`` on disk -- the same hazard the runner's exit 5 already fails
+    closed on. Documentation that says to prefer the artifact over the exit code
+    without first pinning the artifact to *this* run teaches operators to launder
+    a crash into a verdict, which on a host that is retiring corrupt pages is how
+    a hardware fault gets recorded as a passing model.
+    """
+    troubleshooting = (ROOT / "docs/reference/TROUBLESHOOTING.md").read_text()
+    for phrase in ("Trust the artifact, not the exit code",
+                   "trust the artifact, not the exit code"):
+        assert phrase not in troubleshooting, phrase
+
+    section = troubleshooting.partition("## A failed process outranks a passing artifact")[2]
+    section = section.partition("\n## ")[0]
+    assert section, "the section the signalled-exit row points at is missing"
+    for required in ("recorded_at", "boot_id", "exit_after_verdict",
+                     "BUG: Bad page state"):
+        assert required in section, required
