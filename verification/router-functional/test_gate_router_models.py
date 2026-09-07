@@ -188,6 +188,37 @@ class RouterFunctionalGateTests(unittest.TestCase):
         unload.assert_called_once_with(module.VISION_MODELS[0])
 
 
+class LateConflictIntegrationTests(unittest.TestCase):
+    def test_text_and_vision_reject_late_build_and_still_unload(self):
+        conflict = {"pid": 123, "reason": "build", "command": "clang", "cwd": "/build"}
+        state = {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0,
+                 "vram_used_bytes": {"card0": 0}}
+        for vision in (False, True):
+            with self.subTest(vision=vision):
+                def chat(_model, _prompt, **kwargs):
+                    if vision:
+                        return {"message": {"content": "Run Gate"}}
+                    content = '{"status":"ready","count":3}' if kwargs.get("schema") else "PONG"
+                    return {"message": {"content": content}}
+
+                with (
+                    patch.object(module, "sample", return_value=state),
+                    patch.object(module, "blocked_workloads", side_effect=[[], [conflict]]) as probe,
+                    patch.object(module, "chat", side_effect=chat),
+                    patch.object(module, "checks_for", return_value=module.READER_CHECKS),
+                    patch.object(module, "model_metadata", return_value={"id": "candidate"}),
+                    patch.object(module, "unload") as unload,
+                ):
+                    gate = module.check_vision_model if vision else module.check_model
+                    result = gate("candidate")
+                self.assertEqual(2, probe.call_count)
+                self.assertTrue(all(check["pass"] for check in result["checks"].values()))
+                self.assertFalse(result["pass"])
+                self.assertEqual([conflict], result["post_load_conflicts"])
+                self.assertTrue(any("confounded qualification" in p for p in result["problems"]))
+                unload.assert_called_once_with("candidate")
+
+
 class PrivilegeProfileTests(unittest.TestCase):
     """A preset policy refuses tools to must never be sent a tools payload."""
 
