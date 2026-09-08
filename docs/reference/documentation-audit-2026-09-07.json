@@ -6,7 +6,8 @@
   "dispositions": {
     "updated": "A disagreement with the implementation was found and the document was corrected in this pass.",
     "aligned": "Checked against the named implementation evidence in this pass and found consistent. Not a claim that every line was independently re-derived.",
-    "historical": "A dated record of a past observation. Preserved unchanged, and deliberately NOT re-verified against current implementation, because it does not describe current state."
+    "historical": "A dated record of a past observation. Preserved unchanged, and deliberately NOT re-verified against current implementation, because it does not describe current state.",
+    "added": "Created after this audit's date, in the 2026-09-08 continuation, and inventoried here so the coverage check stays complete. Each was checked against the implementation or source named in its evidence field at the time it was written; it was not re-derived in the 2026-09-07 pass."
   },
   "limits": [
     "This is a documentation-consistency audit. It makes no quality, performance or model-capability claim.",
@@ -22,11 +23,12 @@
     "Every 127.0.0.1:<port> in documentation matches a port in a tracked unit, env file or script.",
     "The CONFIGURATION.md alias table is compared field by field against llama-models.ini by an added test."
   ],
-  "inventory_count": 59,
+  "inventory_count": 62,
   "disposition_counts": {
-    "aligned": 26,
+    "updated": 11,
     "historical": 22,
-    "updated": 11
+    "aligned": 26,
+    "added": 3
   },
   "entries": [
     {
@@ -441,6 +443,27 @@
       "finding": "Dated record of a past observation; preserved unchanged.",
       "source_evidence": "Assessment dated 2026-09-01 against three named upstream projects.",
       "change": "None. Not re-verified against current implementation, because it does not describe current state."
+    },
+    {
+      "path": "docs/decisions/0007-conditional-custom-quantization.md",
+      "disposition": "added",
+      "finding": "No ADR governed producing a quantization locally for a candidate published only in formats llama.cpp cannot serve; the first concrete instance arrived with the medismera intake on 2026-09-08.",
+      "source_evidence": "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md records the intake; upstream/llama.cpp conversion/qwen3vl.py registers Qwen3_5ForConditionalGeneration and src/llama-arch.cpp carries LLM_ARCH_QWEN35 at the pinned v0.4.0 (5266f24).",
+      "change": "Added as proposed, and listed in README.md and docs/decisions/README.md. Proposed is its real status: no conversion has been performed or qualified."
+    },
+    {
+      "path": "config/hardware/amdgpu/2026-09-08/README.md",
+      "disposition": "added",
+      "finding": "The 12:37/13:03 capture of /etc/default/amdgpu* had no inventory entry.",
+      "source_evidence": "config/hardware/amdgpu/2026-09-08/SHA256SUMS verifies against the files beside it; the offsets quoted in the table are the ones the captured files configure.",
+      "change": "Inventoried, and given a one-line pointer to the later capture that supersedes it for card0 and card1. Its own checksums and offsets were left as recorded."
+    },
+    {
+      "path": "config/hardware/amdgpu/2026-09-08T1924-0400/README.md",
+      "disposition": "added",
+      "finding": "card0 and card1 had been retuned after the earlier capture, so the repository's backup no longer matched /etc/default.",
+      "source_evidence": "Source hashed before copy and both source and destination re-hashed after: card0 2052c604..., card1 1f2c9467..., card2 5b3d535e... unchanged. Source mtimes 15:38:42, 16:15:42 and 08:44:30 on 2026-09-08.",
+      "change": "Added the refreshed capture with its own SHA256SUMS and README. No /etc file was written, no GPU setting applied and no service restarted."
     }
   ]
 }

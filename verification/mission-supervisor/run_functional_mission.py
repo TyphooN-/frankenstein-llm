@@ -10,6 +10,7 @@ mission still fails closed.
 from __future__ import annotations
 
 from collections import Counter
+import argparse
 import fcntl
 import hashlib
 import json
@@ -19,6 +20,9 @@ import signal
 import subprocess
 import sys
 import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from qualification_cache import Store, step_key, adopt_legacy_step
 
 ROOT = Path("/home/typhoon/git/frankenstein-llm")
 HERE = ROOT / "verification" / "mission-supervisor"
@@ -95,6 +99,39 @@ child: subprocess.Popen | None = None
 stop_signal: int | None = None
 
 
+# Re-verifying files that already exist rewrites these on every boot: they say
+# when the downloader ran and how far it had got, not what it produced. Hashing
+# them made every reboot change the fingerprint, which invalidated every gate
+# that had already passed and restarted the whole mission from the first step.
+VOLATILE_QUEUE_KEYS = frozenset({
+    "started_at", "completed_at", "first_started_at", "status", "files_complete"})
+
+
+def durable_queue_state(raw: bytes) -> bytes:
+    """The part of a download-state document that says what was downloaded.
+
+    Provenance is unaffected: repository, revision and file counts still hash,
+    the queue documents themselves are hashed whole, and each destination file
+    still contributes its size and mtime. A failed or incomplete queue is caught
+    by wait_for_inputs and by the stamp byte total, not by this digest.
+    """
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError:
+        # Unparseable is still a change worth noticing; hash the bytes as given.
+        return raw
+
+    def strip(value):
+        if isinstance(value, dict):
+            return {key: strip(item) for key, item in value.items()
+                    if key not in VOLATILE_QUEUE_KEYS}
+        if isinstance(value, list):
+            return [strip(item) for item in value]
+        return value
+
+    return json.dumps(strip(document), sort_keys=True, separators=(",", ":")).encode()
+
+
 def mission_inputs_fingerprint() -> str:
     """Fingerprint source and promoted artifacts without re-hashing model weights."""
     digest = hashlib.sha256()
@@ -113,13 +150,16 @@ def mission_inputs_fingerprint() -> str:
         for path in (state_path, stamp_path):
             digest.update(str(path).encode())
             try:
-                digest.update(path.read_bytes())
+                raw = path.read_bytes()
             except OSError:
                 # Not promoted yet. wait_for_inputs is what blocks on that; this
                 # only has to change when the bytes do, and "absent" is a state
                 # it can fingerprint rather than a reason to abort the mission
                 # before it can report what it is waiting for.
                 digest.update(b"\0absent\0")
+            else:
+                digest.update(durable_queue_state(raw)
+                              if path == state_path else raw)
     for queue_path in sorted(FOUNDATION.glob("download-queue*.json")):
         digest.update(queue_path.read_bytes())
         document = json.loads(queue_path.read_text(encoding="utf-8"))
@@ -224,7 +264,11 @@ DELETED_SUFFIX = " (deleted)"
 # Only these conflict classes actually collide with a serialized GPU gate on this
 # desktop. cargo/rustc/makepkg in other trees, aria2 re-hash, and Chromium load
 # are not kernel compiles and must not hold the mission after a new kernel boot.
-MISSION_BLOCKING_REASONS = frozenset({"kernel-build", "inference"})
+MISSION_BLOCKING_REASONS = frozenset({"kernel-build", "inference", "download-queue"})
+# The systemd slice every download queue runs under. gate_router_models refuses
+# to qualify beside one, so the mission has to wait for it rather than start a
+# gate that will immediately refuse.
+DOWNLOAD_UNIT_PREFIX = "local-ai-model-downloads"
 
 
 def printable(raw: bytes | str) -> str:
@@ -289,6 +333,11 @@ def conflict_reason(command: str, cwd: str, cgroup: str) -> str | None:
     rather than by its name: llama-server started by hand is still a conflict.
     """
     managed_router = ROUTER_UNIT in cgroup
+    if DOWNLOAD_UNIT_PREFIX in cgroup:
+        # Named by cgroup, before the command tests: a queue runs python3 and
+        # aria2c, which would otherwise be classified transfer or
+        # workspace-python and let the mission walk into a refused gate.
+        return "download-queue"
     if KERNEL_TREE in cwd:
         return "kernel-build"
     if command in BUILD_COMMANDS:
@@ -498,7 +547,87 @@ def prepare_child_environment() -> None:
     os.environ["TEMP"] = str(SCRATCH)
 
 
-def main() -> int:
+def qualification_key(name, command):
+    try:
+        return step_key(name, command)
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def reuse_step(name, command, state, force=False):
+    key = qualification_key(name, command)
+    cached = Store(HERE / 'qualification-cache').reuse(name, name, key, force)
+    if cached is None:
+        return False
+    state['steps'][name] = dict(cached['step'], qualification_reused=True,
+                               input_fingerprint=state['input_fingerprint'])
+    atomic_json(state)
+    log(f'qualification reused name={name}; no model execution')
+    return True
+
+
+def execute_qualification(name, command, state):
+    key = qualification_key(name, command)
+    store = Store(HERE / 'qualification-cache')
+    store.publish(name, name, key)
+    rc = run_step(name, command, state)
+    if key is not None and qualification_key(name, command) != key:
+        rc = 1
+        state['steps'][name].update(status='failed', exit_code=1,
+                                    error='qualification inputs changed during execution')
+        atomic_json(state)
+    store.publish(name, name, key, {'pass': rc == 0,
+                                  'step': state['steps'].get(name, {})})
+    return rc
+
+
+def main(argv=()) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--gate', action='append', choices=[name for name, _ in STEPS])
+    parser.add_argument('--model', action='append', help='router/repository preset')
+    parser.add_argument('--requalify', action='store_true')
+    parser.add_argument('--stability-runs', type=int, default=1)
+    parser.add_argument('--plan', action='store_true', help='report gate reuse without starting workloads or writing state')
+    parser.add_argument('--migrate-passes', action='store_true', help='import eligible legacy passes only; no workloads')
+    args = parser.parse_args(argv)
+    if not 1 <= args.stability_runs <= 100:
+        parser.error('--stability-runs must be between 1 and 100')
+    if args.stability_runs > 1:
+        child_args = list(argv)
+        if '--stability-runs' in child_args:
+            index = child_args.index('--stability-runs')
+            del child_args[index:index + 2]
+        else:
+            child_args = [x for x in child_args if not x.startswith('--stability-runs=')]
+        if '--requalify' not in child_args:
+            child_args.append('--requalify')
+        for _ in range(args.stability_runs):
+            rc = main(child_args)
+            if rc:
+                return rc
+        return 0
+    selected = set(args.gate or [name for name, _ in STEPS])
+    if args.model:
+        from qualification_cache import preset_identity
+        for model in args.model:
+            try:
+                preset_identity(model)
+            except (ValueError, OSError) as error:
+                parser.error(str(error))
+        selected &= {'router-models', 'repository-agent', 'candidate-policy', 'router-reload-presets'}
+        if 'repository-agent' in selected and not set(args.model) <= {'heretic', 'qwen3-coder-next'}:
+            selected.remove('repository-agent')
+        if not selected - {'candidate-policy', 'router-reload-presets'}:
+            parser.error('no applicable model gate selected')
+    os.environ['HERMES_REQUALIFY'] = '1' if args.requalify else '0'
+    os.environ['HERMES_QUALIFY_MODELS'] = json.dumps(args.model or [])
+    if args.plan:
+        store = Store(HERE / 'qualification-cache')
+        print(json.dumps([{'gate': name, 'action':
+            'reuse' if store.reuse(name, name, qualification_key(name, command), args.requalify)
+            else ('per-model dispatch' if name in ('router-models', 'repository-agent') else 'run')}
+            for name, command in STEPS if name in selected], indent=2))
+        return 0
     HERE.mkdir(parents=True, exist_ok=True)
     prepare_child_environment()
     lock_handle = LOCK.open("a+")
@@ -508,6 +637,15 @@ def main() -> int:
         log("another mission supervisor owns the lock")
         return 75
     state = load_state()
+    imported = []
+    if not args.requalify:
+        for name, command in STEPS:
+            if adopt_legacy_step(name, command, state, Store(HERE / 'qualification-cache')):
+                imported.append(name)
+                log(f'imported completed qualification name={name}; original evidence retained')
+    if args.migrate_passes:
+        print(json.dumps({'imported': imported, 'model_workloads_started': False}))
+        return 0
     input_fingerprint = mission_inputs_fingerprint()
     for stale in ("signal", "error", "failed_step", "failed_steps", "exit_code",
                   "interrupted_step", "step_exit_code", "step_status"):
@@ -568,14 +706,19 @@ def main() -> int:
 
     failures = []
     for name, command in STEPS[1:]:
+        if name not in selected:
+            continue
         previous = state["steps"].get(name, {})
-        if (previous.get("status") == "passed"
+        if reuse_step(name, command, state, args.requalify):
+            continue
+        if (not args.requalify and name not in ('router-models', 'repository-agent')
+                and previous.get("status") == "passed"
                 and previous.get("input_fingerprint") == input_fingerprint):
             log(f"step already passed; skipping name={name}")
             continue
         if previous.get("status") == "passed":
             log(f"passed step inputs changed; rerunning name={name}")
-        rc = run_step(name, command, state)
+        rc = execute_qualification(name, command, state)
         # Order matters. A SIGTERM to this supervisor is forwarded to the running
         # step, which then exits non-zero -- so testing rc first recorded every
         # operator stop as "step X failed" and lost the fact that the mission was
@@ -613,7 +756,7 @@ def main() -> int:
         log(f"functional foundation incomplete; failed steps={failures}")
         return 1
     state.update({
-        "status": "functional-foundation-complete",
+        "status": "selected-qualifications-complete" if args.gate or args.model else "functional-foundation-complete",
         "current_step": None,
         "remaining": [
             "build bounded end-to-end computer control only after grounding passes",
@@ -630,7 +773,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, on_signal)
     signal.signal(signal.SIGTERM, on_signal)
     try:
-        raise SystemExit(main())
+        raise SystemExit(main(sys.argv[1:]))
     except Exception as error:  # noqa: BLE001 - durable failure evidence is required
         HERE.mkdir(parents=True, exist_ok=True)
         state = load_state()

@@ -59,6 +59,8 @@ See:
 - `docs/decisions/0003-hardware-allocation-and-memory-policy.md`
 - `docs/decisions/0004-prompt-corpus-admission.md`
 - `docs/decisions/0005-track-llama-cpp-submodule.md`
+- `docs/decisions/0006-placement-policy-prefers-the-rx-6900-xts.md`
+- `docs/decisions/0007-conditional-custom-quantization.md` — proposed
 - `docs/LOCAL-AI-MODEL-STRATEGY.md`
 - `docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md` — 2026-09-02 research snapshot
 - `docs/CANDIDATE-STATUS-2026-09-06.md` — current download/policy/runtime/functional state

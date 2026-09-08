@@ -150,6 +150,51 @@ def test_candidate_research_closeout_covers_queued_repositories():
     assert queued == set(QUEUED_ADDITIONS)
 
 
+def test_submitted_intake_lists_each_url_exactly_once():
+    """A submitted URL is a queue entry, not a verdict.
+
+    The 2026-09-08 second batch resubmitted three identifiers that already had
+    a recorded verdict, which is the case this check exists for: an intake that
+    silently restates an existing finding as a new one inflates the queue and
+    hides that the question was already answered. Each identifier appears once,
+    carries an explicit investigated/qualified pair, and nothing in the intake
+    may claim qualification -- that is what the gates decide, not this file.
+    """
+    inventory = json.loads((ROOT / "docs/reference/candidate-research-inventory.json").read_text())
+    intake = inventory["submitted_intake"]
+    entries = intake["entries"]
+    urls = [entry["url"] for entry in entries]
+    repositories = [entry["repository"] for entry in entries]
+    assert len(urls) == len(set(urls)) == len(repositories) == len(set(repositories))
+    assert intake["submitted_url_count"] == len(urls)
+    assert intake["unique_repository_count"] == len(set(repositories))
+    assert intake["newly_queued_count"] == sum(
+        1 for entry in entries if entry["state"] == "queued")
+    assert intake["already_investigated_count"] == sum(
+        1 for entry in entries if entry["investigated"])
+    assert intake["qualified_count"] == 0
+    closeout = (ROOT / "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md").read_text()
+    problems = []
+    for entry in entries:
+        # The URL must be the repository it claims to be, not a lookalike.
+        if entry["url"] != f"https://huggingface.co/{entry['repository']}":
+            problems.append((entry["repository"], "url does not match repository"))
+        if entry["qualified"]:
+            problems.append((entry["repository"], "intake may not claim qualification"))
+        if entry["investigated"] != (entry["state"] == "investigated"):
+            problems.append((entry["repository"], "state contradicts investigated"))
+        # Queued means no research was done, so it must not cite one.
+        if entry["investigated"] and not entry["prior_record"]:
+            problems.append((entry["repository"], "investigated without a record"))
+        if not entry["investigated"] and entry["prior_record"]:
+            problems.append((entry["repository"], "queued but cites a record"))
+        if entry["prior_record"] and not (ROOT / entry["prior_record"]).exists():
+            problems.append((entry["repository"], "prior record file is missing"))
+        if closeout.count(entry["repository"]) < 1:
+            problems.append((entry["repository"], "absent from the closeout"))
+    assert problems == [], problems
+
+
 def test_coverage_map_contains_all_outer_tracked_files():
     tracked = set(subprocess.check_output(
         ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")) - {"", "upstream/llama.cpp"}

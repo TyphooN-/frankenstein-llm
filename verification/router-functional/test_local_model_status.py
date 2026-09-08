@@ -468,7 +468,7 @@ class SupervisorReuseTests(unittest.TestCase):
 
     def test_the_real_supervisor_module_supplies_the_predicates(self):
         supervisor = status.load_supervisor()
-        self.assertEqual(frozenset({"kernel-build", "inference"}),
+        self.assertEqual(frozenset({"kernel-build", "inference", "download-queue"}),
                          supervisor.MISSION_BLOCKING_REASONS)
         self.assertTrue(callable(supervisor.conflicts))
         self.assertTrue(callable(supervisor.mem_available))

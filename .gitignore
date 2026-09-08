@@ -38,6 +38,7 @@ __pycache__/
 /verification/workspace-move-report.json
 /verification/obliterated-mmproj-download.log
 /verification/**/evidence/
+/verification/mission-supervisor/qualification-cache/
 # Waveforms the TTS gate synthesises on every run. Same class as evidence: gate
 # output, not repository state, and not a fixture -- the gate's inputs are the
 # tracked reference clips under local-coverage-foundation/fixtures/asr/. Four of

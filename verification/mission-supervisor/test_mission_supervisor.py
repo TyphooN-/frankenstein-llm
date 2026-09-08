@@ -523,6 +523,29 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
         self.assertEqual("functional-foundation-complete", state["status"])
         self.assertEqual(["step-0", "step-1", "step-2"], calls)
 
+    def test_failed_gates_self_heal_on_next_invocation(self):
+        code, _, _ = self.drive([0, 1, 0, 2])
+        self.assertEqual(1, code)
+        code, state, calls = self.drive([0, 0, 0, 0])
+        self.assertEqual(["step-1", "step-3"], calls)
+        self.assertEqual(0, code)
+        self.assertEqual("functional-foundation-complete", state["status"])
+        self.assertNotIn("failed_steps", state)
+
+    def test_persistent_failure_is_attempted_once_per_invocation(self):
+        self.drive([0, 1, 0])
+        code, state, calls = self.drive([0, 1, 0])
+        self.assertEqual(["step-1"], calls)
+        self.assertEqual(1, code)
+        self.assertEqual("functional-foundation-incomplete", state["status"])
+
+    def test_failed_policy_recovers_before_previously_blocked_gates(self):
+        self.drive([1, 0, 0])
+        code, state, calls = self.drive([0, 0, 0])
+        self.assertEqual(["step-0", "step-1", "step-2"], calls)
+        self.assertEqual(0, code)
+        self.assertEqual("functional-foundation-complete", state["status"])
+
     def test_a_genuine_step_failure_is_reported_as_a_failure(self):
         code, state, calls = self.drive([0, 3, 0])
         self.assertEqual(1, code)
@@ -707,6 +730,130 @@ class MissionPolicyTests(SupervisorTestCase):
         for path in ("/tmp", "/var/tmp", "/venvs", "/tools", "/verification"):
             with self.subTest(path=path):
                 self.assertIn(path, writable)
+
+
+class DownloadQueueConflictTests(SupervisorTestCase):
+    """A running download queue confounds the router gate, so the mission waits.
+
+    Before ``download-queue`` was a waited class the mission started
+    ``router-models`` while the queues were re-verifying ~130 GB of files that
+    already existed. ``gate_router_models`` refuses a confounded qualification,
+    so the step ended in under a second and was recorded as nine model failures
+    -- on every boot, because the queue units start at boot too.
+    """
+
+    CGROUP = ("0::/user.slice/user-1000.slice/user@1000.service/app.slice/"
+              "local-ai-model-downloads-phase4.service\n")
+
+    def test_a_queue_process_is_named_by_its_cgroup_not_its_command(self):
+        for command in ("python3", "aria2c"):
+            with self.subTest(command=command):
+                self.assertEqual("download-queue", self.supervisor.conflict_reason(
+                    command, str(self.supervisor.ROOT), self.CGROUP))
+
+    def test_the_mission_waits_for_a_download_queue(self):
+        self.assertIn("download-queue", self.supervisor.MISSION_BLOCKING_REASONS)
+
+    def test_the_router_gate_and_the_mission_name_the_same_units(self):
+        gate = (self.supervisor.ROOT
+                / "verification/router-functional/gate_router_models.py").read_text()
+        self.assertIn(f'DOWNLOAD_UNIT_PREFIX = "{self.supervisor.DOWNLOAD_UNIT_PREFIX}"',
+                      gate)
+
+    def test_a_transfer_outside_a_queue_unit_still_does_not_hold_the_mission(self):
+        # aria2 re-hash by hand and a browser download are not queue units.
+        # Blocking the mission on those is what the narrow waited set avoids.
+        self.assertEqual("transfer", self.supervisor.conflict_reason(
+            "aria2c", "/tmp", "0::/user.slice/hand.scope\n"))
+        self.assertNotIn("transfer", self.supervisor.MISSION_BLOCKING_REASONS)
+
+
+class DownloadStateFingerprintTests(SupervisorTestCase):
+    """Re-verifying an existing download must not invalidate a passed gate.
+
+    The queue units run at every boot and rewrite their state document with new
+    run timestamps even when every file is already present and verified. That
+    document is hashed into the mission input fingerprint, so hashing the
+    timestamps meant every boot changed the fingerprint, every passed gate was
+    re-run, and the mission could never converge.
+    """
+
+    DOCUMENT = {
+        "schema": "hermes-hf-download-state/1",
+        "queue_built_at": "2026-09-02T10:50:00-0400",
+        "first_started_at": "2026-09-03T14:42:01-0400",
+        "started_at": "2026-09-08T11:55:37-0400",
+        "completed_at": "2026-09-08T11:56:48-0400",
+        "status": "complete",
+        "artifacts": {
+            "image-editing": {
+                "repository": "Comfy-Org/Qwen-Image-Edit_ComfyUI",
+                "revision": "984166f60a9b1fcede5e9b9287b7a7aebc050010",
+                "files_total": 1,
+                "files_complete": 1,
+                "completed_at": "2026-09-08T11:56:48-0400",
+                "status": "complete",
+            },
+        },
+    }
+
+    def digest(self, document):
+        return self.supervisor.durable_queue_state(json.dumps(document).encode())
+
+    def variant(self, **changes):
+        document = json.loads(json.dumps(self.DOCUMENT))
+        artifact = changes.pop("artifact", {})
+        document.update(changes)
+        document["artifacts"]["image-editing"].update(artifact)
+        return document
+
+    def test_a_rerun_that_only_reverifies_hashes_the_same(self):
+        rerun = self.variant(started_at="2026-09-08T12:40:00-0400",
+                             completed_at="2026-09-08T12:47:00-0400",
+                             artifact={"completed_at": "2026-09-08T12:47:00-0400"})
+        self.assertEqual(self.digest(self.DOCUMENT), self.digest(rerun))
+
+    def test_progress_partway_through_a_rerun_hashes_the_same(self):
+        partway = self.variant(status="running",
+                               artifact={"status": "running", "files_complete": 0})
+        self.assertEqual(self.digest(self.DOCUMENT), self.digest(partway))
+
+    def test_key_order_does_not_change_the_digest(self):
+        self.assertEqual(self.digest(self.DOCUMENT),
+                         self.digest(dict(reversed(list(self.DOCUMENT.items())))))
+
+    def test_what_was_downloaded_still_changes_the_digest(self):
+        for artifact in ({"revision": "0" * 40}, {"files_total": 2},
+                         {"repository": "someone-else/weights"}):
+            with self.subTest(artifact=artifact):
+                self.assertNotEqual(self.digest(self.DOCUMENT),
+                                    self.digest(self.variant(artifact=artifact)))
+
+    def test_an_unparseable_document_is_hashed_as_given(self):
+        # Silently ignoring bytes that will not parse would hide a real change.
+        self.assertEqual(b"{not json",
+                         self.supervisor.durable_queue_state(b"{not json"))
+
+    def test_the_whole_fingerprint_survives_a_reverify(self):
+        state = self.sandbox / "download-state.json"
+        stamp = self.sandbox / "downloads-complete.ok"
+        foundation = self.sandbox / "foundation"
+        foundation.mkdir()
+        state.write_text(json.dumps(self.DOCUMENT))
+        stamp.write_text("72134030730")
+        with mock.patch.object(self.supervisor, "UPSTREAM",
+                               ((state, stamp, "72134030730"),)), \
+                mock.patch.object(self.supervisor, "FOUNDATION", foundation), \
+                mock.patch.object(self.supervisor.subprocess, "run",
+                                  return_value=mock.Mock(stdout=b"tree")):
+            before = self.supervisor.mission_inputs_fingerprint()
+            state.write_text(json.dumps(self.variant(
+                started_at="2026-09-08T12:40:00-0400",
+                completed_at="2026-09-08T12:47:00-0400")))
+            self.assertEqual(before, self.supervisor.mission_inputs_fingerprint())
+            # The stamp is the durable byte total; a change there must still count.
+            stamp.write_text("72134030731")
+            self.assertNotEqual(before, self.supervisor.mission_inputs_fingerprint())
 
 
 if __name__ == "__main__":

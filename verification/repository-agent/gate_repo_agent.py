@@ -35,6 +35,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 import uuid
 
@@ -379,10 +380,18 @@ def qualify(root: Path, model: str, call=router_call) -> dict:
         "started_at": timestamp(), "sandbox": sandbox,
         "throughput_measured": False,
     })
-    result = run_agent(root, call)
+    try:
+        result = run_agent(root, call)
+    except urllib.error.HTTPError as error:
+        # A received HTTP failure is terminal, not an interrupted process.
+        # Do not persist arbitrary server response bodies (which may echo inputs).
+        result = {"pass": False, "http_status": error.code,
+                  "problems": [f"router returned HTTP {error.code}"],
+                  "status": "failed"}
+        error.close()
     result.update({"gate": "local-repository-agent", "model": model, "router": ROUTER,
                    "workspace": str(root), "sandbox": sandbox,
-                   "run_id": run_id, "status": "complete", "interrupted": False,
+                   "run_id": run_id, "status": result.get("status", "complete"), "interrupted": False,
                    "finished_at": timestamp(),
                    "throughput_measured": False})
     publish_evidence(evidence_path, result)
@@ -390,22 +399,39 @@ def qualify(root: Path, model: str, call=router_call) -> dict:
 
 
 def main() -> int:
+    import sys
+    sys.path.insert(0, str(Path(__file__).parents[1] / 'mission-supervisor'))
+    from qualification_cache import model_key, run_cached
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=DEFAULT_MODEL,
                         help=f"router preset to qualify; one of {list(ALLOWED_MODELS)}")
+    parser.add_argument('--requalify', action='store_true')
     args = parser.parse_args()
     model = resolve_model(args.model)
+    selected = json.loads(os.environ.get('HERMES_QUALIFY_MODELS', '[]'))
+    if selected and model not in selected:
+        print(json.dumps({'model': model, 'status': 'not-selected'}))
+        return 0
     require_sandbox()
     # The workspace is always a fresh private copy, and it is removed on the way
     # out rather than at some later collection: a caller-named directory would
     # let the run be pointed at a real checkout, the fixture's own __pycache__
     # would carry host-built bytecode into the judged workspace, and whatever
     # candidate code wrote in there should not outlive the verdict about it.
-    with tempfile.TemporaryDirectory(prefix="hermes-repo-agent-") as temporary:
-        root = Path(temporary) / "fixture"
-        shutil.copytree(SOURCE_FIXTURE, root,
-                        ignore=shutil.ignore_patterns("__pycache__"))
-        result = qualify(root, model, lambda messages: router_call(messages, model))
+    sources = [Path(__file__).parent]
+    key = model_key('repository-agent', model, sources)
+    def execute():
+        with tempfile.TemporaryDirectory(prefix="hermes-repo-agent-") as temporary:
+            root = Path(temporary) / "fixture"
+            shutil.copytree(SOURCE_FIXTURE, root,
+                            ignore=shutil.ignore_patterns("__pycache__"))
+            result = qualify(root, model, lambda messages: router_call(messages, model))
+        if model_key('repository-agent', model, sources) != key:
+            result['pass'] = False
+            result.setdefault('problems', []).append('qualification inputs changed during execution')
+        return result
+    result = run_cached('repository-agent', model, key, execute,
+                        args.requalify or os.environ.get('HERMES_REQUALIFY') == '1')
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["pass"] else 1
 

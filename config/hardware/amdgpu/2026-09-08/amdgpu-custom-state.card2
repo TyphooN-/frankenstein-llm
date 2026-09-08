@@ -1,0 +1,19 @@
+# 6900 XT Liquid Devil
+OD_SCLK:
+0: 500Mhz
+1: 2710Mhz
+
+OD_MCLK:
+0: 97Mhz
+1: 1000MHz
+
+OD_VDDGFX_OFFSET:
+#-95mV crash
+-90mV
+
+OD_RANGE:
+SCLK:     500Mhz     3000Mhz
+MCLK:     674Mhz     1075Mhz
+
+FORCE_POWER_CAP: 346000000
+FORCE_PERF_LEVEL: manual

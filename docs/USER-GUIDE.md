@@ -1,5 +1,99 @@
 # User guide
 
+## Mission progress at a glance
+
+### Incremental qualification and explicit retests
+
+Successful qualifications now have durable local receipts under
+`verification/mission-supervisor/qualification-cache/` (ignored by Git).
+Router and repository-agent receipts are independent per preset; a failed
+neighbor does not cause a passed preset to execute again. Other model-backed
+gates retain their fixed workflow receipts. Media is a composite workflow:
+partial image/music success is not a pass for its full pipeline.
+
+Unchanged receipts are reused by default. Boot IDs, download progress timestamps,
+documentation changes and unrelated router presets are not identity inputs.
+Relevant artifacts, effective preset settings, gate code, runtime and GPU tuning
+changes invalidate the affected receipt. Large model identities use local file
+size/mtime/ctime, not a new full weight checksum scan. This assumes trusted local
+storage; receipts are not cryptographic provenance or current host-health proof.
+Missing or unreadable dependencies prevent reuse. Host admission and policy
+checks still apply before new work.
+
+Inspect the execution plan without starting services or model workloads:
+
+```bash
+python3 verification/mission-supervisor/run_functional_mission.py --plan
+```
+
+Run only a selected router preset (other successful presets are untouched):
+
+```bash
+python3 verification/mission-supervisor/run_functional_mission.py --gate router-models --model heretic
+```
+
+Explicitly requalify that preset, or run a bounded stability test that stops on
+the first failed invocation:
+
+```bash
+python3 verification/mission-supervisor/run_functional_mission.py --gate router-models --model heretic --requalify
+python3 verification/mission-supervisor/run_functional_mission.py --gate router-models --model heretic --stability-runs 3
+```
+
+`--gate` and `--model` may be repeated. Model selection currently addresses
+router/repository presets; fixed ASR, embedding and media workflows are selected
+by gate. Candidate registration and policy admission are still required; adding a
+research URL alone never authorizes model execution. A targeted successful run is
+reported as `selected-qualifications-complete`, not whole-mission completion.
+
+The receipt is revoked before an explicit test begins. Failed or interrupted
+retests cannot fall back to an older green result; the previous successful result
+remains historical in `last_pass`. Only the latest eligible verdict is reused.
+
+Legacy fixed-workflow passes can migrate without inference when completion,
+same-kernel provenance, command/fingerprint agreement and pre-run input timestamps
+are established. Run `--migrate-passes` to do only that migration and print exactly
+which gates were imported. Ambiguous legacy per-model results are not imported:
+they lack the new model-specific dependency key. Original evidence is preserved.
+No passing result is synthesized from partial checks or a failed aggregate.
+
+### Automatic recovery after reboot
+
+When `local-ai-functional-mission.service` is enabled, the user systemd manager
+starts it with its default target (normally login, or boot with user lingering).
+Each invocation retries failed, interrupted and blocked gates; matching passed
+gates are skipped. Changed input fingerprints invalidate old passes. The
+supervisor waits for its host-safety checks and holds a single-writer lock.
+Persistent failures are attempted once per invocation, not retried endlessly.
+This recovers transient failures after a reboot without claiming a permanent
+model or runtime defect has healed. Check enablement with
+`systemctl --user is-enabled local-ai-functional-mission.service`.
+To request a retry without blocking your terminal, use
+`systemctl --user start --no-block local-ai-functional-mission.service`.
+
+From the repository root, run `python3 scripts/mission_status.py`, or use
+`python3 scripts/mission_status.py --watch 5` for repeated snapshots. Automation
+can use `python3 scripts/mission_status.py --json`.
+
+This read-only command reports passed gates separately from finished attempts,
+with each gate's status, duration, exit code and log age. It does not start or
+stop services, load models, or change mission state. A failed attempt is not a
+qualified capability. The denominator counts recorded functional gates, **not**
+all researched models, downloads, or optimization tasks. Historical passes with
+different input fingerprints are reported as stale, not as current success.
+
+The snapshot cannot prove a gate is alive, but it does prove when one is not.
+The supervisor records its boot id and runs one gate at a time, so a gate still
+marked `running` that is not the current step, or whose boot has been replaced,
+is reported as `interrupted`: a crash or hard kill left the record behind with no
+signal handler to correct it. Use
+`bash scripts/local-model-status.sh --host-sharing` for host/process diagnostics.
+An old state timestamp or log age alone does not prove a stall: a quiet gate can
+still be working. Missing or corrupt state is reported explicitly. ETA remains
+unknown when contention, retries and failed gates prevent a defensible estimate.
+Completion of a pass means attempts ended; failed gates still require repair
+and retesting before functional qualification is complete.
+
 For the unified user/agent command interface and per-model serve scripts, see
 [Model runs](MODEL-RUNS.md). Benchmark tooling is now available for explicit user-run
 measurements; no performance result is implied by its existence.

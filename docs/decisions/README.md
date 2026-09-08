@@ -9,6 +9,7 @@ implementation references start at the [documentation index](../README.md).
 - [0004 — Inert pinned prompt-corpus admission](0004-prompt-corpus-admission.md)
 - [0005 — Pinned in-repository llama.cpp submodule](0005-track-llama-cpp-submodule.md)
 - [0006 — Placement policy prefers the RX 6900 XTs](0006-placement-policy-prefers-the-rx-6900-xts.md)
+- [0007 — Conditional custom quantization (proposed)](0007-conditional-custom-quantization.md)
 
 A reboot does not itself authorize benchmarks; explicit user authorization is
 required before performance testing. Historical sections retain their original

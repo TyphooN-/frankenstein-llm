@@ -412,6 +412,19 @@ qualification mission. It is a `oneshot` unit, holds an exclusive `flock`
 (exit 75 if another supervisor owns it), and is designed to be resumed across
 reboots and operator stops.
 
+**Reuse.** `qualification_cache.py` gives each gate a durable receipt under
+`verification/mission-supervisor/qualification-cache/` (ignored by Git), keyed by
+a digest of that gate's own code, virtualenv record files, model artifacts and
+runtime identity. A gate is skipped only when its receipt key still matches, so
+one replaced weight no longer re-runs unrelated capabilities the way the
+whole-mission `input_fingerprint` does. Aggregates (`router-models`,
+`repository-agent`) hold no receipt of their own: they dispatch, and each preset
+owns its own. Eligibility is revoked before a test starts, so a crashed or failed
+retest cannot fall back to the previous pass; that pass is kept as `last_pass`,
+which is historical and never reusable. Large weights are identified by size and
+timestamps rather than a re-read checksum, which assumes trusted local storage —
+a receipt is evidence about inputs, not proof the host is currently healthy.
+
 **Ordering.** `candidate-policy` is step one and is a blocking prerequisite: if
 it fails, every later step is recorded `blocked-policy` and nothing model-backed
 runs. After it passes, the remaining eleven steps continue past a failure so one
@@ -430,10 +443,12 @@ state `running` while it re-hashes existing files after reboot. A `failed` state
 aborts; a stamp that does not match its expected byte total aborts.
 
 **Waiting for a quiet host.** `wait_for_quiet` requires two consecutive clean
-polls with `MemAvailable ≥ 32 GiB` and no competing kernel-tree build or
-unmanaged llama.cpp/inference process. Unrelated cargo/rustc, download re-hash,
-and desktop load average are not blockers: they are not a missing kernel and
-must not hold the mission after a new-kernel boot. Unlike the input wait it is
+polls with `MemAvailable ≥ 32 GiB` and no competing kernel-tree build, unmanaged
+llama.cpp/inference process, or active download queue. Unrelated cargo/rustc and
+desktop load average are not blockers: they are not a missing kernel and must not
+hold the mission after a new-kernel boot. A download queue is a blocker for a
+narrower reason — `gate_router_models` refuses to qualify beside competing work,
+so a mission that starts it during a queue run collects refusals, not verdicts. Unlike the input wait it is
 bounded — default six hours, overridable with `HERMES_MISSION_QUIET_TIMEOUT`,
 which rejects a non-positive or unparseable value rather than silently
 substituting a default. On timeout it records the blockers it actually observed

@@ -29,6 +29,7 @@ Related: [architecture](ARCHITECTURE.md) · [operations](OPERATIONS.md) ·
 - [Capability ledger schema](#capability-ledger-schema)
 - [Prompt corpus schemas](#prompt-corpus-schemas)
 - [Other tracked manifests](#other-tracked-manifests)
+- [Hardware profile backups](#hardware-profile-backups)
 - [ComfyUI model paths](#comfyui-model-paths)
 - [Hermes provider configuration](#hermes-provider-configuration)
 - [What Git tracks](#what-git-tracks)
@@ -461,6 +462,28 @@ in disposable synthetic environments.
 | `verification/computer-use-grounding/fixtures/ground-truth.json` | ad hoc | control rectangles and OCR text, emitted by `make_fixtures.py` from the same `LAYOUT` that drew the pixels |
 | `verification/local-coverage-foundation/fixtures/ground-truth.json` | ad hoc | OCR and screen-grounding ground truth for the validator fixtures |
 | `verification/candidate-qualification/requirements.in` / `.lock` | uv | the isolated `venvs/candidates` runtime; `.lock` is hash-locked and is the one `*.lock` file Git tracks |
+
+## Hardware profile backups
+
+`config/hardware/amdgpu/<capture>/` holds byte-for-byte copies of every
+`/etc/default/amdgpu*` file, one directory per capture, each with its own
+`SHA256SUMS` and a `README.md` recording what the source said at that moment.
+
+**These are archives, not inputs.** Nothing in this repository reads them, no
+automation applies them, and copying one back into `/etc` is an operator action
+this repository does not perform. `amdgpu-clocks` discovers the files under
+`/etc/default`; installing a file there is still not applying it.
+
+Keep the older captures. The pair captured on 2026-09-08 is the only record that
+`card0` and `card1` were retuned toward nominal voltage between 12:37 and 16:15
+that day, each gaining a crash annotation above its new value. That is a tuning
+history, not a stability verdict: this repository holds no qualification evidence
+for any of these values, and a gate result taken while the host is faulting
+describes the host rather than the model under test.
+
+Verify a capture from inside its directory with `sha256sum -c SHA256SUMS`. Before
+restoring anything, re-check PCI identities and DRM card numbering — this host
+has already booted with a card missing and the rest renumbered.
 
 ## ComfyUI model paths
 

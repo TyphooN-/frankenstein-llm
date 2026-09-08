@@ -4,6 +4,68 @@
   "submitted_url_count": 14,
   "queued_unique_count": 11,
   "total_assessed_repositories": 27,
+  "submitted_intake": {
+    "batch": "2026-09-08",
+    "recorded_at": "2026-09-08T19:22:59-0400",
+    "integrity": "Identifier transcription only. No Hugging Face API call, no weight download, no remote code execution, and no revision pin was performed for this batch. Queued is not investigated and investigated is not qualified.",
+    "submitted_url_count": 5,
+    "unique_repository_count": 5,
+    "newly_queued_count": 2,
+    "already_investigated_count": 3,
+    "qualified_count": 0,
+    "entries": [
+      {
+        "url": "https://huggingface.co/medismera/Qwen3.8-27B-OBLITERATED-Mythos-Class-Agentic",
+        "repository": "medismera/Qwen3.8-27B-OBLITERATED-Mythos-Class-Agentic",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "duplicate_of_prior_submission": true,
+        "prior_record": "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md",
+        "note": "Pinned primary-source intake recorded 2026-09-08 in the closeout. No public GGUF; any use is an ADR 0007 conversion experiment. Not admitted, not downloaded, not qualified."
+      },
+      {
+        "url": "https://huggingface.co/ruvnet/ruos-foundry-swarm-qwen3-30b-a3b-e32",
+        "repository": "ruvnet/ruos-foundry-swarm-qwen3-30b-a3b-e32",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false,
+        "duplicate_of_prior_submission": false,
+        "prior_record": null,
+        "note": "First submission of this identifier in this repository. No metadata was collected; nothing here asserts the repository exists, its size, license or architecture."
+      },
+      {
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-Vision-Exp",
+        "repository": "deepseek-ai/DeepSeek-V4-Flash-Vision-Exp",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "duplicate_of_prior_submission": true,
+        "prior_record": "docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md",
+        "note": "Screened 2026-09-02 at revision 6821d6ad: 304.65B parameters, idealised 4-bit weights alone ~152.3 GB, which exceeds this host. Recorded verdict SKIP on this hardware. Resubmission does not reopen it without new evidence."
+      },
+      {
+        "url": "https://huggingface.co/Jackrong/Qwopus3.8-27B-Flash",
+        "repository": "Jackrong/Qwopus3.8-27B-Flash",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false,
+        "duplicate_of_prior_submission": false,
+        "prior_record": null,
+        "note": "First submission of this identifier in this repository. No metadata was collected; nothing here asserts the repository exists, its size, license or architecture."
+      },
+      {
+        "url": "https://huggingface.co/microsoft/VibeVoice-ASR-Streaming-1.5B",
+        "repository": "microsoft/VibeVoice-ASR-Streaming-1.5B",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "duplicate_of_prior_submission": true,
+        "prior_record": "docs/CANDIDATE-MODEL-REVIEW-2026-09-02.md",
+        "note": "Screened 2026-09-02 at revision 94efa5c0: named 1.5B while Hub safetensors metadata reports 2.814B, custom VibeVoice code path, no verified llama.cpp or ComfyUI support. Recorded verdict WATCH. The local ASR capability is served by Qwen3-ASR-1.7B and is not blocked on this."
+      }
+    ]
+  },
   "repositories": [
     {
       "repository": "speach1sdef178/MiniMax-H3-Semantic-Bridge",

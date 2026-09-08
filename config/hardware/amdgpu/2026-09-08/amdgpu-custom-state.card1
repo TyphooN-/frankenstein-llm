@@ -1,0 +1,15 @@
+# Radeon Pro V620 -- baseline placeholder, NOT a qualified overclock.
+# Previously verified identity: 0000:07:00.0 [1002:73a1]; recheck after reboot.
+# Installing does not apply settings. amdgpu-clocks discovers this file on run.
+# Do not restart tuning during model qualification.
+# Observed OD interface: offset 0mV, empty OD_RANGE, no SCLK/MCLK ranges.
+# Negative voltage offsets and clock overclocking are NOT verified supported.
+# Do not copy 6900 XT clocks, voltage offsets, or power limits here.
+OD_VDDGFX_OFFSET:
+#-145mV crash
+-140mV
+
+# Previously observed current and maximum cap: 250 W (microwatts).
+# Explicit fields avoid card0 power/performance inheritance in the helper.
+FORCE_POWER_CAP: 250000000
+FORCE_PERF_LEVEL: auto

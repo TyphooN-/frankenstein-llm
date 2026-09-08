@@ -90,6 +90,8 @@ only after builds and other host pressure have drained.
 |---|---|
 | `verification/upstream-pin/test_llama_cpp_pin.py` | lock fields, `.gitmodules`, staged gitlink vs lock, build-script/lock agreement, stale runtime paths in tracked files, every preset key against `llama-server --help` |
 | `verification/mission-supervisor/test_mission_supervisor.py` | quiet-timeout parsing, bounded quiet wait and its blocker reporting, `/proc` classification against fixtures, durable state, operator-stop vs step-failure classification |
+| `verification/mission-supervisor/test_qualification_cache.py` | receipt identity and revocation — a changed dependency invalidates, an unchanged one reuses, a failed or crashed retest cannot fall back to an older pass, and legacy migration refuses incomplete, cross-kernel or post-dated records |
+| `.../test_mission_status.py` | stale passes, records left `running` by a crash, absent and corrupt state, and the read-only guarantee |
 | `verification/local-coverage-foundation/test_download_queue_cli.py` | `--help` exits before any lock/log/state side effect; unexpected arguments exit 2 |
 | `.../test_download_parallel.py` | per-file ownership after `realpath`, concurrency, per-artifact state accounting |
 | `.../test_download_resume.py` | short partial resumes, full-size-correct partial promotes, full-size-wrong partial quarantines, transport selection |

@@ -18,6 +18,10 @@ Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
 - [Build failures](#build-failures)
 - [Download problems](#download-problems)
 - [Mission never starts](#mission-never-starts)
+- [Every boot repeats the whole mission](#every-boot-repeats-the-whole-mission)
+- [A gate's receipt is invalidated every boot](#a-gates-receipt-is-invalidated-every-boot)
+- [A refused router qualification revokes a pass](#a-refused-router-qualification-revokes-a-pass)
+- [One preset fails only its tool-call check](#one-preset-fails-only-its-tool-call-check)
 - [Gate problems](#gate-problems)
 - [A failed process outranks a passing artifact](#a-failed-process-outranks-a-passing-artifact)
 - [A gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting)
@@ -221,17 +225,26 @@ The supervisor logs why it is waiting to
 | `status` | Meaning | Action |
 |---|---|---|
 | `waiting-artifacts` | One or more phases are not `complete`, or a stamp mismatches | Finish the downloads; the log names the file and the reason |
-| `waiting-safe-host` | A **blocking** conflict (`kernel-build` or `inference`) or `MemAvailable < 32 GiB`. Load average is not read at all | The log line names counts by reason and up to eight sample tasks |
+| `waiting-safe-host` | A **blocking** conflict (`kernel-build`, `inference` or `download-queue`) or `MemAvailable < 32 GiB`. Load average is not read at all | The log line names counts by reason and up to eight sample tasks |
 | `blocked-policy` | The candidate policy gate failed; nothing model-backed ran | Read `candidate-qualification/evidence/candidate-policy.json` → `problems` |
 | `interrupted` | An operator stop or a signal | Re-run; passed steps are skipped, the interrupted step repeats |
 | `failed` with `host did not become quiet` | The bounded wait expired | The message lists the blockers actually observed |
 
-Only two classified reasons actually hold the mission
+Three classified reasons actually hold the mission
 (`MISSION_BLOCKING_REASONS`): a build whose `cwd` is inside a kernel tree
-(`kernel-build`), and any inference process that is not the managed router
+(`kernel-build`), any inference process that is not the managed router
 (`inference`) — a **sidecar left resident by a failed gate**, or `llama-server`
-started by hand. The router is excused by its cgroup, not its name, so a
+started by hand — and any process in the `local-ai-model-downloads` slice
+(`download-queue`). The router is excused by its cgroup, not its name, so a
 hand-started `llama-server` blocks even though the unit does not.
+
+`download-queue` is matched by cgroup before the command tests, because a queue
+runs `python3` and `aria2c` and would otherwise classify as workspace Python or
+a transfer, neither of which blocks. It blocks for one specific reason: the
+router gate refuses a qualification that competing work would confound, so a
+mission that starts it beside a queue records nine model `FAIL` rows in under a
+second and none of them is a verdict about a model. See
+[every boot repeats the whole mission](#every-boot-repeats-the-whole-mission).
 
 Everything else the classifier names is reported and not gating: a generic
 compiler or `makepkg` outside a kernel tree, a transfer such as `aria2c` or
@@ -245,6 +258,146 @@ scripts/local-model-status.sh --host-sharing   # separates blocking from advisor
 ```
 
 Exit 75 from the unit means another supervisor holds the lock.
+
+## Every boot repeats the whole mission
+
+Symptom: every invocation logs `passed step inputs changed; rerunning` for the
+first step and works forward from there, so gates that passed an hour ago are run
+again and the mission never reaches its last step. On a host that is also
+rebooting this looks like the kernel problem below, and it is a separate cause
+that survives fixing the kernel.
+
+The mission skips a step only when its recorded `input_fingerprint` equals the
+one computed at startup. `mission_inputs_fingerprint` hashes each
+`download-state*.json` document, and the download units start at boot too and
+rewrite those documents with fresh `started_at`/`completed_at` timestamps while
+they re-verify files that are already present and correct. Different bytes,
+different fingerprint, every pass invalidated.
+
+```bash
+python3 -c "import importlib.util as u;s=u.spec_from_file_location('m','verification/mission-supervisor/run_functional_mission.py');m=u.module_from_spec(s);s.loader.exec_module(m);print(m.mission_inputs_fingerprint())"
+python3 -c "import json;print(json.load(open('verification/mission-supervisor/mission-state.json'))['input_fingerprint'])"
+```
+
+If those disagree while `git status` is clean, compare the queue documents
+against the last pass. A queue that only re-verified is not a changed input;
+`durable_queue_state` is what keeps the run timestamps out of the digest. A
+changed `repository`, `revision` or file count **is** a changed input and is
+supposed to invalidate the passes that used it.
+
+Related: `router-models` failing in well under a second with every model `FAIL`
+is not nine model failures. `gate_router_models` refuses a qualification that
+would be confounded by competing work, and a download queue re-verifying ~130 GB
+is competing work. The refusal is correct; the mission starting the gate anyway
+is not. Confirm from the artifact rather than the log, which has no run
+boundaries:
+
+```bash
+python3 -c "import json;d=json.load(open('verification/router-functional/evidence/router-functional.json'));print(d['models'][0]['problems'])"
+systemctl --user list-units 'local-ai-model-downloads*'
+```
+
+`refusing confounded qualification; active workloads:` naming `download-queue`
+means wait for the queues and re-run the step. It is not a weights, template or
+placement problem, and the tolerances must not be moved for it.
+
+## A gate's receipt is invalidated every boot
+
+Symptom: `qualification-cache/` holds a `passed` receipt for a gate, the gate's
+code and virtualenv have not been touched, and it still re-runs. `--plan` says
+`run` where you expected `reuse`.
+
+The receipt key includes each model artifact the gate depends on, and a large
+weight is identified by size, mtime and ctime rather than by re-reading its
+bytes. So the question is not "did the weights change" but "were the files
+rewritten". On this host they are, repeatedly, and for a reason that has nothing
+to do with the gate:
+
+```bash
+grep -c quarantined verification/local-coverage-foundation/downloads*.log
+find models -name '*.bad-*' -printf '%TF %f\n' | sort | tail
+```
+
+A queue that re-reads an artifact it already promoted and computes a different
+SHA-256 quarantines it as `*.bad-<epoch>` and downloads it again. The re-promoted
+file has a new mtime and ctime, so every receipt and the whole-mission
+`input_fingerprint` that named it are invalidated — correctly, by their own
+rules, because from the cache's point of view the input really did change.
+
+**Read the promotion lines before blaming the cache.** If a file is quarantined
+and then re-promoted with the *same* SHA-256 it had before, the bytes on disk
+were fine and the failing read was the host:
+
+```bash
+grep -E 'quarantined|promoted' verification/local-coverage-foundation/downloads.log | tail -20
+```
+
+That is the signature of the memory corruption described in
+[a gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting),
+not of a bad mirror. Fix the host first. Raising no tolerance, disabling no
+verification and rebuilding no cache will stop this loop while reads keep coming
+back wrong: the queue re-downloads, the fingerprint moves, and the mission
+restarts from the top for as long as it continues.
+
+## A refused router qualification revokes a pass
+
+**Known defect, not yet repaired.** `gate_router_models` raises
+`refusing confounded qualification` from inside `check_model` and
+`check_vision_model` — that is, from inside the function `run_cached` wraps. By
+then `run_cached` has already published a `running` receipt, which revokes reuse
+eligibility, and it goes on to publish the refusal as a `failed` one. The
+previous pass survives only as `last_pass`, which is historical and never
+reusable.
+
+So a preset that genuinely passed loses its receipt because a download queue
+happened to be running, and the artifact records nine model `FAIL` rows that are
+not verdicts about any model. Confirm from the artifact, which keeps the reason:
+
+```bash
+python3 -c "import json;d=json.load(open('verification/router-functional/evidence/router-functional.json'));print(d['models'][0]['problems'])"
+```
+
+The repair is to refuse before the receipt is touched, not inside the workload:
+hoist the `blocked_workloads()` check out of `check_model`/`check_vision_model`
+into `main()`, ahead of the model loop, and exit with a distinct status that
+writes no per-model rows and publishes no receipt. Refusal is not a verdict and
+must not consume one. Until that lands, treat a `router-models` artifact whose
+`problems` name `download-queue` as "not run", and re-run the gate when the
+queues are idle rather than reading it as a regression.
+
+## One preset fails only its tool-call check
+
+Observed on 2026-09-08, boot `b9e45a0d`: `router-models` ran for six minutes with
+the queues idle and returned eight passes and one failure. `obliterated` answered
+`PONG` for coherence and returned valid JSON for structured output, then produced
+160 `/` characters for the tool-call prompt and stopped on `finish_reason:
+length` with `tool_calls: []`.
+
+Rule the template out first, because it was the previous cause here and it is
+recorded in the artifact:
+
+```bash
+python3 -c "import json;d=json.load(open('verification/router-functional/evidence/router-functional.json'));m=[x for x in d['models'] if x['model']=='obliterated'][0];print(m['checks']['tool_call']['template'])"
+```
+
+`chat_template_length` 8952 with `supports_tool_calls: true` is the ridge/heretic
+tools template, so the payload did reach the model. A model that emits one
+character until the length cap is a sampling collapse, not a discarded tools
+block.
+
+Compare presets before suspecting the weights. `ridge`, `heretic` and `fable` all
+run `spec-type = draft-mtp` with `spec-draft-n-max = 2` and pass, so speculative
+decoding is not the difference. What is unique to `obliterated` is
+`repeat-penalty = 1.15` with `temp = 0.2`: a tool-call prompt repeats its JSON
+scaffolding, a repetition penalty pushes exactly those tokens down, and a
+low temperature makes whatever the sampler lands on sticky. The failure mode is
+repetition produced by the setting meant to prevent it.
+
+**This is a hypothesis, not a finding.** Testing it means one bounded run of that
+preset with the penalty at the default, and that is a GPU workload: do it when
+the mission is not running, and change nothing in `llama-models.ini` until a run
+shows the check passing. `phr00ty` passing at `temp = 1.5` has already closed the
+older theory that its temperature was the cause of its tool-call failures.
 
 ## Gate problems
 
@@ -262,6 +415,8 @@ Exit 75 from the unit means another supervisor holds the lock.
 | Router gate reports `reclaimable RAM remained N bytes below baseline` | Host memory did not come back after the model was unloaded, and the ZFS ARC does not account for it | A real shortfall. Note this is measured as `MemAvailable + (ARC size - ARC c_min)`, because MemAvailable alone does not credit the ARC and charged whichever model was under test for cache the router had filled reading earlier presets. `ram_recovery` in the artifact separates the two deltas. A shortfall is real memory, which is not the same as the model's: confirm the host is not retiring corrupt pages first, see [a gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting) |
 | A gate exits -11 or 139 after its artifact says `"pass": true` | Two causes look identical here and only one is benign: ROCm's HSA runtime segfaulting in its own process-exit teardown *after* the verdict was written, or a crash *during* the gate that left an artifact from an earlier run in place | The run failed until you prove otherwise; see [a failed process outranks a passing artifact](#a-failed-process-outranks-a-passing-artifact) |
 | A ComfyUI node fails with `HIPBLAS_STATUS_INVALID_VALUE` from `hipblasLtMatmulAlgoGetHeuristic` | hipBLASLt has no algorithm for that problem shape on this architecture. These cards are gfx1030 and torch's own hipBLASLt support list is gfx9 | Not a model or workflow fault, and not a tolerance question. The media runner exports `TORCH_BLAS_PREFER_HIPBLASLT=0` to route matmuls through hipBLAS instead |
+| `router-models` exits 1 in under a second with every model `FAIL` | Not a model verdict. The gate refused a qualification confounded by competing work, usually a download queue re-verifying at boot | [Every boot repeats the whole mission](#every-boot-repeats-the-whole-mission) |
+| A gate shows `running` long after the host rebooted | A crash or hard kill left the record behind; no signal handler ran to mark it interrupted | `python3 scripts/mission_status.py` reports it as `interrupted` rather than trusting the record |
 | Grounding scores look confidently wrong | A geometry or action-space mismatch, not the model. This is exactly what `groundlib.py` exists to prevent | `python3 -m pytest verification/computer-use-grounding/test_grounding_contract.py` |
 
 ## A failed process outranks a passing artifact
@@ -303,6 +458,10 @@ Symptoms that arrive together: gates that pass and fail across consecutive runs
 with no change to weights, configuration or presets; the router gate reporting
 `reclaimable RAM remained N bytes below baseline` for whichever preset happened to
 be under test; the mission restarting from the top every few minutes.
+
+Rule out the harness first for that last one: a changed input fingerprint
+restarts the mission from the top on a perfectly healthy host. See
+[every boot repeats the whole mission](#every-boot-repeats-the-whole-mission).
 
 Check the host before the model:
 

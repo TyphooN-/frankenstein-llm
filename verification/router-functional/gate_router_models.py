@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import argparse
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ import urllib.request
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
 sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/mission-supervisor")
 from candidate_policy import tool_grant_allowed_for_preset  # noqa: E402
+from qualification_cache import model_key, run_cached, preset_identity  # noqa: E402
 from run_functional_mission import (  # noqa: E402
     MISSION_BLOCKING_REASONS,
     conflict_reason,
@@ -463,7 +465,35 @@ def write_atomic(payload: dict) -> None:
     os.replace(temp, ARTIFACT)
 
 
-def main() -> int:
+def qualify_cached(model, vision=False, force=False):
+    sources = [Path(__file__), Path(__file__).parents[1] / 'candidate-qualification/candidate_policy.py']
+    if vision:
+        sources.append(VISION_FIXTURE)
+    key = model_key('router-models', model, sources, extra=checks_for(model))
+    def execute():
+        result = check_vision_model(model) if vision else check_model(model)
+        if model_key('router-models', model, sources, extra=checks_for(model)) != key:
+            result['pass'] = False
+            result.setdefault('problems', []).append('qualification inputs changed during execution')
+        return result
+    return run_cached('router-models', model, key, execute, force)
+
+
+def main(argv=()) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--model', action='append', help='configured router preset; repeat to select several')
+    parser.add_argument('--requalify', action='store_true')
+    args = parser.parse_args(argv)
+    requested = args.model or json.loads(os.environ.get('HERMES_QUALIFY_MODELS', '[]'))
+    selected = set(requested or CHAT_MODELS + VISION_MODELS)
+    chat_models, vision_models = list(CHAT_MODELS), list(VISION_MODELS)
+    for model in sorted(selected - set(chat_models + vision_models)):
+        try:
+            preset = preset_identity(model)['preset']
+        except (ValueError, OSError) as error:
+            parser.error(str(error))
+        (vision_models if preset.get('mmproj') else chat_models).append(model)
+    force = args.requalify or os.environ.get('HERMES_REQUALIFY') == '1'
     summary = {
         "gate": "router-functional",
         "benchmarking_performed": False,
@@ -475,13 +505,17 @@ def main() -> int:
         "models": [],
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
-    for model in CHAT_MODELS:
-        item = check_model(model)
+    for model in chat_models:
+        if model not in selected:
+            continue
+        item = qualify_cached(model, force=force)
         summary["models"].append(item)
         write_atomic(summary)
-        print(f"{model}: {'PASS' if item['pass'] else 'FAIL'}", flush=True)
-    for model in VISION_MODELS:
-        vision_item = check_vision_model(model)
+        print(f"{model}: {'PASS' if item['pass'] else 'FAIL'} reused={item['qualification_reused']}", flush=True)
+    for model in vision_models:
+        if model not in selected:
+            continue
+        vision_item = qualify_cached(model, vision=True, force=force)
         summary["models"].append(vision_item)
         write_atomic(summary)
         print(f"{model}: {'PASS' if vision_item['pass'] else 'FAIL'}", flush=True)
@@ -492,4 +526,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

@@ -336,9 +336,13 @@ waits for a quiet host — two consecutive polls with `MemAvailable ≥ 32 GiB` 
 no *blocking* conflict — bounded by `HERMES_MISSION_QUIET_TIMEOUT` (default six
 hours). Its per-step logs are `verification/mission-supervisor/<step>.log`.
 
-Only two of the classifier's reasons block: `kernel-build` (a task whose `cwd`
-is inside a kernel tree) and `inference` (a model server that is not the managed
-router, identified by cgroup rather than by name). Generic builds, transfers and
+Three of the classifier's reasons block: `kernel-build` (a task whose `cwd`
+is inside a kernel tree), `inference` (a model server that is not the managed
+router, identified by cgroup rather than by name), and `download-queue` (any
+process in the `local-ai-model-downloads` slice, also matched by cgroup). The
+third is there because `gate_router_models` refuses to qualify beside competing
+work: starting the router gate while a queue re-verifies produces a refusal
+recorded as nine model failures, not a verdict. Generic builds, transfers and
 workspace Python are classified and reported, but they do not hold the mission —
 `MISSION_BLOCKING_REASONS` in `run_functional_mission.py` is the list, and
 [architecture → layer 5](ARCHITECTURE.md#layer-5--supervision)
@@ -347,6 +351,17 @@ not delay a mission after a new-kernel boot. **Load average is not part of this
 check at all**; the supervisor never reads `/proc/loadavg`.
 
 To read progress, use the durable state:
+
+```bash
+python3 scripts/mission_status.py          # per-gate status, duration, exit code, log age
+python3 scripts/mission_status.py --json   # same snapshot for automation
+```
+
+That reader starts nothing and changes nothing. It reports a recorded `passed`
+whose fingerprint no longer matches as **stale**, and a `running` record that no
+live supervisor owns as **interrupted**, so a state file left behind by a crash
+or a reboot is not read as progress. The raw document is still there if you want
+it:
 
 ```bash
 python3 -c "import json;s=json.load(open('verification/mission-supervisor/mission-state.json'));\
@@ -358,9 +373,19 @@ the supervisor records `interrupted` with the step name, and the next run repeat
 that step. A step that had already exited 0 is kept, so hours of GPU work are not
 repeated.
 
-Re-running skips steps recorded `passed` whose `input_fingerprint` still matches.
-Editing a gate, replacing a weight or reordering the step list changes the
-fingerprint and re-runs the affected steps.
+Re-running skips a step two ways, and they are not equivalent. The older one is
+the whole-mission `input_fingerprint`: it covers every tracked source file, every
+download queue and every destination file's size and mtime at once, so any change
+anywhere — a gate edit, one replaced weight, a reordered step list — invalidates
+**every** recorded pass, not just the affected one. The newer one is the
+per-gate receipt under `verification/mission-supervisor/qualification-cache/`,
+whose key names only that gate's own code, environment, artifacts and runtime, so
+replacing a media weight no longer re-runs the embedding gate. A gate is reused
+only when its receipt key still matches; otherwise the fingerprint rule applies.
+
+Neither is a claim about host health. A receipt says a qualification passed
+against those exact inputs, not that the host is currently healthy or that the
+weights on disk still read back correctly.
 
 Setting a shorter quiet timeout for an experiment:
 

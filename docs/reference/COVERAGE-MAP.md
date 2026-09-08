@@ -263,5 +263,20 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/benchmarks/qwen3-reranker-8b.md`](../../docs/benchmarks/qwen3-reranker-8b.md) | [Reference](../MODEL-RUNS.md) |
 | [`docs/reference/PLACEMENT-MEASUREMENTS.md`](../../docs/reference/PLACEMENT-MEASUREMENTS.md) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
 | [`docs/HANDOFF-2026-09-07.md`](../../docs/HANDOFF-2026-09-07.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`config/hardware/amdgpu/2026-09-08/README.md`](../../config/hardware/amdgpu/2026-09-08/README.md) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08/SHA256SUMS`](../../config/hardware/amdgpu/2026-09-08/SHA256SUMS) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card1) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card2) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08T1924-0400/README.md`](../../config/hardware/amdgpu/2026-09-08T1924-0400/README.md) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08T1924-0400/SHA256SUMS`](../../config/hardware/amdgpu/2026-09-08T1924-0400/SHA256SUMS) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card1) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card2) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`docs/decisions/0007-conditional-custom-quantization.md`](../../docs/decisions/0007-conditional-custom-quantization.md) | [Reference](DEVELOPER-GUIDE.md) |
+| [`scripts/mission_status.py`](../../scripts/mission_status.py) | [Reference](OPERATIONS.md) |
+| [`verification/mission-supervisor/qualification_cache.py`](../../verification/mission-supervisor/qualification_cache.py) | [Reference](ARCHITECTURE.md) |
+| [`verification/mission-supervisor/test_mission_status.py`](../../verification/mission-supervisor/test_mission_status.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/mission-supervisor/test_qualification_cache.py`](../../verification/mission-supervisor/test_qualification_cache.py) | [Reference](DEVELOPER-GUIDE.md) |
 
-Inventory entries: 255. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 274. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

@@ -454,6 +454,23 @@ class EvidenceLifecycleTests(unittest.TestCase):
             "status": "complete", "finished_at": "2026-09-04T08:00:00-0400",
         })
 
+    def test_http_error_publishes_a_terminal_failure(self):
+        import urllib.error
+        from email.message import Message
+        self.stale_pass()
+
+        def fail(_messages):
+            raise urllib.error.HTTPError('http://127.0.0.1:8080', 500, 'error', Message(), None)
+
+        result = gate.qualify(self.root, 'heretic', fail)
+        current = json.loads(self.path.read_text())
+        self.assertFalse(result['pass'])
+        self.assertEqual('failed', current['status'])
+        self.assertFalse(current['interrupted'])
+        self.assertEqual(500, current['http_status'])
+        self.assertIn('finished_at', current)
+        self.assertNotEqual('old', current['run_id'])
+
     def test_new_attempt_invalidates_an_older_pass_before_router_failure(self):
         self.stale_pass()
 

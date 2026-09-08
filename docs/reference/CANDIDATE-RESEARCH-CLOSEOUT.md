@@ -8,6 +8,114 @@ and the provisional ranking in
 [MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md). Those files retain
 useful header and pagination notes; they are not the current verdicts.
 
+## Submitted candidate intake — 2026-09-08
+
+The following intake records investigation requests, not download admission or
+qualification. Existing entries are referenced rather than duplicated.
+
+| Repository | Intake disposition | Next action |
+|---|---|---|
+| `medismera/Qwen3.8-27B-OBLITERATED-Mythos-Class-Agentic` | New; source pinned 2026-09-08, see below | No public GGUF exists and the pinned llama.cpp registers the architecture, so any use is an [ADR 0007](../decisions/0007-conditional-custom-quantization.md) conversion experiment. Blocked behind the current gate repairs. |
+| `huihui-ai/Huihui-Qwen3.8-Flash-Next-abliterated-GGUF` | Already in `candidate-research-inventory.json` | Retain existing research; reassess only from pinned evidence and resource feasibility. This request does not enqueue another download. |
+| `wfakhri/OTel-2.0-LLM-31B-IT-GGUF` | Already screened below as a conditional telecom specialist | Retain source/license and workload prerequisites before admission; not a qualified general-driver upgrade. |
+
+New submitted URL:
+<https://huggingface.co/medismera/Qwen3.8-27B-OBLITERATED-Mythos-Class-Agentic>.
+The OTel submission split `https` and `://` across lines; matching above is by
+the exact repository identifier, not validation of the broken URL string.
+
+### medismera/Qwen3.8-27B-OBLITERATED-Mythos-Class-Agentic — pinned intake
+
+Source pinned 2026-09-08 from the repository itself, not from the card's prose.
+`lastModified` 2026-09-07T18:23:54Z; metadata `license: apache-2.0`. Nothing here
+is a download admission, a quality claim or a functional verdict.
+
+**From `config.json` (primary source).** `architectures:
+["Qwen3_5ForConditionalGeneration"]`, `model_type: qwen3_5`, 64 hidden layers,
+hidden size 5120, 24 attention heads over 4 KV heads, `head_dim` 256,
+`intermediate_size` 17408, `vocab_size` 248320, `max_position_embeddings`
+262144, `dtype` bfloat16, `rope_theta` 1e7 with `partial_rotary_factor` 0.25.
+A vision encoder is present (`depth` 27, hidden size 1152) with image and video
+token ids, so a projector is part of the model, not an optional extra.
+
+**From the file listing.** 28 `model-*.safetensors` shards plus one
+`model-extra-*` shard, `chat_template.jinja`, `abliteration_metadata.json`,
+`hard_negative_residue.json`. **No `.gguf` file exists in the repository.** The
+tags name `sglang`, `vllm`, `fp8` and `awq`: this is published for a
+tensor-parallel Python serving stack, not for the llama.cpp router this host
+runs. The `fp8` and `awq` branches do not change that — llama.cpp does not serve
+either format.
+
+**Runtime feasibility, checked locally rather than assumed.** The pinned
+llama.cpp (`upstream/llama-cpp.lock.json`, v0.4.0, commit `5266f24`) *does* know
+this architecture on both sides: `conversion/qwen3vl.py` registers
+`Qwen3_5ForConditionalGeneration`, and `src/llama-arch.cpp` carries
+`LLM_ARCH_QWEN35`. So a conversion path is plausible. It is not proven: nothing
+here establishes that the hybrid linear/full attention alternation the card
+describes converts correctly, produces coherent output, or runs on gfx1030 under
+ROCm. Registration is not qualification.
+
+**Consequence.** Using this candidate at all would require producing a GGUF
+locally, which is precisely the "missing supported format" gap
+[ADR 0007](../decisions/0007-conditional-custom-quantization.md) governs. It is
+the first concrete instance of that ADR, and it inherits every precondition in
+it. Memory fit is deliberately not estimated here: the repository's own method
+is to read a real GGUF header with `scripts/gguf_header.py` and place it with
+`scripts/gpu_placement.py`, and no such artifact exists yet. The card's "~60GB
+VRAM" BF16 figure is a vLLM statement about a format this host does not serve.
+
+**Card claims that do not survive contact with the repository.** The card states
+a 248,044 vocabulary; `config.json` states 248320. The repository name says 27B
+and the card says 28B. The benchmark scores (98/100, 96/100, 37/38) ship with no
+harness, seed, prompt set or reproduction command, so they are unverified
+marketing, not evidence. Treat every performance and capability statement on the
+card as unverified until a local held-out gate says otherwise.
+
+**Operating advice on the card that must not be followed.** It instructs
+`--trust-remote-code` and a configuration with `redact_secrets: false` and
+`tirith_enabled: false`. This workspace does not enable remote code execution to
+admit a candidate and does not disable redaction to make one look better; ADR
+0007 says in terms that security policy is never changed to make a candidate
+pass. The abliterated lineage also puts this model under
+[ADR 0004](../decisions/0004-prompt-corpus-admission.md) rather than outside it.
+
+**Next action, unchanged by this intake:** none, until the mission's existing
+failed gates are repaired. This is a research record.
+
+## Submitted candidate intake — 2026-09-08, second batch
+
+Five URLs were submitted for investigation. They dedupe to five distinct
+repositories: **two are new identifiers, three already have a recorded
+research verdict.** The machine-readable form of this table, including the
+exact submitted URL strings, is `submitted_intake` in
+[candidate-research-inventory.json](candidate-research-inventory.json).
+
+**Queued is not investigated, and investigated is not qualified.** For this
+batch no Hugging Face API call, revision pin, weight download or remote code
+execution was performed, so nothing below asserts that a queued repository
+exists or states its size, license or architecture. Nothing here admits a
+download or authorizes model execution.
+
+| Submitted repository | State | Basis |
+|---|---|---|
+| `ruvnet/ruos-foundry-swarm-qwen3-30b-a3b-e32` | **queued**, not investigated | First submission of this identifier here. No metadata collected. |
+| `Jackrong/Qwopus3.8-27B-Flash` | **queued**, not investigated | First submission of this identifier here. No metadata collected. |
+| `medismera/Qwen3.8-27B-OBLITERATED-Mythos-Class-Agentic` | investigated 2026-09-08, not qualified | Resubmission of the first-batch URL above; the pinned intake in this document already covers it. Not re-collected. |
+| `deepseek-ai/DeepSeek-V4-Flash-Vision-Exp` | investigated 2026-09-02, not qualified | Screened at revision `6821d6ad` in [CANDIDATE-MODEL-REVIEW-2026-09-02.md](../CANDIDATE-MODEL-REVIEW-2026-09-02.md): 304.65B parameters, ideal 4-bit weights alone ≈152.3 GB, verdict **SKIP** on this hardware. |
+| `microsoft/VibeVoice-ASR-Streaming-1.5B` | investigated 2026-09-02, not qualified | Screened at revision `94efa5c0` in the same document: 1.5B name against 2.814B Hub metadata, custom VibeVoice code path, no verified llama.cpp or ComfyUI support, verdict **WATCH**. |
+
+The two prior verdicts are recorded findings, not closed questions. A
+resubmission on its own is not new evidence, so neither is reopened here; both
+remain reversible on a pinned re-collection. The three already-investigated
+entries are referenced rather than re-researched, which is what keeps this
+intake a deduplicated queue rather than a growing pile of restatements.
+
+**Next action:** none for any of the five. The two queued identifiers need a
+primary-source collection through
+`verification/local-coverage-foundation/research/collect_hf_metadata.py` before
+anything can be said about them, and that is research, not admission. Every
+candidate in this batch is behind the mission's existing failed gates.
+
 ## Additional submitted candidates — 2026-09-07 screening
 
 These **three distinct repositories** are additional to the 11-repository
@@ -418,7 +526,8 @@ research, not a driver upgrade**.
 
 ### wfakhri/OTel-2.0-LLM-31B-IT-GGUF
 
-Telecom specialist, not a general driver. Q6_K 25.201 GiB; Q4_K_M 18.687 GiB.
+Telecom specialist, not a general driver. Q6_K 23.471 GiB; Q4_K_M 17.404 GiB
+(25,201,487,104 and 18,687,065,344 bytes respectively; projector excluded).
 See the OTel 2.0 section above for the full disposition.
 
 These comparisons are research, not admission. A quantization label is not a
