@@ -54,9 +54,14 @@ still apply. Every append is one write. Sidecars are ignored runtime evidence an
 may be archived with the gate logs; there is no automatic deletion of evidence.
 No prompts, completions, headers, tool payloads or arbitrary response fields are
 included. Missing, negative, non-finite and non-numeric fields remain unavailable.
-Inference exceptions retain elapsed observations and are re-raised. Telemetry
-write failure never changes a gate verdict. GPU synchronization is used only
-around already-authorized in-process inference, never as a new workload.
+Inference exceptions retain elapsed observations and are re-raised. No telemetry
+failure changes a gate verdict: the write, the accounting and the device
+synchronize are each guarded, so a raising synchronize or a malformed response
+costs the sample and never replaces the gate's own result. GPU synchronization is
+used only around already-authorized in-process inference, never as a new
+workload. `runtime_timing_source` is recorded only when a runtime `timings`
+field actually supplied a value; counts taken from `usage` are never attributed
+to it.
 
 Offline regression tests exercise actual loopback HTTP callers, failed requests,
 malformed metadata, count semantics, output preservation and sample bounds. Those

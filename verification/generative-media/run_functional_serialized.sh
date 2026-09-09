@@ -26,26 +26,49 @@ pid=
 router_was_active=0
 signal_seen=
 
+# Enqueue the router restart; never wait for it.
+#
+# The restore runs from the EXIT trap, which is reached while systemd is
+# executing this unit's own stop job. local-ai-qualification.service is ordered
+# After=llama-router.service, so systemd puts the qualification stop ahead of
+# any llama-router start in the same transaction: a blocking `systemctl start`
+# here waits for a job that is waiting for this trap to return, and the unit
+# only gets out of it when TimeoutStopSec fires. That deadlock was observed on
+# 2026-09-09 in the sibling TTS runner. --no-block returns as soon as the job is
+# enqueued, so the router is *requested* here, never observed ready.
 restore_router() {
   if [ "$router_was_active" -eq 1 ]; then
-    systemctl --user start llama-router.service || true
     router_was_active=0
+    if systemctl --user --no-block start llama-router.service; then
+      printf 'router restore queued; readiness not verified %s\n' "$(date -Is)"
+    else
+      printf 'WARNING: router restore could not be queued %s\n' "$(date -Is)"
+    fi
   fi
 }
-cleanup() {
+# Stopping ComfyUI is separate from restoring the router on purpose: the VRAM
+# residue check below has to read the cards with no other GPU consumer being
+# introduced, so the router stays stopped until this script is done measuring.
+stop_comfy() {
   if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
     kill -TERM "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
   fi
   pid=
+}
+on_exit() {
+  # Capture first: the runner's status is the gate's status, never the trap's.
+  local status=$?
+  stop_comfy
   restore_router
+  exit "$status"
 }
 forward() {
   signal_seen=$1
   printf 'runner signal=%s %s\n' "$1" "$(date -Is)"
   [ -n "${pid:-}" ] && kill -s "$1" "$pid" 2>/dev/null || true
 }
-trap cleanup EXIT
+trap on_exit EXIT
 trap 'forward HUP' HUP
 trap 'forward INT' INT
 trap 'forward TERM' TERM
@@ -98,7 +121,7 @@ fi
 python3 "$DIR/live_schema_gate.py" || exit $?
 "$ROOT/venvs/comfy/bin/python" "$DIR/functional_gate.py"
 rc=$?
-cleanup
+stop_comfy
 sleep 8
 
 after0=$(cat /sys/class/drm/card0/device/mem_info_vram_used)

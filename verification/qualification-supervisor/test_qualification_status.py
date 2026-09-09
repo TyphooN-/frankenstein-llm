@@ -131,3 +131,37 @@ def test_current_boot_reads_the_kernel_identity(monkeypatch, tmp_path):
     assert MODULE.current_boot() == 'boot-c'
     monkeypatch.setattr(MODULE, 'BOOT_ID', tmp_path / 'absent')
     assert MODULE.current_boot() is None
+
+
+def test_recorded_cause_ledger_is_reported_and_bounded(tmp_path):
+    path = tmp_path / 'state.json'
+    path.write_text(json.dumps({
+        'status': 'functional-foundation-incomplete', 'input_fingerprint': 'f',
+        'error': 'x' * 900,
+        'failed_steps': [{'name': 'asr', 'exit_code': 1}] * (MODULE.LEDGER_LIMIT + 5),
+        'blocked_steps': [{'name': 'tts', 'exit_code': 75}, 'not-a-record'],
+        'remaining': ['asr', 'tts', 42],
+        'steps': {'asr': {'status': 'failed', 'exit_code': 1, 'input_fingerprint': 'f',
+                          'error': 'qualification inputs changed during execution'}}}))
+    report = MODULE.snapshot(path, now=100)
+    assert len(report['error']) == MODULE.TEXT_LIMIT
+    assert len(report['failed_steps']) == MODULE.LEDGER_LIMIT
+    assert report['blocked_steps'] == [{'name': 'tts', 'exit_code': 75}]
+    assert report['remaining'] == ['asr', 'tts']
+    assert report['steps'][0]['error'] == 'qualification inputs changed during execution'
+    rendered = MODULE.render(report)
+    assert 'Blocked (nothing ran): tts(exit 75)' in rendered
+    assert 'inputs changed during execution' in rendered
+    assert 'Remaining: asr; tts' in rendered
+
+
+def test_a_missing_or_malformed_ledger_is_empty_not_invented(tmp_path):
+    path = tmp_path / 'state.json'
+    path.write_text(json.dumps({'input_fingerprint': 'f', 'failed_steps': 'asr',
+                                'remaining': {'asr': 1}, 'error': 7,
+                                'steps': {'asr': {'status': 'passed', 'input_fingerprint': 'f'}}}))
+    report = MODULE.snapshot(path, now=100)
+    assert report['error'] is None
+    assert report['failed_steps'] == [] and report['remaining'] == []
+    assert 'Recorded cause' not in MODULE.render(report)
+

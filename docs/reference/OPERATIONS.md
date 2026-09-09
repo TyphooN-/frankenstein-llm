@@ -360,8 +360,13 @@ python3 scripts/qualification_status.py --json   # same snapshot for automation
 That reader starts nothing and changes nothing. It reports a recorded `passed`
 whose fingerprint no longer matches as **stale**, and a `running` record that no
 live supervisor owns as **interrupted**, so a state file left behind by a crash
-or a reboot is not read as progress. The raw document is still there if you want
-it:
+or a reboot is not read as progress. It also echoes the supervisor's own recorded
+cause ledger -- the run's `error`, `failed_steps`, `blocked_steps`, `remaining`,
+and each step's recorded `error` -- so a failure says *why* rather than only
+which exit code it produced. Those values are reported, never recomputed, and are
+bounded on read (32 entries, 500 characters each). The supervisor clears them at
+the start of every invocation, so what is shown belongs to the run that wrote the
+state. The raw document is still there if you want it:
 
 ```bash
 python3 -c "import json;s=json.load(open('verification/qualification-supervisor/qualification-state.json'));\

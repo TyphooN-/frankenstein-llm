@@ -405,7 +405,7 @@ against a queue that is in fact complete.
 | `boot_id`, `kernel_release`, `kernel_build_signature` | which boot produced this run |
 | `input_fingerprint` | SHA-256 over tracked sources, promotion records, queues and queued-file metadata; a step is skipped only when its recorded fingerprint still matches |
 | `steps.<name>` | `command`, `input_fingerprint`, `started_at`, `finished_at`, `exit_code`, `status` (`running`/`passed`/`failed`/`interrupted`/`blocked-policy`), `benchmarking_performed: false`, `benchmark_performed: false` |
-| `failed_steps[]`, `remaining[]`, `exit_code` | terminal summary |
+| `failed_steps[]`, `blocked_steps[]`, `remaining[]`, `error`, `exit_code` | terminal summary, cleared at the start of every invocation so it never describes the previous run |
 | `signal`, `interrupted_step`, `step_exit_code`, `step_status` | operator-stop detail |
 
 Per-step logs land beside it as `<step>.log`, with `qualification.log` as the lifecycle

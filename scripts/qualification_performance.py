@@ -48,6 +48,7 @@ def observation(response=None, elapsed=None, *, operation='inference', model=Non
             row[key] = value
     if number(completion_tokens) is not None:
         row['completion_tokens'] = completion_tokens
+    from_runtime = False
     for source, target in (('prompt_per_second', 'prompt_tokens_per_second'),
                            ('predicted_per_second', 'decode_tokens_per_second'),
                            ('prompt_ms', 'prompt_milliseconds'),
@@ -57,7 +58,12 @@ def observation(response=None, elapsed=None, *, operation='inference', model=Non
         value = number(timings.get(source))
         if value is not None:
             row[target] = value
-    if timings and any(k.startswith('decode_') or k.startswith('prompt_') for k in row):
+            from_runtime = True
+    # Attribute only what the runtime actually supplied. Testing key *names*
+    # here credited response.timings with prompt_tokens, which comes from
+    # usage: a timings block carrying nothing usable then produced a row that
+    # named a source for numbers it had not contributed.
+    if from_runtime:
         row['runtime_timing_source'] = 'response.timings'
     tokens = row.get('completion_tokens', row.get('runtime_completion_tokens'))
     if tokens is not None and seconds:
@@ -105,12 +111,35 @@ def emit(row):
         return
 
 
+def guarded(function, *args):
+    """Run one telemetry step; a failure costs the sample and nothing else.
+
+    Both callers sit in a ``finally`` beside a real gate result. Left unguarded,
+    a device synchronize that raises after a failed generate -- or any accounting
+    error -- would replace the gate's own exception, or turn a passing gate into
+    a failing one. Losing an observation is the correct price.
+    """
+    if function is None:
+        return
+    try:
+        function(*args)
+    except Exception:                                           # noqa: BLE001
+        pass
+
+
+def record(values, operation, model, elapsed):
+    row = observation(values.get('response'), elapsed, operation=operation, model=model,
+                      completion_tokens=values.get('completion_tokens'),
+                      audio_seconds=values.get('audio_seconds'), items=values.get('items'))
+    row['request_failed'] = values.get('failed', False)
+    emit(row)
+
+
 @contextmanager
 def measure(operation, *, model=None, synchronize=None):
     """Time existing work. Caller may fill response/count/duration fields."""
     values = {}
-    if synchronize:
-        synchronize()
+    guarded(synchronize)
     start = time.perf_counter()
     try:
         yield values
@@ -118,14 +147,10 @@ def measure(operation, *, model=None, synchronize=None):
         values['failed'] = True
         raise
     finally:
-        if synchronize:
-            synchronize()
-        row = observation(values.get('response'), time.perf_counter() - start,
-                          operation=operation, model=model,
-                          completion_tokens=values.get('completion_tokens'),
-                          audio_seconds=values.get('audio_seconds'), items=values.get('items'))
-        row['request_failed'] = values.get('failed', False)
-        emit(row)
+        # Elapsed is read after the synchronize so queued device work is inside
+        # the interval, exactly as before.
+        guarded(synchronize)
+        guarded(record, values, operation, model, time.perf_counter() - start)
 
 
 def synchronize_devices():

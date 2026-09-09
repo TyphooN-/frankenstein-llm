@@ -740,7 +740,11 @@ class TestRunnerAndUnitContract(unittest.TestCase):
     def test_runner_restores_the_router_it_stopped(self):
         text = RUNNER.read_text()
         self.assertIn("systemctl --user stop \"$ROUTER\"", text)
-        self.assertIn("systemctl --user start \"$ROUTER\"", text)
+        # The restart is enqueued, not awaited: the EXIT trap runs inside this
+        # unit's own stop job, and a blocking start there deadlocks against it.
+        # Behaviour is covered by test_serialized_runner_router_restore.py.
+        self.assertIn("systemctl --user --no-block start \"$ROUTER\"", text)
+        self.assertNotIn("systemctl --user start \"$ROUTER\"", text)
         self.assertIn("trap on_exit EXIT", text)
 
     def test_runner_no_longer_waits_for_an_idle_host(self):

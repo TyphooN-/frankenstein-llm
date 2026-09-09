@@ -279,8 +279,6 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/qualification-supervisor/test_qualification_status.py`](../../verification/qualification-supervisor/test_qualification_status.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/qualification-supervisor/test_qualification_cache.py`](../../verification/qualification-supervisor/test_qualification_cache.py) | [Reference](DEVELOPER-GUIDE.md) |
 
-Inventory entries: 274. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
-
 | [`scripts/qualification-status.sh`](../../scripts/qualification-status.sh) | [Reference](QUALIFICATION-MIGRATION.md) |
 | [`scripts/qualification_performance.py`](../../scripts/qualification_performance.py) | [Reference](QUALIFICATION-PERFORMANCE.md) |
 | [`verification/qualification-supervisor/test_qualification_launcher.py`](../../verification/qualification-supervisor/test_qualification_launcher.py) | [Reference](QUALIFICATION-MIGRATION.md) |
@@ -292,3 +290,6 @@ Inventory entries: 274. The pinned upstream source is covered by [ADR 0005](../d
 | [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card0) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
 | [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card1) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
 | [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card2) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
+| [`verification/qualification-supervisor/test_serialized_runner_router_restore.py`](../../verification/qualification-supervisor/test_serialized_runner_router_restore.py) | [Reference](TROUBLESHOOTING.md) |
+
+Inventory entries: 286. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

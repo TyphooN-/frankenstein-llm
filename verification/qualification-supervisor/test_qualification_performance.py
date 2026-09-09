@@ -78,6 +78,32 @@ def test_generate_preserves_arguments_and_excludes_input_tokens(output):
     assert row['end_to_end_tokens_per_second'] > 0
 
 
+def test_a_timings_block_is_only_credited_for_what_it_supplied():
+    # prompt_tokens comes from usage. A timings block that carried nothing
+    # usable must not be named as the source of it.
+    row = performance.observation({'usage': {'prompt_tokens': 11},
+                                   'timings': {'unrecognised': 1}}, 2)
+    assert row['prompt_tokens'] == 11
+    assert 'runtime_timing_source' not in row
+    assert performance.observation(
+        {'timings': {'predicted_per_second': 3}}, 2)['runtime_timing_source'] == 'response.timings'
+
+
+def test_observation_failures_never_decide_a_verdict(output, monkeypatch):
+    def explode():
+        raise RuntimeError('device synchronize failed')
+    with performance.measure('guarded', synchronize=explode) as observed:
+        observed['response'] = {'usage': {'completion_tokens': 4}}
+    monkeypatch.setattr(performance, 'observation',
+                        lambda *a, **k: (_ for _ in ()).throw(ValueError('accounting bug')))
+    with performance.measure('guarded'):
+        pass
+    # The gate's own exception still wins over anything telemetry does.
+    with pytest.raises(KeyError):
+        with performance.measure('guarded', synchronize=explode):
+            raise KeyError('the real failure')
+
+
 def load(name, relative):
     spec = importlib.util.spec_from_file_location(name, ROOT / relative)
     assert spec is not None and spec.loader is not None
@@ -128,6 +154,13 @@ def test_media_existing_workflow_records_elapsed_and_output_count(output, monkey
     assert row['items'] == 1
     assert row['wall_seconds'] > 0
     assert not row['token_rate_available']
+
+
+def test_media_output_count_tolerates_an_unfamiliar_history(output):
+    media = load('performance_media', 'verification/generative-media/functional_gate.py')
+    assert media.produced_outputs({'outputs': {'1': ['unexpected']}}) == 0
+    assert media.produced_outputs({'outputs': []}) is None
+    assert media.produced_outputs(None) is None
 
 
 def test_supervisor_supplies_unique_sidecars_and_preserves_failed_attempts(tmp_path, monkeypatch):

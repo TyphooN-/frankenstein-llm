@@ -25,6 +25,31 @@ def current_boot():
         return None
 
 
+# The recorded cause ledger is read back bounded: it is a state file the reader
+# does not control, and a status command must not become a way to print an
+# arbitrary amount of arbitrary text.
+LEDGER_LIMIT = 32
+TEXT_LIMIT = 500
+
+
+def text(value):
+    """One recorded string, truncated, or None. Never a summary of one."""
+    return value[:TEXT_LIMIT] if isinstance(value, str) else None
+
+
+def named_steps(value):
+    """A recorded {name, exit_code} ledger, entries kept exactly as written."""
+    if not isinstance(value, list):
+        return []
+    rows = []
+    for item in value[:LEDGER_LIMIT]:
+        if isinstance(item, dict):
+            code = item.get('exit_code')
+            rows.append({'name': text(item.get('name')),
+                         'exit_code': code if isinstance(code, int) and not isinstance(code, bool) else None})
+    return rows
+
+
 def timestamp(value):
     try:
         result = datetime.fromisoformat(value)
@@ -80,7 +105,12 @@ def snapshot(path, now=None, boot=None):
         rows.append(dict(name=name, status=status, elapsed_seconds=elapsed,
                          exit_code=step.get('exit_code'), log_age_seconds=log_age,
                          log_path=str(log) if safe_name else None,
-                         performance_log=step.get('performance_log')))
+                         performance_log=step.get('performance_log'),
+                         # Why this attempt ended the way it did, when the
+                         # supervisor recorded a reason. An exit code alone does
+                         # not distinguish a model verdict from a refusal.
+                         error=text(step.get('error')),
+                         blocked_by=text(step.get('blocked_by'))))
     counts = dict(Counter(row['status'] for row in rows))
     updated = timestamp(state.get('updated_at'))
     liveness = ('State-file observation only; running does not prove a live process'
@@ -94,7 +124,15 @@ def snapshot(path, now=None, boot=None):
                 steps=rows, eta='unknown: host waits and failed gates prevent a reliable completion estimate',
                 scope='Recorded functional gates, not model count or optimization completeness',
                 boot_id=recorded_boot, host_boot_id=boot, boot_crossed=crossed_boot,
-                liveness=liveness)
+                liveness=liveness,
+                # The supervisor's own terminal ledger, reported rather than
+                # recomputed: it clears these at the start of every invocation,
+                # so what is here belongs to the run that wrote this state.
+                error=text(state.get('error')),
+                failed_steps=named_steps(state.get('failed_steps')),
+                blocked_steps=named_steps(state.get('blocked_steps')),
+                remaining=[text(item) for item in state.get('remaining', [])[:LEDGER_LIMIT]
+                           if isinstance(item, str)] if isinstance(state.get('remaining'), list) else [])
 
 
 def render(data):
@@ -108,6 +146,17 @@ def render(data):
         elapsed = '-' if row['elapsed_seconds'] is None else f"{row['elapsed_seconds'] / 60:.1f}m"
         age = '-' if row['log_age_seconds'] is None else f"{row['log_age_seconds'] / 60:.1f}m"
         lines.append(f"{row['name']:30} {row['status']:18} {elapsed:>10} {str(row['exit_code']):>5} {age:>10}")
+    if data['error']:
+        lines += ['', 'Recorded cause: ' + data['error']]
+    for label, key in (('Failed', 'failed_steps'), ('Blocked (nothing ran)', 'blocked_steps')):
+        if data[key]:
+            lines.append(f"{label}: " + ', '.join(
+                f"{row['name']}(exit {row['exit_code']})" for row in data[key]))
+    for row in data['steps']:
+        if row['error']:
+            lines.append(f"  {row['name']}: {row['error']}")
+    if data['remaining']:
+        lines.append('Remaining: ' + '; '.join(data['remaining']))
     lines += ['', 'Failures require repair/retest; finishing this pass is not qualification success.',
               'Host/process detail: bash scripts/local-model-status.sh --host-sharing',
               'Gate logs: verification/qualification-supervisor/<gate>.log; redirected runner paths in --json']

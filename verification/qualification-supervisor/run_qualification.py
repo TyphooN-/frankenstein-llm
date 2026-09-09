@@ -785,8 +785,13 @@ def main(argv=()) -> int:
         atomic_json(state)
         log(f"inputs unreadable; no gate was attempted: {error}")
         return EXIT_ADMISSION_REFUSED
+    # Terminal summaries from the previous invocation. "remaining" is one of
+    # them (see CONFIGURATION.md): left in place it describes the last run's
+    # outstanding work while this one is still deciding, and a reader has no way
+    # to tell the two apart.
     for stale in ("signal", "error", "failed_step", "failed_steps", "blocked_steps",
-                  "exit_code", "interrupted_step", "step_exit_code", "step_status"):
+                  "exit_code", "interrupted_step", "step_exit_code", "step_status",
+                  "remaining"):
         state.pop(stale, None)
     state.update({
         "status": "starting",

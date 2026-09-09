@@ -85,18 +85,34 @@ child=0
 signal_seen=""
 router_was_active=0
 router_restored=0
+router_restore_queued=0
 python_rc=""
 
 log() { printf '%s runner %s\n' "$(date -Is)" "$*"; journal "runner $*"; }
 
 log "start invocation=${INVOCATION_ID:-none} pid=$$ args=[$*]"
 
+# Enqueue the router restart; never wait for it.
+#
+# restore_router is also reached from the EXIT trap, which runs while systemd is
+# executing this unit's own stop job. This unit and the serialized qualification
+# unit are both ordered After=llama-router.service, so systemd puts their stop
+# ahead of any llama-router start in the same transaction: a blocking
+# `systemctl start` from the trap waits for a job that is waiting for the trap
+# to return, and only TimeoutStopSec breaks the tie. The sibling TTS runner
+# deadlocked exactly that way on 2026-09-09. --no-block returns as soon as the
+# job is enqueued, which makes the restart a *request*: the result record below
+# says it was queued and never claims the router came back up.
 restore_router() {
   [ "$router_restored" -eq 0 ] || return 0
   router_restored=1
   if [ "$router_was_active" -eq 1 ]; then
-    log "restoring $ROUTER (was active before this run)"
-    systemctl --user start "$ROUTER" || log "WARNING: could not restart $ROUTER"
+    log "queueing $ROUTER restart (was active before this run); not waiting for it"
+    if systemctl --user --no-block start "$ROUTER"; then
+      router_restore_queued=1
+    else
+      log "WARNING: could not queue $ROUTER restart"
+    fi
   else
     log "leaving $ROUTER stopped (it was not active before this run)"
   fi
@@ -119,9 +135,13 @@ payload = {
     "control_plane_success": int(status) == 0 and artifact_pass == "true",
     "router_was_active": os.environ.get("RUNNER_ROUTER_WAS_ACTIVE") == "1",
     "router_restore_ran": os.environ.get("RUNNER_ROUTER_RESTORED") == "1",
-    # Only a router that was stopped by this run can be "restored" by it.
-    "router_restored": (os.environ.get("RUNNER_ROUTER_WAS_ACTIVE") == "1"
-                        and os.environ.get("RUNNER_ROUTER_RESTORED") == "1"),
+    # Only a router that was stopped by this run can be restarted by it, and the
+    # restart is enqueued without waiting, so the strongest true statement is
+    # that systemd accepted the job. Readiness is deliberately not claimed: this
+    # runner never observes it, and the previous "router_restored" field said
+    # more than the asynchronous request can support.
+    "router_restart_requested": (os.environ.get("RUNNER_ROUTER_WAS_ACTIVE") == "1"
+                                 and os.environ.get("RUNNER_ROUTER_QUEUED") == "1"),
     "started_at": os.environ.get("RUNNER_STARTED_AT"),
     "finished_at": os.environ.get("RUNNER_FINISHED_AT"),
     "invocation_id": os.environ.get("INVOCATION_ID"),
@@ -142,7 +162,8 @@ on_exit() {
   restore_router
   RUNNER_PYTHON_RC="$python_rc" RUNNER_SIGNAL="$signal_seen" \
     RUNNER_ARTIFACT="$ARTIFACT" RUNNER_ROUTER_WAS_ACTIVE="$router_was_active" \
-    RUNNER_ROUTER_RESTORED="$router_restored" RUNNER_STARTED_AT="$STARTED_AT" \
+    RUNNER_ROUTER_RESTORED="$router_restored" \
+    RUNNER_ROUTER_QUEUED="$router_restore_queued" RUNNER_STARTED_AT="$STARTED_AT" \
     RUNNER_FINISHED_AT="$(date -Is)" \
     write_result "$status" "${artifact_state:-unknown}" "${artifact_pass:-unknown}"
   log "end rc=$status python_rc=${python_rc:-none} signal=${signal_seen:-none} artifact=${artifact_state:-unknown}"

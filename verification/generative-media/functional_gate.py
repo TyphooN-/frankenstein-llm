@@ -57,11 +57,23 @@ def free_models() -> None:
 def submit(prompt: dict, timeout: int = 1800) -> dict:
     with performance.measure("media-workflow") as observed:
         result = _submit(prompt, timeout)
-        outputs = result.get("outputs", {})
-        observed["items"] = sum(
-            len(node.get(kind, [])) for node in outputs.values()
-            for kind in ("images", "audio", "gifs") if isinstance(node.get(kind), list))
+        observed["items"] = produced_outputs(result)
         return result
+
+
+def produced_outputs(result) -> int | None:
+    """How many artifacts the workflow returned, or None for an unfamiliar shape.
+
+    This is telemetry, not scoring: the gate judges the workflow on the files it
+    actually wrote. A history document laid out differently than expected is a
+    reason to record no count -- reaching into it unguarded would turn a
+    completed workflow into an AttributeError raised from the timing wrapper.
+    """
+    outputs = result.get("outputs") if isinstance(result, dict) else None
+    if not isinstance(outputs, dict):
+        return None
+    return sum(len(node[kind]) for node in outputs.values() if isinstance(node, dict)
+               for kind in ("images", "audio", "gifs") if isinstance(node.get(kind), list))
 
 
 def _submit(prompt: dict, timeout: int = 1800) -> dict:

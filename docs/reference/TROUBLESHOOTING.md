@@ -18,6 +18,7 @@ Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
 - [Build failures](#build-failures)
 - [Download problems](#download-problems)
 - [Qualification never starts](#qualification-never-starts)
+- [Stopping the qualification unit times out](#stopping-the-qualification-unit-times-out)
 - [Every boot repeats the whole qualification](#every-boot-repeats-the-whole-qualification)
 - [A gate's receipt is invalidated every boot](#a-gates-receipt-is-invalidated-every-boot)
 - [A refused router qualification revokes a pass](#a-refused-router-qualification-revokes-a-pass)
@@ -263,6 +264,36 @@ scripts/local-model-status.sh --host-sharing   # separates blocking from advisor
 ```
 
 Exit 75 from the unit means another supervisor holds the lock.
+
+## Stopping the qualification unit times out
+
+Symptom: `systemctl --user stop local-ai-qualification.service` hangs for the
+unit's whole stop timeout and the unit ends `failed` with `MainPID=0` and no
+cgroup. `systemctl --user list-jobs` during the hang shows a `llama-router.service`
+start job queued behind the qualification stop job.
+
+Cause: a serialized runner stops the router for exclusive GPU access and restarts
+it from its shell EXIT trap. That trap runs *inside* the unit's stop job, and
+the gate units are ordered `After=llama-router.service`, so systemd schedules
+the qualification stop ahead of the router start in the same transaction. A
+blocking `systemctl start` in the trap then waits for a job that is waiting for
+the trap to return. Observed on 2026-09-09 against the pre-rename unit; the
+runner was killed after the stop timeout, which loses the gate's real exit code.
+
+Fix, already applied: `run_serialized.sh` (TTS), `run_functional_serialized.sh`
+(media) and `run_when_idle.sh` (computer use) enqueue the restart with
+`systemctl --user --no-block start`, which returns as soon as the job is
+accepted. The router is therefore *requested*, not observed ready — the runner
+logs say `router restore queued; readiness not verified`, and the computer-use
+runner result records `router_restart_requested` rather than a restored router.
+Callers that need a live router start it and poll for it themselves, as
+`verification/repository-agent/run_serialized.sh` does.
+
+Check the router actually came back after the stop completes:
+
+```bash
+systemctl --user is-active llama-router.service
+```
 
 ## Every boot repeats the whole qualification
 

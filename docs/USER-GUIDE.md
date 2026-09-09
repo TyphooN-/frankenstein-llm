@@ -21,8 +21,11 @@ counts inconclusive executions as finished attempts, but never as passed gates;
 blocked admission is not a finished model attempt.
 
 The supervisor carries that distinction to the end of the run. A gate that exits
-`75` is recorded in `blocked_steps`, not `failed_steps`, and stays in `remaining`
-for the next invocation; the gates after it are still attempted. A pass with
+`75` is recorded in `blocked_steps`, not `failed_steps`, and is outstanding work
+the next invocation attempts again; the gates after it are still attempted. The
+terminal `remaining` list is rebuilt when a run ends and cleared when the next
+one starts, so it never describes the previous run's outstanding work while a new
+one is deciding. A pass with
 nothing but blocked gates ends in status `admission-blocked` and exit `75`, while
 any genuine failure still ends in `functional-foundation-incomplete` and exit `1`.
 An operator stop is recorded as `interrupted` in the qualification state and as

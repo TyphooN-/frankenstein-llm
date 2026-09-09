@@ -33,6 +33,16 @@ promote failure, inconclusive, interrupted, or running records to passes.
 Divergent state requires explicit reconciliation, not an overwrite. A stopped
 attempt without a completion receipt is interrupted, not running or passed.
 
+Two details decide whether transferred evidence survives the next invocation.
+`run_qualification.load_state()` accepts only the current schema marker,
+`frankenstein-functional-qualification/1`, and silently starts from an empty
+document otherwise, taking the recorded failure, interruption and exit-code
+ledger with it; a transferred document must therefore carry that marker, with
+`throughput_measured` respelled `benchmark_performed`. Copy the passive
+`*.performance.jsonl` observation sidecars alongside the gate logs as well, or
+the `performance_log` pointers in the state name evidence that is not there.
+Neither is a receipt key, so neither can turn a miss into a pass.
+
 Install the new tracked unit with the same security settings and disable the old
 unit. Preserve whether it was enabled; do not automatically restart qualification
 as part of the naming migration. Audit user overrides separately, including any
@@ -48,4 +58,4 @@ reuse. This release also changes gate and cache behavior, including unload proof
 and postcheck ordering: receipts measured with those older criteria can legitimately
 miss. Changed source hashes (including renamed source paths) are not silently
 waived or automatically rekeyed. Existing evidence is retained, and `--plan`
-explains eligibility; do not use `--force-requalify` merely for the rename.
+explains eligibility; do not use `--requalify` merely for the rename.
