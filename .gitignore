@@ -74,6 +74,4 @@ __pycache__/
 *~
 *.swp
 
-# Legacy runtime backup retained by the naming migration.
-verification/mission-supervisor/
 verification/qualification-supervisor/*.performance.jsonl

@@ -281,9 +281,9 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 
 Inventory entries: 274. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
 
-| [`scripts/migrate_qualification_state.py`](../../scripts/migrate_qualification_state.py) | [Reference](QUALIFICATION-MIGRATION.md) |
+| [`scripts/qualification-status.sh`](../../scripts/qualification-status.sh) | [Reference](QUALIFICATION-MIGRATION.md) |
 | [`scripts/qualification_performance.py`](../../scripts/qualification_performance.py) | [Reference](QUALIFICATION-PERFORMANCE.md) |
-| [`verification/qualification-supervisor/test_qualification_rebrand.py`](../../verification/qualification-supervisor/test_qualification_rebrand.py) | [Reference](QUALIFICATION-MIGRATION.md) |
+| [`verification/qualification-supervisor/test_qualification_launcher.py`](../../verification/qualification-supervisor/test_qualification_launcher.py) | [Reference](QUALIFICATION-MIGRATION.md) |
 | [`verification/qualification-supervisor/test_qualification_performance.py`](../../verification/qualification-supervisor/test_qualification_performance.py) | [Reference](QUALIFICATION-PERFORMANCE.md) |
 | [`docs/reference/QUALIFICATION-MIGRATION.md`](../../docs/reference/QUALIFICATION-MIGRATION.md) | [Reference](QUALIFICATION-MIGRATION.md) |
 | [`docs/reference/QUALIFICATION-PERFORMANCE.md`](../../docs/reference/QUALIFICATION-PERFORMANCE.md) | [Reference](QUALIFICATION-PERFORMANCE.md) |

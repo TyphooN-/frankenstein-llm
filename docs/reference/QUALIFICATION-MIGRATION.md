@@ -7,6 +7,7 @@ execution. Admission and permission are unrelated words and are unchanged.
 
 ## New entry points
 
+- `./scripts/qualification-status.sh` (also accepts `--json`)
 - `python3 scripts/qualification_status.py`
 - `python3 verification/qualification-supervisor/run_qualification.py --plan`
 - `systemctl --user status local-ai-qualification.service`
@@ -16,24 +17,21 @@ execution. Admission and permission are unrelated words and are unchanged.
 
 ## Existing installations
 
-Do not run old and new supervisors concurrently. Before updating a live checkout,
-stop `local-ai-functional-mission.service` and confirm its MainPID and cgroup have
-no live processes. Stop any manually launched `run_functional_mission.py` too.
+Stop the existing supervisor and confirm its MainPID and cgroup have no live
+processes before updating a live checkout. Stop manually launched runners too.
 Do not change source files out from under an active gate.
 
-After updating the checkout, inspect the offline migration plan:
+The one-time state migration has completed on the maintained host. Its helper,
+tests, and recovery evidence are archived outside the repository under the
+operator's qualification-closeout checkpoint. There is no supported alternate
+status command or compatibility fallback.
 
-```bash
-python3 scripts/migrate_qualification_state.py
-python3 scripts/migrate_qualification_state.py --apply
-```
-
-The migration acquires both supervisor locks, refuses visible old/new runners,
-preflights conflicting targets, and copies only known runtime files. It keeps the
-old `verification/mission-supervisor` directory as a backup. It translates paths
-in the state snapshot but preserves receipt bytes, keys, verdicts, and timestamps
-exactly. It never promotes historical failure/inconclusive/running records to
-passes. Divergent new state must be reconciled explicitly, not overwritten.
+When transferring runtime state from another installation, hold both supervisor
+locks, preflight conflicting targets, and preserve the original evidence outside
+the checkout. Copy receipt bytes, keys, verdicts, and timestamps exactly. Never
+promote failure, inconclusive, interrupted, or running records to passes.
+Divergent state requires explicit reconciliation, not an overwrite. A stopped
+attempt without a completion receipt is interrupted, not running or passed.
 
 Install the new tracked unit with the same security settings and disable the old
 unit. Preserve whether it was enabled; do not automatically restart qualification
@@ -51,6 +49,3 @@ and postcheck ordering: receipts measured with those older criteria can legitima
 miss. Changed source hashes (including renamed source paths) are not silently
 waived or automatically rekeyed. Existing evidence is retained, and `--plan`
 explains eligibility; do not use `--force-requalify` merely for the rename.
-
-The legacy names in this migration document and migration tests/tool are
-intentional compatibility references, not supported parallel public interfaces.
