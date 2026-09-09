@@ -77,6 +77,37 @@ def vram_residue(baseline: dict[str, int], released: dict[str, int]) -> tuple[di
     return residue, sorted(unreadable)
 
 
+def release_torch_memory(torch) -> list[str]:
+    """Release runtime-owned BLAS workspaces after callers drop model references.
+
+    empty_cache cannot release an allocated BLAS workspace. Synchronize every
+    device first, clear those workspace references, then empty the allocator.
+    Return cleanup errors so a finally block can retain its original verdict.
+    This does not relax allocator or card-level unload checks.
+    """
+    problems = []
+
+    def attempt(label, action):
+        try:
+            action()
+        except Exception as error:
+            problems.append(f"{label}: {type(error).__name__}: {error}"[:300])
+
+    try:
+        if not torch.cuda.is_available():
+            return problems
+        devices = range(torch.cuda.device_count())
+    except Exception as error:
+        return [f"device discovery: {type(error).__name__}: {error}"[:300]]
+    for index in devices:
+        attempt(f"synchronize cuda:{index}", lambda index=index: torch.cuda.synchronize(index))
+    clear = getattr(torch._C, "_cuda_clearCublasWorkspaces", None)
+    if callable(clear):
+        attempt("BLAS workspace release", clear)
+    attempt("allocator cache release", torch.cuda.empty_cache)
+    return problems
+
+
 def allocator_report() -> dict[str, dict[str, int]] | None:
     """Bytes this process's tensor allocator still holds, per device, or None.
 

@@ -6,6 +6,10 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import time
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from qualification_detail import detail, router_residency
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STATE = ROOT / 'verification/qualification-supervisor/qualification-state.json'
@@ -58,7 +62,7 @@ def timestamp(value):
         return None
 
 
-def snapshot(path, now=None, boot=None):
+def snapshot(path, now=None, boot=None, live=False):
     now = time.time() if now is None else now
     boot = current_boot() if boot is None else boot
     with path.open('rb') as handle:
@@ -111,6 +115,12 @@ def snapshot(path, now=None, boot=None):
                          # not distinguish a model verdict from a refusal.
                          error=text(step.get('error')),
                          blocked_by=text(step.get('blocked_by'))))
+    for row in rows:
+        row['detail'] = detail(path.parent.parent.parent, row['name'], state['steps'][row['name']], boot)
+        if row['status'].startswith('stale-') and row['detail'].get('available'):
+            row['detail']['evidence_scope'] = 'previous-inputs'
+            for model in row['detail']['models']:
+                model['evidence_scope'] = 'previous-inputs'
     counts = dict(Counter(row['status'] for row in rows))
     updated = timestamp(state.get('updated_at'))
     liveness = ('State-file observation only; running does not prove a live process'
@@ -118,6 +128,7 @@ def snapshot(path, now=None, boot=None):
                 f'State records boot {recorded_boot}; host is now on {boot}, '
                 'so nothing it left running is live')
     return dict(status=state.get('status', 'unknown'), current_step=state.get('current_step'),
+                router_observation=router_residency() if live else {'available': False},
                 total=len(rows), passed=counts.get('passed', 0), counts=counts,
                 terminal_attempts=sum(counts.get(k, 0) for k in ('passed', 'failed', 'inconclusive')),
                 state_age_seconds=None if updated is None else max(0, now - updated),
@@ -135,7 +146,7 @@ def snapshot(path, now=None, boot=None):
                            if isinstance(item, str)] if isinstance(state.get('remaining'), list) else [])
 
 
-def render(data):
+def render(data, details=False):
     lines = [f"LOCAL AI QUALIFICATION: {data['status']} | current: {data['current_step'] or '-'}",
              f"Qualification: {data['passed']}/{data['total']} gates passed; "
              f"{data['terminal_attempts']}/{data['total']} attempts finished",
@@ -146,6 +157,32 @@ def render(data):
         elapsed = '-' if row['elapsed_seconds'] is None else f"{row['elapsed_seconds'] / 60:.1f}m"
         age = '-' if row['log_age_seconds'] is None else f"{row['log_age_seconds'] / 60:.1f}m"
         lines.append(f"{row['name']:30} {row['status']:18} {elapsed:>10} {str(row['exit_code']):>5} {age:>10}")
+        info = row.get('detail', {})
+        if info.get('available'):
+            outcomes = ', '.join(f'{k}={v}' for k, v in sorted(info['outcomes'].items()))
+            denominator = str(info['configured_models']) if info['configured_models'] else '?'
+            unit = 'models' if row['name'] in ('router-models', 'repository-agent') else 'result records'
+            lines.append(f"  [{info['evidence_scope']}] {unit}: {info['models_recorded']}/{denominator}; "
+                         f"{outcomes}; recorded checks: {info['checks_passed']} passed, {info['checks_failed']} failed")
+            if info['configured_models']:
+                lines.append('  Denominator: ' + info['plan_basis'])
+            for model in info['models']:
+                failed = model['failed_checks']
+                if details or failed or model['outcome'] not in ('passed', 'unknown'):
+                    lines.append(f"    {model['model']}: {model['outcome']}"
+                                 + (' (reused)' if model['reused'] else '')
+                                 + f"; checks {model['checks_passed']}/{model['checks_recorded']} passed"
+                                 + (f"; FAILED: {', '.join(failed)}" if failed else '')
+                                 + (f"; missing: {', '.join(model['missing_checks'])}" if model['missing_checks'] else '')
+                                 + (f"; other problems: {model['problem_count']}" if model['problem_count'] else ''))
+        elif details:
+            lines.append('  Detail unavailable: ' + info.get('reason', 'not recorded'))
+    observation = data.get('router_observation', {})
+    if observation.get('available'):
+        lines += ['', 'Router resident/loading models: ' + (', '.join(
+            f"{r['model']} ({r['state']})" for r in observation['models']) or 'none'), observation['note']]
+    lines += ['', 'Check counts cover published evidence only; an in-flight model may not publish until it finishes.',
+              'Use --details for every recorded model and --offline to skip the read-only router probe.']
     if data['error']:
         lines += ['', 'Recorded cause: ' + data['error']]
     for label, key in (('Failed', 'failed_steps'), ('Blocked (nothing ran)', 'blocked_steps')):
@@ -168,13 +205,15 @@ def main():
     parser.add_argument('--state', type=Path, default=DEFAULT_STATE)
     parser.add_argument('--json', action='store_true')
     parser.add_argument('--watch', type=float, metavar='SECONDS')
+    parser.add_argument('--details', action='store_true', help='show all recorded model/check outcomes')
+    parser.add_argument('--offline', action='store_true', help='read artifacts only; do not query router residency')
     args = parser.parse_args()
     if args.watch is not None and (not 1 <= args.watch <= 3600):
         parser.error('--watch must be between 1 and 3600 seconds')
     while True:
         try:
-            data = snapshot(args.state)
-            print(json.dumps(data, indent=2) if args.json else render(data), flush=True)
+            data = snapshot(args.state, live=not args.offline and args.state.resolve() == DEFAULT_STATE.resolve())
+            print(json.dumps(data, indent=2) if args.json else render(data, args.details), flush=True)
         except (OSError, ValueError, TypeError) as exc:
             print(json.dumps({'error': str(exc)}) if args.json else f'Qualification status unavailable: {exc}', flush=True)
             return 1

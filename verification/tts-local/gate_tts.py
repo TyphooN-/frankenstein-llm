@@ -30,7 +30,7 @@ import unicodedata
 # tree's gatelib, so a change under test was never the code that ran.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                         / "verification/local-coverage-foundation/validators"))
-from gatelib import allocator_report, unload_verdict, vram_used  # noqa: E402
+from gatelib import allocator_report, release_torch_memory, unload_verdict, vram_used  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
 import qualification_performance as performance
@@ -331,12 +331,8 @@ def main() -> int:
     finally:
         model = None
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            try:
-                torch.cuda.synchronize(TTS_DEVICE)
-            except Exception:                                   # noqa: BLE001
-                pass
+        for problem in release_torch_memory(torch):
+            note(problems, f"unload cleanup: {problem}")
         gc.collect()
         time.sleep(8)
         allocator = allocator_report()

@@ -53,7 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # put its own on the path, and sys.modules then kept the wrong one.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                        / "verification/local-coverage-foundation/validators"))
-from gatelib import exit_after_verdict  # noqa: E402
+from gatelib import exit_after_verdict, release_torch_memory  # noqa: E402
 from culib import generation_diagnostic  # noqa: E402
 from culib import (  # noqa: E402
     EVIDENCE, FIXTURES, MODEL_DIR, GateFailure, allocator_report, build_inputs,
@@ -614,11 +614,10 @@ class Runner:
         self.image_processor = None
         self.tokenizer = None
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            for index in range(torch.cuda.device_count()):
-                torch.cuda.synchronize(index)
+        problems = release_torch_memory(torch)
         gc.collect()
+        if problems:
+            raise RuntimeError("; ".join(problems))
 
 
 # ---------------------------------------------------------------------------
