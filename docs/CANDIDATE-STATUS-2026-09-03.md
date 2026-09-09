@@ -68,7 +68,7 @@ linux-tkg and cargo were active. No throughput was recorded.
   `{"ticket_id":4172}`; unloaded. Preset `tensor-split = 13,26,6` still
   spends display-GPU2 VRAM; bias GPU0+GPU1 on a later quiet-host pass.
 
-The mission `router-models` failure at 23:15 was confounder admission
+The qualification `router-models` failure at 23:15 was confounder admission
 (`makepkg` started after `ridge` passed), not an architecture miss.
 
 Candidate Transformers runtime: `venvs/candidates` on host Python 3.14.7,

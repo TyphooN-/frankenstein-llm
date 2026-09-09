@@ -29,7 +29,7 @@ import time
 from datetime import datetime
 
 ROOT = Path(__file__).resolve().parents[2]
-CACHE = ROOT / 'verification/mission-supervisor/qualification-cache'
+CACHE = ROOT / 'verification/qualification-supervisor/qualification-cache'
 MAX_RECORD = 2 << 20
 # Only model inputs used by these fixed workflows. Adding another queue candidate
 # does not alter an existing workflow's identity.

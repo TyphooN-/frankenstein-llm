@@ -25,7 +25,7 @@ Related: [architecture](ARCHITECTURE.md) · [operations](OPERATIONS.md) ·
 - [Environment variables](#environment-variables)
 - [Download queue schema](#download-queue-schema)
 - [Download state and stamps](#download-state-and-stamps)
-- [Mission state schema](#mission-state-schema)
+- [Qualification state schema](#qualification-state-schema)
 - [Capability ledger schema](#capability-ledger-schema)
 - [Prompt corpus schemas](#prompt-corpus-schemas)
 - [Other tracked manifests](#other-tracked-manifests)
@@ -48,7 +48,7 @@ and something checks them against each other.
 | Which model file backs an alias | `llama-models.ini` | prose in `docs/local-hermes-models.md`; prose is descriptive |
 | Sidecar model, port, flags | `services/sidecar-*.env` | none — the unit template substitutes them |
 | Pinned artifact, revision, size, digest | `verification/local-coverage-foundation/download-queue*.json` | generated from `research/hf/`; consumed by policy and ledger without restatement |
-| Phase byte totals | the queue's `total_bytes` | the phase stamp, the next phase runner, the mission supervisor; reconciled by `test_queue_manifests.py` |
+| Phase byte totals | the queue's `total_bytes` | the phase stamp, the next phase runner, the qualification supervisor; reconciled by `test_queue_manifests.py` |
 | Candidate privilege and prerequisites | `verification/candidate-qualification/candidate_policy.py` | none — the router gate derives its check list from it |
 | Approved remote-code digests | `wemm_remote_code_review.py` (`REVIEWED_FILES`) | `WEMM-REMOTE-CODE-REVIEW.md` table |
 | Which artifact proves which capability | `build_capability_ledger.py` (`CAPABILITY_EVIDENCE`) | [capability matrix](CAPABILITY-MATRIX.md) prose |
@@ -240,7 +240,7 @@ Tracked copies of user units. They are **not** installed by cloning; see
 | `local-ai-model-downloads-phase4.service` | simple | yes | researched candidates |
 | `obliterated-mmproj-download.service` | oneshot | yes | one projector download |
 | `glm53flash-reverify.service` | oneshot | yes | force publisher-hash reverify of GLM shards |
-| `local-ai-functional-mission.service` | oneshot | yes | the serialized mission |
+| `local-ai-qualification.service` | oneshot | yes | the serialized qualification |
 | `local-ai-computer-use-gate.service` | exec | **no** | grounding gate; started explicitly |
 | `local-ai-tts-gate.service` | oneshot | no | TTS→ASR round trip |
 | `local-ai-repo-agent-gate.service` | oneshot | no | repository-agent A/B |
@@ -248,7 +248,7 @@ Tracked copies of user units. They are **not** installed by cloning; see
 
 Notable hardening: the download phases run `ProtectSystem=strict`,
 `ProtectHome=read-only`, `NoNewPrivileges=true` with `ReadWritePaths` limited to
-`models/` and their own foundation directory. The mission unit keeps that
+`models/` and their own foundation directory. The qualification unit keeps that
 sandbox, but must also write `/tmp`, `/var/tmp`, `venvs/`, `tools/`, and
 `verification/tmp` (`TMPDIR`): `ProtectSystem=strict` otherwise remounts `/tmp`
 read-only and torch dies at import with `No usable temporary directory`. It
@@ -307,11 +307,11 @@ into the queue.
 Service policy: phase one and two use budget 32; phases three and four use 64.
 All four use 16 workers.
 
-### Mission supervisor
+### Qualification supervisor
 
 | Variable | Default | Behaviour |
 |---|---|---|
-| `HERMES_MISSION_QUIET_TIMEOUT` | `21600` (6 h) | positive integer seconds; empty or unset uses the default, anything else raises rather than silently defaulting |
+| `HERMES_QUALIFICATION_QUIET_TIMEOUT` | `21600` (6 h) | positive integer seconds; empty or unset uses the default, anything else raises rather than silently defaulting |
 
 ### GLM isolated runtime
 
@@ -394,21 +394,21 @@ plus a newline. It is written with the same atomic-plus-fsync path as the state,
 because a torn stamp is not a retryable state — it reads as a permanent mismatch
 against a queue that is in fact complete.
 
-## Mission state schema
+## Qualification state schema
 
-`verification/mission-supervisor/mission-state.json`,
-`frankenstein-functional-mission/1` (ignored):
+`verification/qualification-supervisor/qualification-state.json`,
+`frankenstein-functional-qualification/1` (ignored):
 
 | Field | Meaning |
 |---|---|
 | `status` | `starting`, `waiting-artifacts`, `waiting-safe-host`, `running`, `running-with-failures`, `blocked-policy`, `functional-foundation-incomplete`, `functional-foundation-complete`, `interrupted`, `failed` |
 | `boot_id`, `kernel_release`, `kernel_build_signature` | which boot produced this run |
 | `input_fingerprint` | SHA-256 over tracked sources, promotion records, queues and queued-file metadata; a step is skipped only when its recorded fingerprint still matches |
-| `steps.<name>` | `command`, `input_fingerprint`, `started_at`, `finished_at`, `exit_code`, `status` (`running`/`passed`/`failed`/`interrupted`/`blocked-policy`), `benchmarking_performed: false`, `throughput_measured: false` |
+| `steps.<name>` | `command`, `input_fingerprint`, `started_at`, `finished_at`, `exit_code`, `status` (`running`/`passed`/`failed`/`interrupted`/`blocked-policy`), `benchmarking_performed: false`, `benchmark_performed: false` |
 | `failed_steps[]`, `remaining[]`, `exit_code` | terminal summary |
 | `signal`, `interrupted_step`, `step_exit_code`, `step_status` | operator-stop detail |
 
-Per-step logs land beside it as `<step>.log`, with `mission.log` as the lifecycle
+Per-step logs land beside it as `<step>.log`, with `qualification.log` as the lifecycle
 log.
 
 ## Capability ledger schema
@@ -419,7 +419,7 @@ log.
 | Field | Meaning |
 |---|---|
 | `built_at`, `source_of_truth[]` | when, and from which queues |
-| `model_inference_performed`, `throughput_measured`, `sha256_reverified` | all `false` by construction |
+| `model_inference_performed`, `benchmark_performed`, `sha256_reverified` | all `false` by construction |
 | `capabilities.<name>.state` | one of the seven states in [architecture → layer 6](ARCHITECTURE.md#layer-6--reporting) |
 | `capabilities.<name>.reasons[]` | why that state, in words |
 | `capabilities.<name>.artifacts[]` | per-file presence, bytes vs expected, `newest_mtime`, `complete` |
@@ -526,7 +526,7 @@ fixtures and documentation. Not tracked:
 | `/venvs/`, `/tools/ComfyUI/`, `/tools/qwen38-mtp/` | local runtimes and nested upstream checkouts |
 | `/logs/`, `router-state.json`, `*.log`, `*.lock`, `*.tmp`, `*.tmp.*`, `*.ok` | runtime state, locks, stamps; `*.tmp.*` alone would miss the plain-suffix crash residue |
 | `*.partial`, `*.recovered` | transfer debris |
-| `verification/**/evidence/`, `**/download-state*.json`, `**/mission-state.json`, `**/transcript-*.jsonl`, `**/lane.json`, `**/build-*/` | gate evidence and per-run state |
+| `verification/**/evidence/`, `**/download-state*.json`, `**/qualification-state.json`, `**/transcript-*.jsonl`, `**/lane.json`, `**/build-*/` | gate evidence and per-run state |
 | `/verify-*`, several named probe dumps | ad-hoc probe output |
 | `__pycache__/`, `*.py[cod]`, `.pytest_cache/`, `*.egg-info/` | Python debris |
 
@@ -542,10 +542,10 @@ that is a dependency hash lock rather than a transient process lock.
 
 **Admission.** `download-queue-phase4.json` + `models/**` + `llama-models.ini` +
 `WEMM-REMOTE-CODE-REVIEW.md` → `gate_candidate_policy.py` →
-`candidate-qualification/evidence/candidate-policy.json` → mission step one.
+`candidate-qualification/evidence/candidate-policy.json` → qualification step one.
 
-**Qualification.** stamps + quiet host → mission supervisor → each gate →
-`verification/**/evidence/*.json` + `mission-state.json`.
+**Qualification.** stamps + quiet host → qualification supervisor → each gate →
+`verification/**/evidence/*.json` + `qualification-state.json`.
 
 **Reporting.** `download-queue*.json` + `models/**` metadata + gate artifacts →
 `build_capability_ledger.py` → `evidence/capability-ledger.json` → the prose

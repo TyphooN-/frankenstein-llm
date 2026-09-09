@@ -46,9 +46,9 @@ Expect diminishing speed returns as offload grows, potentially abrupt degradatio
 
 ## Benchmark boundary and method
 
-The user's later request explicitly permits targeted benchmarks of larger upgrade candidates, including RAM-offloaded candidates. A further operator request authorizes a same-slot speed and usefulness A/B of the two mradermacher 27B Q6_K GGUFs against installed `heretic` and `obliterated`. It does not blanket-enable every existing throughput mission. Preserve the distinction in execution controls and require explicit benchmark execution rather than a permissive config default. Do not run that A/B while the functional mission lock is held.
+The user's later request explicitly permits targeted benchmarks of larger upgrade candidates, including RAM-offloaded candidates. A further operator request authorizes a same-slot speed and usefulness A/B of the two mradermacher 27B Q6_K GGUFs against installed `heretic` and `obliterated`. It does not blanket-enable every existing throughput qualification. Preserve the distinction in execution controls and require explicit benchmark execution rather than a permissive config default. Do not run that A/B while the functional qualification lock is held.
 
-Run timing comparisons only on a healthy, uncontended host with verified kernel/backend provenance, no competing build or GPU mission, and one inference owner. Do not change voltage, clocks, security settings, or the production router to manufacture a favorable result.
+Run timing comparisons only on a healthy, uncontended host with verified kernel/backend provenance, no competing build or GPU qualification, and one inference owner. Do not change voltage, clocks, security settings, or the production router to manufacture a favorable result.
 
 Measure separately:
 - Task-level quality: code correctness, native tool calls, reasoning and retrieval accuracy, and relevant multimodal outcomes.
@@ -60,7 +60,7 @@ Measure separately:
 
 Use fixed workloads, controlled warmup and cache state, repeat runs, and report variability. Tiny smoke-test responses are functional evidence, not performance benchmarks. Report tradeoffs rather than collapsing unrelated quality and speed measurements into an unexplained score.
 
-Abort or defer on unsafe memory pressure, kernel/allocator errors, missing GPUs, or workload collisions. Preserve evidence; do not reinterpret a confounded run as a model defect or a successful fit. Do not alter shared mission state or interrupt an active router without coordinating ownership.
+Abort or defer on unsafe memory pressure, kernel/allocator errors, missing GPUs, or workload collisions. Preserve evidence; do not reinterpret a confounded run as a model defect or a successful fit. Do not alter shared qualification state or interrupt an active router without coordinating ownership.
 
 ## Deliverable and decisions
 

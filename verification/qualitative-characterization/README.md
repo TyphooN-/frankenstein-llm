@@ -77,7 +77,7 @@ an edit.
   asserts the harness contains no `subprocess`, `exec`, `eval` or shell call.
 - **Loopback only.** The endpoint is asserted to be `127.0.0.1`, not assumed.
 - **No speed measurement.** No timing, token-rate or usage field is requested or
-  recorded. `report.json` carries `throughput_measured: false` and
+  recorded. `report.json` carries `benchmark_performed: false` and
   `timing_recorded: false`, and a test asserts those fields never appear.
 
 ## Resource evidence

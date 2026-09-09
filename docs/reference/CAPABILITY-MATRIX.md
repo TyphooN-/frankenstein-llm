@@ -190,7 +190,7 @@ Consequences to keep in mind when reading any document here:
 Building the harness later means: an offline scorer with pinned inputs, per-model
 evidence artifacts carrying explicit measurement fields, a ledger extension that
 does not confuse a measurement with an admission, and removal of the
-`throughput_measured: false` invariant that every gate currently asserts. None of
+`benchmark_performed: false` invariant that every gate currently asserts. None of
 that exists yet.
 
 ## Dated observation

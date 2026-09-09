@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only mission snapshot. Never starts, stops, or loads a model."""
+"""Read-only qualification snapshot. Never starts, stops, or loads a model."""
 import argparse
 from collections import Counter
 from datetime import datetime, timezone
@@ -8,7 +8,7 @@ from pathlib import Path
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_STATE = ROOT / 'verification/mission-supervisor/mission-state.json'
+DEFAULT_STATE = ROOT / 'verification/qualification-supervisor/qualification-state.json'
 BOOT_ID = Path('/proc/sys/kernel/random/boot_id')
 RUNNER_LOGS = {
     'tts-asr-roundtrip': 'tts-local/evidence/tts-runner.log',
@@ -39,10 +39,10 @@ def snapshot(path, now=None, boot=None):
     with path.open('rb') as handle:
         raw = handle.read(4 * 1024 * 1024 + 1)
     if len(raw) > 4 * 1024 * 1024:
-        raise ValueError('mission state exceeds 4 MiB')
+        raise ValueError('qualification state exceeds 4 MiB')
     state = json.loads(raw)
     if not isinstance(state, dict) or not isinstance(state.get('steps'), dict):
-        raise ValueError('mission state has no valid steps mapping')
+        raise ValueError('qualification state has no valid steps mapping')
     # The supervisor records its boot id at startup, runs exactly one step at a
     # time, and sets current_step and the top-level running status before it
     # starts the child. A step left marked running that fails any of those three
@@ -79,7 +79,8 @@ def snapshot(path, now=None, boot=None):
                 pass
         rows.append(dict(name=name, status=status, elapsed_seconds=elapsed,
                          exit_code=step.get('exit_code'), log_age_seconds=log_age,
-                         log_path=str(log) if safe_name else None))
+                         log_path=str(log) if safe_name else None,
+                         performance_log=step.get('performance_log')))
     counts = dict(Counter(row['status'] for row in rows))
     updated = timestamp(state.get('updated_at'))
     liveness = ('State-file observation only; running does not prove a live process'
@@ -97,7 +98,7 @@ def snapshot(path, now=None, boot=None):
 
 
 def render(data):
-    lines = [f"MISSION: {data['status']} | current: {data['current_step'] or '-'}",
+    lines = [f"LOCAL AI QUALIFICATION: {data['status']} | current: {data['current_step'] or '-'}",
              f"Qualification: {data['passed']}/{data['total']} gates passed; "
              f"{data['terminal_attempts']}/{data['total']} attempts finished",
              'States: ' + ', '.join(f'{key}={value}' for key, value in sorted(data['counts'].items())),
@@ -109,7 +110,7 @@ def render(data):
         lines.append(f"{row['name']:30} {row['status']:18} {elapsed:>10} {str(row['exit_code']):>5} {age:>10}")
     lines += ['', 'Failures require repair/retest; finishing this pass is not qualification success.',
               'Host/process detail: bash scripts/local-model-status.sh --host-sharing',
-              'Gate logs: verification/mission-supervisor/<gate>.log; redirected runner paths in --json']
+              'Gate logs: verification/qualification-supervisor/<gate>.log; redirected runner paths in --json']
     return '\n'.join(lines)
 
 
@@ -126,7 +127,7 @@ def main():
             data = snapshot(args.state)
             print(json.dumps(data, indent=2) if args.json else render(data), flush=True)
         except (OSError, ValueError, TypeError) as exc:
-            print(json.dumps({'error': str(exc)}) if args.json else f'Mission status unavailable: {exc}', flush=True)
+            print(json.dumps({'error': str(exc)}) if args.json else f'Qualification status unavailable: {exc}', flush=True)
             return 1
         if args.watch is None:
             return 0

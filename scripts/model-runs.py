@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""User-operated functional mission and native llama.cpp benchmark runner.
+"""User-operated functional qualification and native llama.cpp benchmark runner.
 
 Planning is the default. Never starts/stops services or builds dependencies.
 """
@@ -16,7 +16,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-MISSION = ROOT / 'verification/mission-supervisor'
+QUALIFICATION = ROOT / 'verification/qualification-supervisor'
 BIN = ROOT / 'upstream/llama.cpp/build/bin/llama-bench'
 BUILD_NAMES = {'makepkg', 'make', 'ninja', 'cmake', 'cargo', 'rustc', 'clang',
                'clang++', 'cc1', 'cc1plus', 'gcc', 'g++', 'ld', 'ld.lld',
@@ -40,7 +40,7 @@ def parser():
         s.add_argument('--config', default=str(ROOT / 'config/model-runs.json'))
         s.add_argument('--execute', action='store_true', help='run; otherwise print plan only')
         s.add_argument('--timeout', type=bounded(1, 172800), default=86400,
-                       help='total run limit in seconds, including mission waiting')
+                       help='total run limit in seconds, including qualification waiting')
         if name == 'benchmark':
             s.add_argument('--model', required=True, help='local GGUF path, first shard for split models')
             s.add_argument('--devices', default='ROCm0/ROCm1/ROCm2', help='native slash-separated benchmark device list')
@@ -80,7 +80,7 @@ def configured_args(argv):
 
 def command(a):
     if a.mode == 'qualify':
-        return [sys.executable, str(MISSION / 'run_functional_mission.py')]
+        return [sys.executable, str(QUALIFICATION / 'run_qualification.py')]
     if not re.fullmatch(r'ROCm[0-9]+(?:/ROCm[0-9]+)*', a.devices):
         raise ValueError('devices must be slash-separated ROCm device names')
     if not re.fullmatch(r'[0-9]+(?:\.[0-9]+)?(?:/[0-9]+(?:\.[0-9]+)?)*', a.tensor_split):
@@ -207,22 +207,22 @@ def main(argv=None):
         return 2
     lock = None
     try:
-        # Qualification takes this lock inside the existing mission. Benchmarks
+        # Qualification takes this lock inside the existing qualification. Benchmarks
         # hold it here so neither lane can overlap the other.
-        lock = (MISSION / 'mission.lock').open('a+')
+        lock = (QUALIFICATION / 'qualification.lock').open('a+')
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         preflight(a)
         if a.mode == 'qualify':
             lock.close()
             lock = None
-            # Mission reacquires nonblocking; a race loses safely with exit 75.
+            # Qualification reacquires nonblocking; a race loses safely with exit 75.
         outroot = ROOT / 'logs/model-runs'
         outroot.mkdir(parents=True, exist_ok=True)
         out = Path(tempfile.mkdtemp(prefix=a.mode + '-', dir=outroot))
         print(f'Report directory: {out}', flush=True)
         return execute(a, cmd, out)
     except BlockingIOError:
-        print('mission lock busy; stop the existing mission before running this command', file=sys.stderr)
+        print('qualification lock busy; stop the existing qualification before running this command', file=sys.stderr)
         return 75
     except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as e:
         print(f'Preflight refused: {e}', file=sys.stderr)

@@ -91,7 +91,7 @@ license and quality plan and is not part of this quantization experiment.
 ### 4. Correctness and performance qualification
 
 Request explicit benchmark authorization and use the existing serialized
-admission path on a healthy idle host. No competing mission, interactive model,
+admission path on a healthy idle host. No competing qualification, interactive model,
 compiler or media workload; never stop user processes merely to admit a test.
 An unstable boot or changed GPU tuning invalidates comparison evidence.
 
@@ -134,5 +134,5 @@ ADR; no quantization recipe is executable until source, exact backend commands,
 resource budget, held-out tasks and success thresholds have been selected.
 
 The next decision is a bounded experiment proposal naming those inputs and the
-specific fit or quality gap. Existing mission failures remain a separate repair
+specific fit or quality gap. Existing qualification failures remain a separate repair
 backlog and must not be relabeled as completed by this document.

@@ -182,7 +182,7 @@ buffers and fragmentation are free to depart from that proportion by more than
 configured idle baselines are stale by; it is not a reading taken with the model
 unloaded. "Fits" in the table above means "inside the budget this policy
 reserved" — a planning statement. The only proof that a preset loads is loading
-it, which is the functional mission's job.
+it, which is the functional qualification's job.
 
 This measurement was taken before the 2026-09-06 reboot and has not been
 repeated since. The idle baselines it rests on were re-read after that reboot,
@@ -258,8 +258,8 @@ against the policy, and regenerable. Change the policy in
 `config/gpu-placement.json` and rerun `scripts/gpu_placement.py` rather than
 editing `llama-models.ini` by hand — a hand edit is what the comparison test
 will report. What has *not* happened for the current proportions is a load of
-every preset under them; that is the functional mission's job
-(`local-ai-functional-mission.service`), it is gated on an uncontended host, and
+every preset under them; that is the functional qualification's job
+(`local-ai-qualification.service`), it is gated on an uncontended host, and
 until it has run these placements are evaluated but not exercised.
 
 ### A stall this host can produce
@@ -448,7 +448,7 @@ free loopback port and the router proxies to it (`load()`,
 `llama-sidecar@.service` instances on ports 8081-8084, started with
 `--load-mode none`, never counted against the router's `models_max` and never
 evicted by it. A sidecar and the router are genuinely two resident models on the
-same cards, which is why a sidecar left resident by a failed gate is a mission
+same cards, which is why a sidecar left resident by a failed gate is a qualification
 blocker in its own right — see
 [architecture → sidecars](ARCHITECTURE.md#sidecars).
 
@@ -460,7 +460,7 @@ selected:
 
 ```bash
 scripts/local-model-status.sh
-scripts/local-model-status.sh --host-sharing   # adds the mission and host view
+scripts/local-model-status.sh --host-sharing   # adds the qualification and host view
 ```
 
 ## Reading this correctly

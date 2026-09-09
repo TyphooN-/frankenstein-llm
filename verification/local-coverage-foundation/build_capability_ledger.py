@@ -193,7 +193,7 @@ def read_evidence(path: Path, expected_gate: str | None = None) -> dict:
     """Read one gate artifact. Unreadable and absent are both 'no verdict'."""
     record = {"path": str(path), "present": path.is_file(), "pass": False,
               "interrupted": False, "recorded_at": None, "error": None,
-              "sections_missing": None, "throughput_measured": False}
+              "sections_missing": None, "benchmark_performed": False}
     if not record["present"]:
         record["error"] = "evidence artifact absent"
         return record
@@ -216,9 +216,10 @@ def read_evidence(path: Path, expected_gate: str | None = None) -> dict:
         record["error"] = "evidence reports missing required sections"
     if document.get("error"):
         record["error"] = str(document["error"])[:400]
-    # This workspace forbids throughput measurement. An artifact claiming to hold
-    # some is a policy problem worth surfacing, not a field to copy forward.
-    record["throughput_measured"] = bool(document.get("throughput_measured")
+    # Dedicated benchmark runs remain separate from functional acceptance.
+    # Historical artifacts used throughput_measured for that policy marker;
+    # passive per-attempt observations are now kept in a separate sidecar.
+    record["benchmark_performed"] = bool(document.get("benchmark_performed", document.get("throughput_measured"))
                                          or document.get("benchmarking_performed"))
     return record
 
@@ -276,7 +277,7 @@ def build_ledger(queues=QUEUES, evidence_map=None) -> dict:
             for path in evidence_map.get(name, ())
         ]
         state, reasons = classify(artifacts, evidence)
-        if any(item["throughput_measured"] for item in evidence):
+        if any(item["benchmark_performed"] for item in evidence):
             problems.append(f"{name}: an evidence artifact reports measured throughput")
         capabilities[name] = {
             "state": state,
@@ -294,7 +295,7 @@ def build_ledger(queues=QUEUES, evidence_map=None) -> dict:
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "source_of_truth": [str(path) for path in queues],
         "model_inference_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "sha256_reverified": False,
         "capabilities": capabilities,
         "functionally_qualified": sorted(

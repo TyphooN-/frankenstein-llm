@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Execute local image, music, and image-edit workflows; no performance metrics."""
+"""Execute local image, music, and image-edit workflows with passive duration observations."""
 from __future__ import annotations
 
 import json
+import sys
 import os
 from pathlib import Path
 import subprocess
@@ -13,6 +14,9 @@ import urllib.request
 import uuid
 
 from PIL import Image, ImageDraw, ImageStat
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import qualification_performance as performance
 
 BASE = "http://127.0.0.1:8188"
 HERE = Path(__file__).resolve().parent
@@ -51,6 +55,16 @@ def free_models() -> None:
 
 
 def submit(prompt: dict, timeout: int = 1800) -> dict:
+    with performance.measure("media-workflow") as observed:
+        result = _submit(prompt, timeout)
+        outputs = result.get("outputs", {})
+        observed["items"] = sum(
+            len(node.get(kind, [])) for node in outputs.values()
+            for kind in ("images", "audio", "gifs") if isinstance(node.get(kind), list))
+        return result
+
+
+def _submit(prompt: dict, timeout: int = 1800) -> dict:
     response = request_json("/prompt", {"prompt": prompt, "client_id": CLIENT_ID})
     if response.get("node_errors"):
         raise RuntimeError(f"workflow rejected: {response['node_errors']}")
@@ -260,7 +274,7 @@ def main() -> int:
         "gate": "generative-media-functional",
         "server": BASE,
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "started_at": now(),
         "workflows": {},
         "problems": [],

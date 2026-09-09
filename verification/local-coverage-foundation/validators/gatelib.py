@@ -19,6 +19,9 @@ import typing
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'scripts'))
+import qualification_performance as performance
+
 EVIDENCE = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/evidence")
 
 # Measured 2026-09-01 from sysfs. Index is the DRM card, not the ROCm ordinal;
@@ -131,11 +134,11 @@ def unload_verdict(baseline: dict[str, int], released: dict[str, int],
     different tolerance -- 256, 512 and 768 MiB -- which is what tuning a
     constant around the wrong measurement looks like.
 
-    ``allocator`` is the direct measurement, from :func:`allocator_report`: the
-    bytes this process's tensor allocator still has outstanding. When it can be
-    read it decides the model-release claim exactly, with no tolerance at all,
-    and any residue beyond it is recorded as the runtime context rather than
-    scored as a leak. When it cannot be read, nothing changes.
+    ``allocator`` adds framework accounting. Zero allocator bytes cannot prove
+    that arbitrary device residue belongs to the runtime: direct allocations,
+    other processes, and driver leaks are outside that allocator. Preserve the
+    card threshold until process-exit or independently attributed context proof
+    exists; never turn unexplained residue into a pass.
     """
     residue, unreadable = vram_residue(baseline, released)
     problems = []
@@ -160,10 +163,9 @@ def unload_verdict(baseline: dict[str, int], released: dict[str, int],
             # failed unload at any size, including one under the tolerance.
             problems.append(f"model memory still allocated after unload: {outstanding}")
         elif over:
-            verdict["runtime_context_bytes"] = over
-            verdict["note"] = (
-                "the tensor allocator released every byte it held; the residue "
-                "above is the still-live runtime device context, not the model")
+            verdict["unattributed_device_bytes"] = over
+            verdict["note"] = "zero tensor allocator bytes do not attribute device residue"
+            problems.append(f"VRAM release remains unproven: {over}")
     verdict["problems"] = problems
     verdict["pass"] = not problems
     return verdict
@@ -175,8 +177,15 @@ def post_json(url: str, payload: dict, timeout: int = 600) -> dict:
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.load(response)
+    with performance.measure("http-inference", model=payload.get("model")) as observed:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            result = json.load(response)
+        observed["response"] = result
+        if "input" in payload:
+            observed["items"] = len(payload["input"]) if isinstance(payload["input"], list) else 1
+        elif isinstance(payload.get("documents"), list):
+            observed["items"] = len(payload["documents"])
+        return result
 
 
 def wait_healthy(base_url: str, timeout: int = 900) -> float:
@@ -234,7 +243,7 @@ def ensure_unloaded(summary: dict, unit: str, baseline: dict[str, int] | None,
 
     ``unload_gate`` lives on the success path, so any failing assertion used to
     return through the error handler with the model still resident. That breaks
-    the one-resident-large-model policy and stalls the serialized mission, whose
+    the one-resident-large-model policy and stalls the serialized qualification, whose
     quiet-host check treats a live unmanaged llama-server as a conflict and waits
     for it. Cleanup is therefore unconditional, and it is recorded as cleanup:
     an unload check that never ran is not a passing unload check.

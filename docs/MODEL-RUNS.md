@@ -1,7 +1,7 @@
 # User-operated model serving, qualification and benchmarks
 
 These entry points are for both humans and AI agents. Preview is the default;
-`--execute` is required to launch a model or mission. No service is silently stopped,
+`--execute` is required to launch a model or qualification. No service is silently stopped,
 no GPU topology is auto-rewritten, and no dependency is automatically downloaded.
 
 ## Normal hardware and configuration
@@ -97,17 +97,17 @@ Foreground output goes to the terminal unless the caller redirects it or uses a 
 
 ```bash
 bash scripts/qualify-models.sh                # plan only
-# Stop a previously active mission before starting another owner:
-systemctl --user stop local-ai-functional-mission.service
+# Stop a previously active qualification before starting another owner:
+systemctl --user stop local-ai-qualification.service
 bash scripts/qualify-models.sh --execute
 ```
 
-This runs the existing serialized, resumable full mission, including its policy
+This runs the existing serialized, resumable full qualification, including its policy
 prerequisite, artifact readiness checks, model gates and capability evidence. It
-is not a new lightweight single-model gate. The mission may restart the router
+is not a new lightweight single-model gate. The qualification may restart the router
 and hand GPUs between capability lanes. Do not run it while using Hermes on that
 same local backend; switch to a cloud backend or close the local chat first.
-Existing mission progress remains under `verification/mission-supervisor/`.
+Existing qualification progress remains under `verification/qualification-supervisor/`.
 The configured total timeout includes waiting for downloads and host readiness.
 
 ## Build and run native benchmarks
@@ -127,7 +127,7 @@ Preview and run an example:
 ```bash
 bash scripts/benchmark-model.sh --model models/Qwen3.8-27B-Ridge-3.7bpw.gguf
 # Deliberate exclusive handoff; never stop a backend hosting the active agent:
-systemctl --user stop local-ai-functional-mission.service llama-router.service
+systemctl --user stop local-ai-qualification.service llama-router.service
 bash scripts/benchmark-model.sh \
   --model models/Qwen3.8-27B-Ridge-3.7bpw.gguf \
   --confirm-kernel --execute
@@ -146,7 +146,7 @@ meaningful comparisons; do not label different configurations a model ranking.
 
 ## Preflight, ownership and reports
 
-Qualification and benchmarks refuse execution if the mission lock is busy, ZFS
+Qualification and benchmarks refuse execution if the qualification lock is busy, ZFS
 cannot be positively identified as healthy, recognized compiler/download
 processes are active, or available RAM is below 16 GiB. Benchmarks additionally
 refuse live `llama-*` processes. The RAM threshold is only a minimum, not proof
@@ -170,7 +170,7 @@ Every admitted run gets a unique ignored directory in `logs/model-runs/`:
 - `stdout.log` and `stderr.log`: native output;
 - for a successful benchmark, `stdout.log` contains native JSON metrics.
 
-Qualification leaves its detailed gate evidence in existing mission locations.
+Qualification leaves its detailed gate evidence in existing qualification locations.
 No qualification pass is fabricated from a process merely starting. Timeouts and
 interrupts terminate the owned child process group; interrupted/failed reports
 remain available. Do not interpret an interrupted benchmark as a measured result.
@@ -182,8 +182,8 @@ failure (or 1 for report/cleanup failures). Reports never overwrite prior runs.
 
 ## Publish measured throughput as markdown
 
-Throughput is deliberately not part of `local-ai-functional-mission.service`,
-which records `throughput_measured: false`. The mission answers "does this
+Throughput is deliberately not part of `local-ai-qualification.service`,
+which records `benchmark_performed: false`. The qualification answers "does this
 preset work"; this lane answers "how fast was it in one measured run", and the
 two are kept apart so a rate can never stand in for a gate.
 

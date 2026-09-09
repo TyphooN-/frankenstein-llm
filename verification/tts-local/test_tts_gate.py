@@ -38,7 +38,7 @@ class RoundTripTests(unittest.TestCase):
         self.assertTrue(result["pass"])
         self.assertTrue(result["cases"][0]["pass"])
         self.assertGreaterEqual(result["cases"][0]["similarity"], rt.SIMILARITY_THRESHOLD)
-        self.assertFalse(result["throughput_measured"])
+        self.assertFalse(result["benchmark_performed"])
 
     def test_evaluate_pairs_fails_low_similarity(self):
         pairs = rt.parse_pairs(self.raw_pairs())

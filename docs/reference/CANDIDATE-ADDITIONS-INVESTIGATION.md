@@ -154,7 +154,7 @@ repository does not publish one.
 Flash-Next line that the shortlist already lists as research-only, and it is
 the only unrestricted candidate whose architecture the pinned runtime already
 implements. Revisit if a smaller quant appears, or after the RAM upgrade, and
-only as an authorized targeted RAM-spill comparison — never as a mission
+only as an authorized targeted RAM-spill comparison — never as a qualification
 default.
 
 **`Lightricks/LTX-2.5`** — revision `5e6e71018ee1756ed329b697a7b4aedc934dfce9`,

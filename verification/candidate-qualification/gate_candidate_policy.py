@@ -48,7 +48,7 @@ def evaluate() -> dict:
         "policy_problems": policy_problems,
         "problems": problems,
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "model_inference_performed": False,
         "pass": not problems,
     }

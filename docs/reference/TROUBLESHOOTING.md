@@ -17,11 +17,11 @@ Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
 - [Hermes cannot see local models](#hermes-cannot-see-local-models)
 - [Build failures](#build-failures)
 - [Download problems](#download-problems)
-- [Mission never starts](#mission-never-starts)
-- [Every boot repeats the whole mission](#every-boot-repeats-the-whole-mission)
+- [Qualification never starts](#qualification-never-starts)
+- [Every boot repeats the whole qualification](#every-boot-repeats-the-whole-qualification)
 - [A gate's receipt is invalidated every boot](#a-gates-receipt-is-invalidated-every-boot)
 - [A refused router qualification revokes a pass](#a-refused-router-qualification-revokes-a-pass)
-- [The mission dies reading its own inputs](#the-mission-dies-reading-its-own-inputs)
+- [The qualification dies reading its own inputs](#the-qualification-dies-reading-its-own-inputs)
 - [The policy gate blocks every gate over a file that is still arriving](#the-policy-gate-blocks-every-gate-over-a-file-that-is-still-arriving)
 - [A gate reports VRAM still held after unload](#a-gate-reports-vram-still-held-after-unload)
 - [One preset fails only its tool-call check](#one-preset-fails-only-its-tool-call-check)
@@ -211,7 +211,7 @@ CPU.
 | Exit 75 | Another writer holds the phase lock | Wait, or stop the other unit |
 | Exit 2 | Arguments were passed. The program takes none | Set `HERMES_DOWNLOAD_*` instead |
 | A phase never starts | The previous phase's state is not `complete`, or its stamp does not equal the expected byte total | `cat verification/local-coverage-foundation/downloads*-complete.ok` and compare against the queue's `total_bytes`; run `test_queue_manifests.py` |
-| `phase-one stamp mismatch` | The queue was edited without updating every copy of its byte total | Update queue, phase runner and mission supervisor together |
+| `phase-one stamp mismatch` | The queue was edited without updating every copy of its byte total | Update queue, phase runner and qualification supervisor together |
 
 Read-only reconciliation, safe on a busy host:
 
@@ -219,11 +219,11 @@ Read-only reconciliation, safe on a busy host:
 python3 verification/computer-use-grounding/reconcile_downloads.py
 ```
 
-## Mission never starts
+## Qualification never starts
 
 The supervisor logs why it is waiting to
-`verification/mission-supervisor/mission.log` and mirrors it into
-`mission-state.json`.
+`verification/qualification-supervisor/qualification.log` and mirrors it into
+`qualification-state.json`.
 
 | `status` | Meaning | Action |
 |---|---|---|
@@ -235,8 +235,8 @@ The supervisor logs why it is waiting to
 | `inputs-unreadable` | `git ls-files`/`git diff` over `verification` did not answer within the retry budget | Let the disk quiet down; the run exits 75 having attempted nothing |
 | `admission-blocked` | Every incomplete gate refused admission; none failed | Re-run when the queues are idle. `blocked_steps` names them; `failed_steps` is empty |
 
-Three classified reasons actually hold the mission
-(`MISSION_BLOCKING_REASONS`): a build whose `cwd` is inside a kernel tree
+Three classified reasons actually hold the qualification
+(`QUALIFICATION_BLOCKING_REASONS`): a build whose `cwd` is inside a kernel tree
 (`kernel-build`), any inference process that is not the managed router
 (`inference`) — a **sidecar left resident by a failed gate**, or `llama-server`
 started by hand — and any process in the `local-ai-model-downloads` slice
@@ -247,14 +247,14 @@ hand-started `llama-server` blocks even though the unit does not.
 runs `python3` and `aria2c` and would otherwise classify as workspace Python or
 a transfer, neither of which blocks. It blocks for one specific reason: the
 router gate refuses a qualification that competing work would confound, so a
-mission that starts it beside a queue records nine model `FAIL` rows in under a
+qualification that starts it beside a queue records nine model `FAIL` rows in under a
 second and none of them is a verdict about a model. See
-[every boot repeats the whole mission](#every-boot-repeats-the-whole-mission).
+[every boot repeats the whole qualification](#every-boot-repeats-the-whole-qualification).
 
 Everything else the classifier names is reported and not gating: a generic
 compiler or `makepkg` outside a kernel tree, a transfer such as `aria2c` or
 `curl`, and workspace Python. Deliberately so — those are not a missing kernel
-and must not hold a mission after a new-kernel boot. Seeing them in a
+and must not hold a qualification after a new-kernel boot. Seeing them in a
 `waiting-safe-host` log line does not explain the wait; look for a `kernel-build`
 or `inference` count, or for `MemAvailable`.
 
@@ -264,24 +264,24 @@ scripts/local-model-status.sh --host-sharing   # separates blocking from advisor
 
 Exit 75 from the unit means another supervisor holds the lock.
 
-## Every boot repeats the whole mission
+## Every boot repeats the whole qualification
 
 Symptom: every invocation logs `passed step inputs changed; rerunning` for the
 first step and works forward from there, so gates that passed an hour ago are run
-again and the mission never reaches its last step. On a host that is also
+again and the qualification never reaches its last step. On a host that is also
 rebooting this looks like the kernel problem below, and it is a separate cause
 that survives fixing the kernel.
 
-The mission skips a step only when its recorded `input_fingerprint` equals the
-one computed at startup. `mission_inputs_fingerprint` hashes each
+The qualification skips a step only when its recorded `input_fingerprint` equals the
+one computed at startup. `qualification_inputs_fingerprint` hashes each
 `download-state*.json` document, and the download units start at boot too and
 rewrite those documents with fresh `started_at`/`completed_at` timestamps while
 they re-verify files that are already present and correct. Different bytes,
 different fingerprint, every pass invalidated.
 
 ```bash
-python3 -c "import importlib.util as u;s=u.spec_from_file_location('m','verification/mission-supervisor/run_functional_mission.py');m=u.module_from_spec(s);s.loader.exec_module(m);print(m.mission_inputs_fingerprint())"
-python3 -c "import json;print(json.load(open('verification/mission-supervisor/mission-state.json'))['input_fingerprint'])"
+python3 -c "import importlib.util as u;s=u.spec_from_file_location('m','verification/qualification-supervisor/run_qualification.py');m=u.module_from_spec(s);s.loader.exec_module(m);print(m.qualification_inputs_fingerprint())"
+python3 -c "import json;print(json.load(open('verification/qualification-supervisor/qualification-state.json'))['input_fingerprint'])"
 ```
 
 If those disagree while `git status` is clean, compare the queue documents
@@ -293,7 +293,7 @@ supposed to invalidate the passes that used it.
 Related: `router-models` failing in well under a second with every model `FAIL`
 is not nine model failures. `gate_router_models` refuses a qualification that
 would be confounded by competing work, and a download queue re-verifying ~130 GB
-is competing work. The refusal is correct; the mission starting the gate anyway
+is competing work. The refusal is correct; the qualification starting the gate anyway
 is not. Confirm from the artifact rather than the log, which has no run
 boundaries:
 
@@ -325,7 +325,7 @@ find models -name '*.bad-*' -printf '%TF %f\n' | sort | tail
 
 A queue that re-reads an artifact it already promoted and computes a different
 SHA-256 quarantines it as `*.bad-<epoch>` and downloads it again. The re-promoted
-file has a new mtime and ctime, so every receipt and the whole-mission
+file has a new mtime and ctime, so every receipt and the whole-qualification
 `input_fingerprint` that named it are invalidated — correctly, by their own
 rules, because from the cache's point of view the input really did change.
 
@@ -343,12 +343,12 @@ Investigate this alongside the kernel and storage evidence described in
 without attributing a hardware or mirror cause from hashes alone. Fix the host
 integrity issue first. Raising no tolerance, disabling no
 verification and rebuilding no cache will stop this loop while reads keep coming
-back wrong: the queue re-downloads, the fingerprint moves, and the mission
+back wrong: the queue re-downloads, the fingerprint moves, and the qualification
 restarts from the top for as long as it continues.
 
 ## A refused router qualification revokes a pass
 
-**Repaired in the mission admission/receipt update.** Previously a host refusal
+**Repaired in the qualification admission/receipt update.** Previously a host refusal
 inside the cached callable overwrote a valid pass with a failure. Admission is
 now checked before revocation, while the inner guard still covers a workload
 appearing between outer admission and dispatch. A pre-dispatch refusal restores
@@ -369,9 +369,9 @@ repository-agent gate and serialized runner follow the same contract. The
 supervisor waits for admission before revoking a receipt and distinguishes 75
 (blocked) from 76 (inconclusive). A failed forced retest still invalidates reuse.
 
-## The mission dies reading its own inputs
+## The qualification dies reading its own inputs
 
-Symptom: `mission.log` ends in
+Symptom: `qualification.log` ends in
 
 ```
 fatal TimeoutExpired: Command '['git', 'diff', '--binary', 'HEAD', '--', 'verification', 'llama-models.ini', 'scripts']' timed out after 30 seconds
@@ -380,11 +380,11 @@ fatal TimeoutExpired: Command '['git', 'diff', '--binary', 'HEAD', '--', 'verifi
 or the same command with `returned non-zero exit status 128`, and no gate ran at
 all. On 2026-09-08 this ended twenty invocations between 13:23 and 23:35.
 
-`mission_inputs_fingerprint()` asks git what the checkout looks like.
+`qualification_inputs_fingerprint()` asks git what the checkout looks like.
 `git diff --binary HEAD` walks every tracked file under `verification/`, which
 takes minutes while a download queue is saturating the disk; `128` is git
 refusing over a contended `index.lock` or an unreadable object. Both are
-statements about the host at that moment, not about the mission, and both used to
+statements about the host at that moment, not about the qualification, and both used to
 escape as unhandled exceptions into the module-level handler, which recorded
 `status: failed` and exited.
 
@@ -394,8 +394,8 @@ previous `input_fingerprint` left in place, so the next run still compares
 against what actually ran.
 
 ```bash
-grep -c 'input fingerprint attempt' verification/mission-supervisor/mission.log
-grep -n 'inputs unreadable' verification/mission-supervisor/mission.log | tail
+grep -c 'input fingerprint attempt' verification/qualification-supervisor/qualification.log
+grep -n 'inputs unreadable' verification/qualification-supervisor/qualification.log | tail
 ```
 
 Persistent `128` is not a timing problem. Check the checkout itself, and read it
@@ -419,7 +419,7 @@ grep -E 'quarantined|promoted' verification/local-coverage-foundation/downloads.
 ```
 
 On 2026-09-09 the gate ran at 00:01:15 and the file was promoted at 00:17 --
-sixteen minutes of the mission's whole run refused over a transfer in progress.
+sixteen minutes of the qualification's whole run refused over a transfer in progress.
 A completion stamp records that a queue finished once; it does not survive the
 quarantine-and-re-download loop, because the queue verifies SHA-256 on
 promotion, moves a mismatching file aside as `<name>.bad-<stamp>` and fetches it
@@ -432,7 +432,7 @@ is still reported by the policy gate rather than waited for -- otherwise a real
 missing artifact would become a hang.
 
 ```bash
-python3 -c "import sys;sys.path.insert(0,'verification/mission-supervisor');import run_functional_mission as m;print(m.artifacts_in_flight())"
+python3 -c "import sys;sys.path.insert(0,'verification/qualification-supervisor');import run_qualification as m;print(m.artifacts_in_flight())"
 ```
 
 The same loop makes a preset's identity unreadable, because `preset_identity`
@@ -463,21 +463,20 @@ touched until the process exits. That floor was being scored as retained model
 memory, and the three gates had each absorbed it into a different constant --
 256, 512 and 768 MiB.
 
-`unload_verdict` now takes `allocator_report()`, the bytes this process's tensor
-allocator still has outstanding. When it can be read it decides the release
-exactly and with no tolerance: any live tensor fails the section at any size,
-including one under the card tolerance, and residue beyond it is recorded as
-`runtime_context_bytes` with the full host reading kept beside it. When it cannot
-be read -- no torch, an uninitialised runtime, a malformed report -- the card
-check decides as before. Unreadable cards still fail either way.
+`unload_verdict` now also takes `allocator_report()`. Any allocated or reserved
+tensor memory fails even below the card threshold. A zero allocator reading does
+not identify the owner of device-wide residue: direct allocations, other
+processes and driver allocations remain possible. Above-threshold residue stays
+failed and is recorded as `unattributed_device_bytes`. Attribution requires an
+independent runtime baseline or process-exit check; no threshold is waived.
 
 ```bash
 python3 -c "import json;d=json.load(open('verification/tts-local/evidence/gate-tts.json'));print(json.dumps(d['unload'],indent=1))"
 ```
 
-`allocator_bytes` present with an empty `runtime_context_bytes` is a clean
-unload. `model memory still allocated after unload` is a real leak. Neither key
-present means the allocator could not be read and the card tolerance decided.
+Use the complete `unload.pass` verdict, not one empty counter, to decide whether
+release was proven. Allocator counters are diagnostic evidence, not proof that
+every residual device allocation is harmless runtime context.
 
 ## One preset fails only its tool-call check
 
@@ -509,7 +508,7 @@ unproven here and must not be reported as the established cause.
 
 **This is a hypothesis, not a finding.** Testing it means one bounded run of that
 preset with the penalty at the default, and that is a GPU workload: do it when
-the mission is not running, and change nothing in `llama-models.ini` until a run
+the qualification is not running, and change nothing in `llama-models.ini` until a run
 shows the check passing. `phr00ty` passing at `temp = 1.5` has already closed the
 older theory that its temperature was the cause of its tool-call failures.
 
@@ -529,8 +528,8 @@ older theory that its temperature was the cause of its tool-call failures.
 | Router gate reports `reclaimable RAM remained N bytes below baseline` | Host memory did not come back after the model was unloaded, and the ZFS ARC does not account for it | A real shortfall. Note this is measured as `MemAvailable + (ARC size - ARC c_min)`, because MemAvailable alone does not credit the ARC and charged whichever model was under test for cache the router had filled reading earlier presets. `ram_recovery` in the artifact separates the two deltas. A shortfall is real memory, which is not the same as the model's: confirm the host is not retiring corrupt pages first, see [a gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting) |
 | A gate exits -11 or 139 after its artifact says `"pass": true` | Two causes look identical here and only one is benign: ROCm's HSA runtime segfaulting in its own process-exit teardown *after* the verdict was written, or a crash *during* the gate that left an artifact from an earlier run in place | The run failed until you prove otherwise; see [a failed process outranks a passing artifact](#a-failed-process-outranks-a-passing-artifact) |
 | A ComfyUI node fails with `HIPBLAS_STATUS_INVALID_VALUE` from `hipblasLtMatmulAlgoGetHeuristic` | hipBLASLt has no algorithm for that problem shape on this architecture. These cards are gfx1030 and torch's own hipBLASLt support list is gfx9 | Not a model or workflow fault, and not a tolerance question. The media runner exports `TORCH_BLAS_PREFER_HIPBLASLT=0` to route matmuls through hipBLAS instead |
-| `router-models` exits 1 in under a second with every model `FAIL` | Not a model verdict. The gate refused a qualification confounded by competing work, usually a download queue re-verifying at boot | [Every boot repeats the whole mission](#every-boot-repeats-the-whole-mission) |
-| A gate shows `running` long after the host rebooted | A crash or hard kill left the record behind; no signal handler ran to mark it interrupted | `python3 scripts/mission_status.py` reports it as `interrupted` rather than trusting the record |
+| `router-models` exits 1 in under a second with every model `FAIL` | Not a model verdict. The gate refused a qualification confounded by competing work, usually a download queue re-verifying at boot | [Every boot repeats the whole qualification](#every-boot-repeats-the-whole-qualification) |
+| A gate shows `running` long after the host rebooted | A crash or hard kill left the record behind; no signal handler ran to mark it interrupted | `python3 scripts/qualification_status.py` reports it as `interrupted` rather than trusting the record |
 | Grounding scores look confidently wrong | A geometry or action-space mismatch, not the model. This is exactly what `groundlib.py` exists to prevent | `python3 -m pytest verification/computer-use-grounding/test_grounding_contract.py` |
 
 ## A failed process outranks a passing artifact
@@ -548,7 +547,7 @@ its verdict. It was observed three times on boot `1669f3ad`, always
 before that explanation applies:
 
 1. **The artifact is from this run.** Its `recorded_at` falls between the step's
-   `started_at` and `finished_at` in `mission-state.json`, and its `boot_id`, where
+   `started_at` and `finished_at` in `qualification-state.json`, and its `boot_id`, where
    the gate records one, is the current `/proc/sys/kernel/random/boot_id`. An older
    timestamp means you are reading a previous verdict and the crash destroyed this
    one.
@@ -571,11 +570,11 @@ the state file, and do not carry the artifact forward as a verdict.
 Symptoms that arrive together: gates that pass and fail across consecutive runs
 with no change to weights, configuration or presets; the router gate reporting
 `reclaimable RAM remained N bytes below baseline` for whichever preset happened to
-be under test; the mission restarting from the top every few minutes.
+be under test; the qualification restarting from the top every few minutes.
 
 Rule out the harness first for that last one: a changed input fingerprint
-restarts the mission from the top on a perfectly healthy host. See
-[every boot repeats the whole mission](#every-boot-repeats-the-whole-mission).
+restarts the qualification from the top on a perfectly healthy host. See
+[every boot repeats the whole qualification](#every-boot-repeats-the-whole-qualification).
 
 Check the host before the model:
 

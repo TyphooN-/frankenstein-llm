@@ -863,7 +863,7 @@ def main(argv: list[str] | None = None) -> int:
     payload = {
         "schema": "frankenstein-gpu-placement/1",
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "visibility_filters": [{"variable": n, "value": v} for n, v in filters],
         "devices": rows,
         "presets": report,

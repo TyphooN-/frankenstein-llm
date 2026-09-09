@@ -79,7 +79,7 @@ class MediaPolicyTests(unittest.TestCase):
         report = preflight.build_report(healthy_probe(["pid=1 kernel-build"]))
         self.assertTrue(report["pass"])
         self.assertFalse(report["functional_gate_ready_now"])
-        self.assertFalse(report["throughput_measured"])
+        self.assertFalse(report["benchmark_performed"])
         self.assertEqual(["pid=1 kernel-build"], report["kernel_build_blockers"])
 
     def test_idle_host_is_functionally_ready(self):
@@ -246,7 +246,7 @@ class KernelBuildDetectionTests(unittest.TestCase):
         self.process(str(os.getpid()), "cargo build")
         self.assertEqual([], policy.host_exclusive_blockers(self.proc))
 
-    def test_build_names_do_not_drift_from_the_mission_supervisor(self):
+    def test_build_names_do_not_drift_from_the_qualification_supervisor(self):
         """Two gates that disagree about what a build looks like is one gate.
 
         The supervisor owns the canonical list because it is the one that has to
@@ -254,7 +254,7 @@ class KernelBuildDetectionTests(unittest.TestCase):
         broader but never narrower.
         """
         source = (Path(__file__).resolve().parents[1]
-                  / "mission-supervisor" / "run_functional_mission.py")
+                  / "qualification-supervisor" / "run_qualification.py")
         spec = importlib.util.spec_from_file_location("supervisor_build_names", source)
         supervisor = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(supervisor)

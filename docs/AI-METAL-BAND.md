@@ -128,7 +128,7 @@ much of a loss.
 
 ## Production reality
 
-The audio and image half cannot run today. As of the 2026-09-07 00:38 mission:
+The audio and image half cannot run today. As of the 2026-09-07 00:38 qualification:
 
 - `generative-media-functional` **failed** — ComfyUI died in `VAEDecode` with
   `miopenStatusUnknownError`
@@ -139,7 +139,7 @@ Both root causes were found and fixed in this change — a MIOpen cache that
 `ProtectHome=read-only` made unwritable, and an ASR gate pointed at the wrong
 virtualenv — but **neither fix has been proven by a passing gate yet**. The
 correct next step for this project is not to generate anything; it is to re-run
-`local-ai-functional-mission.service` and watch those two gates.
+`local-ai-qualification.service` and watch those two gates.
 
 Lyrics need none of that. `fable` is installed, benchmarked
 ([`docs/benchmarks/fable.md`](benchmarks/fable.md)) and passing its router gate,

@@ -33,7 +33,7 @@ def evidence(passed=True, recorded=RECENT, interrupted=False, present=True,
              throughput=False, path="/tmp/gate-synthetic.json"):
     return {"path": path, "present": present, "pass": passed,
             "interrupted": interrupted, "recorded_at": recorded, "error": None,
-            "sections_missing": None, "throughput_measured": throughput}
+            "sections_missing": None, "benchmark_performed": throughput}
 
 
 class QueueReadingTests(unittest.TestCase):
@@ -92,11 +92,11 @@ class EvidenceReadingTests(unittest.TestCase):
             path.write_text(json.dumps({
                 "gate": "synthetic", "pass": False, "interrupted": True,
                 "recorded_at": OLDER, "error": "interrupted by SIGTERM",
-                "sections_missing": ["grounding"], "throughput_measured": True}))
+                "sections_missing": ["grounding"], "benchmark_performed": True}))
             record = ledger.read_evidence(path)
         self.assertFalse(record["pass"])
         self.assertTrue(record["interrupted"])
-        self.assertTrue(record["throughput_measured"])
+        self.assertTrue(record["benchmark_performed"])
         self.assertEqual(["grounding"], record["sections_missing"])
 
     def test_truthy_pass_must_be_exactly_true(self):
@@ -218,12 +218,12 @@ class LedgerTests(unittest.TestCase):
         self.assertEqual(ledger.SCHEMA, report["schema"])
         self.assertEqual(["asr"], report["functionally_qualified"])
         self.assertTrue(report["pass"])
-        self.assertFalse(report["throughput_measured"])
+        self.assertFalse(report["benchmark_performed"])
         self.assertFalse(report["model_inference_performed"])
 
     def test_measured_throughput_in_evidence_is_a_ledger_problem(self):
         """This workspace forbids throughput measurement; do not copy it forward."""
-        queues, evidence_map = self.synthetic(throughput_measured=True)
+        queues, evidence_map = self.synthetic(benchmark_performed=True)
         report = ledger.build_ledger(queues, evidence_map)
         self.assertFalse(report["pass"])
         self.assertIn("asr: an evidence artifact reports measured throughput",

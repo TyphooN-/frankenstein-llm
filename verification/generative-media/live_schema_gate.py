@@ -66,7 +66,7 @@ def build_report() -> dict:
     return {
         "gate": "generative-media-live-schema",
         "server": BASE,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "generation_submitted": False,
         "required_nodes": list(REQUIRED_NODES),
         "missing_nodes": missing_nodes,
@@ -84,7 +84,7 @@ def main() -> int:
         report = {
             "gate": "generative-media-live-schema",
             "server": BASE,
-            "throughput_measured": False,
+            "benchmark_performed": False,
             "generation_submitted": False,
             "pass": False,
             "error": f"{type(error).__name__}: {error}"[:1000],

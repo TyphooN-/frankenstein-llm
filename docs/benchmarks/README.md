@@ -1,6 +1,6 @@
 # Native throughput artifacts
 
-One file per weight file that was actually benchmarked with the native `llama-bench` binary. Throughput is deliberately **not** part of `local-ai-functional-mission.service`, which records `throughput_measured: false`; these runs are a separate lane that an operator authorizes with `--confirm-kernel --execute` after confirming the intended kernel. See [Scripted model operation](../MODEL-RUNS.md).
+One file per weight file that was actually benchmarked with the native `llama-bench` binary. Throughput is deliberately **not** part of `local-ai-qualification.service`, which records `benchmark_performed: false`; these runs are a separate lane that an operator authorizes with `--confirm-kernel --execute` after confirming the intended kernel. See [Scripted model operation](../MODEL-RUNS.md).
 
 Rows are ordered by alias, not by speed. A model absent from this table was not benchmarked; nothing here is estimated. The functional column is the router gate's own verdict, carried here so a fast preset that failed a gate cannot be read as a recommendation.
 

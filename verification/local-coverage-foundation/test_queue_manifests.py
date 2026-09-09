@@ -2,7 +2,7 @@
 
 The expected byte totals are repeated in four places: each queue JSON, the
 later-phase runners that refuse to start until the previous stamp matches, and
-the mission supervisor that refuses to qualify anything until all four do. A
+the qualification supervisor that refuses to qualify anything until all four do. A
 queue edited without updating those copies produces a stamp mismatch
 that fails a unit *after* the transfer, or -- worse -- a supervisor that waits
 forever for a number nothing will ever write. Cheap to check here; expensive to
@@ -121,8 +121,8 @@ class StampConstantTests(unittest.TestCase):
             with self.subTest(phase=phase):
                 self.assertIn(str(STAMP_BYTES[phase]), found)
 
-    def test_mission_supervisor_waits_for_all_four_totals(self):
-        supervisor = HERE.parent / "mission-supervisor" / "run_functional_mission.py"
+    def test_qualification_supervisor_waits_for_all_four_totals(self):
+        supervisor = HERE.parent / "qualification-supervisor" / "run_qualification.py"
         found = literals(supervisor)
         for phase, total in STAMP_BYTES.items():
             with self.subTest(phase=phase):

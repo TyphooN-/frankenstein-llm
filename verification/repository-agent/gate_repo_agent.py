@@ -39,9 +39,12 @@ import urllib.error
 import urllib.request
 import uuid
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import qualification_performance as performance
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'verification/candidate-qualification'))
-sys.path.insert(0, str(ROOT / 'verification/mission-supervisor'))
+sys.path.insert(0, str(ROOT / 'verification/qualification-supervisor'))
 sys.path.insert(0, str(ROOT / 'verification/router-functional'))
 from gate_router_models import blocked_workloads
 from qualification_cache import (model_key, run_cached, digest, key_components,
@@ -275,8 +278,11 @@ def router_call(messages: list[dict], model: str = DEFAULT_MODEL) -> dict:
     request = urllib.request.Request(
         ROUTER, data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(request, timeout=900) as response:
-        return json.load(response)
+    with performance.measure("repository-agent-turn", model=model) as observed:
+        with urllib.request.urlopen(request, timeout=900) as response:
+            result = json.load(response)
+        observed["response"] = result
+        return result
 
 
 def run_agent(root: Path, call=router_call) -> dict:
@@ -391,7 +397,7 @@ def qualify(root: Path, model: str, call=router_call, postcheck=None) -> dict:
         "gate": "local-repository-agent", "model": model, "run_id": run_id,
         "status": "running", "pass": False, "interrupted": True,
         "started_at": timestamp(), "sandbox": sandbox,
-        "throughput_measured": False,
+        "benchmark_performed": False,
     })
     try:
         result = run_agent(root, call)
@@ -406,7 +412,7 @@ def qualify(root: Path, model: str, call=router_call, postcheck=None) -> dict:
                    "workspace": str(root), "sandbox": sandbox,
                    "run_id": run_id, "status": result.get("status", "complete"), "interrupted": False,
                    "finished_at": timestamp(),
-                   "throughput_measured": False})
+                   "benchmark_performed": False})
     if postcheck is not None:
         postcheck(result)
     result["outcome"] = outcome_of(result)

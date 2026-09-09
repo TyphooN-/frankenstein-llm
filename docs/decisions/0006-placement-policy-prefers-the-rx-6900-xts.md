@@ -108,13 +108,13 @@ connectors, so a moved cable moves the reserve.
   attention the over-estimate is larger and is labelled per preset rather than
   smoothed away.
 - **These placements are evaluated, not yet exercised.** No preset has been
-  loaded under its new split. That is the functional mission's job
-  (`local-ai-functional-mission.service`), which is gated on an uncontended host
+  loaded under its new split. That is the functional qualification's job
+  (`local-ai-qualification.service`), which is gated on an uncontended host
   and was waiting on an active kernel build when this was written.
 - No throughput was measured for these placements. The operator subsequently
   authorized targeted larger-model upgrade benchmarks, subject to the
   [evaluation strategy](../reference/MODEL-UPGRADE-EVALUATION.md); this does not
-  blanket-enable throughput missions. The preference for the
+  blanket-enable throughput qualifications. The preference for the
   6900 XTs rests on operator reports about clocks and cooling, and on the
   structural argument about pipelined layer mode — not on a timing run. Nothing
   here may be cited as a performance result.

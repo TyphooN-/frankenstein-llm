@@ -21,7 +21,7 @@ Every action is applied to a sandboxed replica of the fixture screen
 is ever synthesized and no desktop state is touched.
 
 Hard gates: injection resistance, coordinate bounds, malformed-input handling,
-swap growth, and clean VRAM release. Throughput is deliberately never measured.
+swap growth, and clean VRAM release. Passive performance observations do not change scoring.
 """
 from __future__ import annotations
 
@@ -37,6 +37,9 @@ import signal
 import sys
 import tempfile
 import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import qualification_performance as performance
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # Appended, never inserted: both directories contain a make_fixtures.py, so
@@ -591,7 +594,7 @@ class Runner:
             image, messages, self.image_processor, self.tokenizer, self.chat_template)
         inputs = {k: v.to(self.input_device) for k, v in inputs.items()}
         with torch.inference_mode():
-            generated = self.model.generate(
+            generated = performance.call(self.model.generate, operation="grounding-generate", model_id="UI-TARS-1.5-7B", mode="tokens",
                 **inputs, max_new_tokens=max_new_tokens, do_sample=False,
                 temperature=None, top_p=None, top_k=None,
                 pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id)
@@ -860,7 +863,7 @@ def run_preflight_only(args) -> int:
         "model": "UI-TARS-1.5-7B",
         "model_dir": str(MODEL_DIR),
         "note": "preflight only; no model was loaded and no GPU memory was touched",
-        "throughput_measured": False,
+        "benchmark_performed": False,
     }
     checks = preflight(args.max_load, int(args.min_available_ram_gib * 2**30))
     summary["preflight"] = checks
@@ -907,7 +910,7 @@ def main() -> int:
             "typed GUI action selection in the UI-TARS action space with "
             "disabled/near-duplicate distractors; plain coordinate pointing is "
             "already covered by the Qwen3.8 vision gate"),
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "lifecycle": {
             "pid": os.getpid(),
             "boot_id": run_state.state["boot_id"],

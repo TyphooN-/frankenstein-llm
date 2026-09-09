@@ -686,7 +686,7 @@ class EvidenceLifecycleTests(unittest.TestCase):
         record = ledger.read_evidence(self.path, "local-repository-agent")
         state, reasons = ledger.classify([], [record])
         self.assertEqual(ledger.STATE_QUALIFIED, state, reasons)
-        self.assertFalse(record["throughput_measured"])
+        self.assertFalse(record["benchmark_performed"])
 
 
 class ModelSelectionTests(unittest.TestCase):

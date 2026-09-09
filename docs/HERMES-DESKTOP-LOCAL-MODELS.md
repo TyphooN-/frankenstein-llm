@@ -4,7 +4,7 @@
 
 The local router is already running. Cloud remains the Hermes default. To use a local model, pick it in Desktop or type `/model heretic` in a new chat. The first reply after a switch waits for the GGUF to load; later replies do not.
 
-Do not wait for the full qualification mission. Chat, writing, and local coding through the router are ready. Grounding, ComfyUI, TTS, and WeMM image retrieval are not required for that.
+Do not wait for the full qualification qualification. Chat, writing, and local coding through the router are ready. Grounding, ComfyUI, TTS, and WeMM image retrieval are not required for that.
 
 1. Confirm the backend:
 

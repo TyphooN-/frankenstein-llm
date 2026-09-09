@@ -493,8 +493,8 @@ class BlockedWorkloadTests(unittest.TestCase):
 
     def test_the_supervisor_that_launched_this_gate_is_not_a_blocker(self):
         """Every gate in this workspace is a "python3"; blocking on that name
-        would make the mission refuse every run it started itself."""
-        self.process("50", "python3", cgroup="0::/user.slice/.../local-ai-functional-mission.service")
+        would make the qualification refuse every run it started itself."""
+        self.process("50", "python3", cgroup="0::/user.slice/.../local-ai-qualification.service")
         self.process("51", "python3")
         self.assertEqual([], self.reasons())
 
@@ -524,16 +524,16 @@ class BlockedWorkloadTests(unittest.TestCase):
         with patch.object(Path, "read_bytes", guarded):
             self.assertEqual([(70, "inference")], self.reasons())
 
-    def test_refusal_matches_what_the_mission_waits_for(self):
+    def test_refusal_matches_what_the_qualification_waits_for(self):
         """A functional gate must not refuse cargo the supervisor would let through."""
         source = (Path(__file__).resolve().parents[1]
-                  / "mission-supervisor" / "run_functional_mission.py")
+                  / "qualification-supervisor" / "run_qualification.py")
         spec = importlib.util.spec_from_file_location("supervisor_workload_names", source)
         assert spec is not None and spec.loader is not None
         supervisor = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(supervisor)
-        self.assertEqual(supervisor.MISSION_BLOCKING_REASONS,
-                         module.MISSION_BLOCKING_REASONS)
+        self.assertEqual(supervisor.QUALIFICATION_BLOCKING_REASONS,
+                         module.QUALIFICATION_BLOCKING_REASONS)
 
 
 class AdmissionIsNotAVerdictTests(unittest.TestCase):
@@ -767,7 +767,7 @@ class WorktreeImportTests(unittest.TestCase):
     """The gate has to resolve its own checkout, not a hardcoded one.
 
     A linked git worktree is how this repository is edited without disturbing the
-    checkout the mission supervisor owns. A gate that names the primary path
+    checkout the qualification supervisor owns. A gate that names the primary path
     literally imports the *other* tree's policy and cache modules from inside the
     worktree, so a test there proves nothing about the code under edit.
     """

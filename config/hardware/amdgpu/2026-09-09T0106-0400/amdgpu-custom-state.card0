@@ -1,0 +1,19 @@
+# ASRock Phantom 6900 XT
+OD_SCLK:
+0: 500Mhz
+1: 2710Mhz
+
+OD_MCLK:
+0: 97Mhz
+1: 1000Mhz
+
+OD_VDDGFX_OFFSET:
+#-50mV crash
+-45mV
+
+OD_RANGE:
+SCLK:     500Mhz     3000Mhz
+MCLK:     674Mhz     1075Mhz
+
+FORCE_POWER_CAP: 323000000
+FORCE_PERF_LEVEL: manual

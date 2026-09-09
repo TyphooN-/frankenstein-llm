@@ -129,7 +129,7 @@ def scan(model_dir: Path = MODEL_DIR) -> dict:
         "never_execute": refused,
         "problems": problems,
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "pass": not problems,
     }
 

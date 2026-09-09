@@ -144,7 +144,7 @@ class AtomicStateTests(unittest.TestCase):
         self.assertGreaterEqual(len(synced), 1, "the state file was never fsynced")
 
     def test_the_completion_stamp_is_written_durably_too(self):
-        # Downstream phases and the mission supervisor compare this stamp against
+        # Downstream phases and the qualification supervisor compare this stamp against
         # an exact byte total, so a torn write is a permanent mismatch against a
         # queue that is in fact complete -- not something a retry repairs.
         stamp = self.sandbox / "downloads-complete.ok"

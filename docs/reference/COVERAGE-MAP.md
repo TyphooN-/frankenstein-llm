@@ -89,7 +89,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`services/systemd/llama-router.service`](../../services/systemd/llama-router.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/llama-sidecar@.service`](../../services/systemd/llama-sidecar@.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-computer-use-gate.service`](../../services/systemd/local-ai-computer-use-gate.service) | [Reference](CONFIGURATION.md) |
-| [`services/systemd/local-ai-functional-mission.service`](../../services/systemd/local-ai-functional-mission.service) | [Reference](CONFIGURATION.md) |
+| [`services/systemd/local-ai-qualification.service`](../../services/systemd/local-ai-qualification.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-media-schema-gate.service`](../../services/systemd/local-ai-media-schema-gate.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-model-downloads-phase2.service`](../../services/systemd/local-ai-model-downloads-phase2.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-model-downloads-phase3.service`](../../services/systemd/local-ai-model-downloads-phase3.service) | [Reference](CONFIGURATION.md) |
@@ -209,8 +209,8 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/local-coverage-foundation/wait_machine_ready.py`](../../verification/local-coverage-foundation/wait_machine_ready.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/watch_claude.py`](../../verification/local-coverage-foundation/watch_claude.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/watch_kernel_build.py`](../../verification/local-coverage-foundation/watch_kernel_build.py) | [Reference](ARCHITECTURE.md) |
-| [`verification/mission-supervisor/run_functional_mission.py`](../../verification/mission-supervisor/run_functional_mission.py) | [Reference](ARCHITECTURE.md) |
-| [`verification/mission-supervisor/test_mission_supervisor.py`](../../verification/mission-supervisor/test_mission_supervisor.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/qualification-supervisor/run_qualification.py`](../../verification/qualification-supervisor/run_qualification.py) | [Reference](ARCHITECTURE.md) |
+| [`verification/qualification-supervisor/test_qualification_supervisor.py`](../../verification/qualification-supervisor/test_qualification_supervisor.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/obliterated-mmproj-manifest.json`](../../verification/obliterated-mmproj-manifest.json) | [Reference](CONFIGURATION.md) |
 | [`verification/operator-runs/test_operator_runs.py`](../../verification/operator-runs/test_operator_runs.py) | [Reference](../MODEL-RUNS.md) |
 | [`verification/operator-runs/test_serve_model.py`](../../verification/operator-runs/test_serve_model.py) | [Reference](../MODEL-RUNS.md) |
@@ -274,9 +274,21 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card1) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
 | [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card2) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
 | [`docs/decisions/0007-conditional-custom-quantization.md`](../../docs/decisions/0007-conditional-custom-quantization.md) | [Reference](DEVELOPER-GUIDE.md) |
-| [`scripts/mission_status.py`](../../scripts/mission_status.py) | [Reference](OPERATIONS.md) |
-| [`verification/mission-supervisor/qualification_cache.py`](../../verification/mission-supervisor/qualification_cache.py) | [Reference](ARCHITECTURE.md) |
-| [`verification/mission-supervisor/test_mission_status.py`](../../verification/mission-supervisor/test_mission_status.py) | [Reference](DEVELOPER-GUIDE.md) |
-| [`verification/mission-supervisor/test_qualification_cache.py`](../../verification/mission-supervisor/test_qualification_cache.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`scripts/qualification_status.py`](../../scripts/qualification_status.py) | [Reference](OPERATIONS.md) |
+| [`verification/qualification-supervisor/qualification_cache.py`](../../verification/qualification-supervisor/qualification_cache.py) | [Reference](ARCHITECTURE.md) |
+| [`verification/qualification-supervisor/test_qualification_status.py`](../../verification/qualification-supervisor/test_qualification_status.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/qualification-supervisor/test_qualification_cache.py`](../../verification/qualification-supervisor/test_qualification_cache.py) | [Reference](DEVELOPER-GUIDE.md) |
 
 Inventory entries: 274. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+
+| [`scripts/migrate_qualification_state.py`](../../scripts/migrate_qualification_state.py) | [Reference](QUALIFICATION-MIGRATION.md) |
+| [`scripts/qualification_performance.py`](../../scripts/qualification_performance.py) | [Reference](QUALIFICATION-PERFORMANCE.md) |
+| [`verification/qualification-supervisor/test_qualification_rebrand.py`](../../verification/qualification-supervisor/test_qualification_rebrand.py) | [Reference](QUALIFICATION-MIGRATION.md) |
+| [`verification/qualification-supervisor/test_qualification_performance.py`](../../verification/qualification-supervisor/test_qualification_performance.py) | [Reference](QUALIFICATION-PERFORMANCE.md) |
+| [`docs/reference/QUALIFICATION-MIGRATION.md`](../../docs/reference/QUALIFICATION-MIGRATION.md) | [Reference](QUALIFICATION-MIGRATION.md) |
+| [`docs/reference/QUALIFICATION-PERFORMANCE.md`](../../docs/reference/QUALIFICATION-PERFORMANCE.md) | [Reference](QUALIFICATION-PERFORMANCE.md) |
+| [`config/hardware/amdgpu/2026-09-09T0106-0400/README.md`](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
+| [`config/hardware/amdgpu/2026-09-09T0106-0400/SHA256SUMS`](../../config/hardware/amdgpu/2026-09-09T0106-0400/SHA256SUMS) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
+| [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card0) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
+| [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card1) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
+| [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card2) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |

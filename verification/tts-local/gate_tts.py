@@ -12,7 +12,7 @@ the text that was requested, so the claim is checked by a second model rather
 than by the gate's own author. Silence, noise, or a truncated tail all fail that
 round trip, which is exactly the failure mode a duration/RMS check misses.
 
-Throughput is deliberately not measured anywhere in this file.
+Passive performance observations accompany existing inference; no extra benchmark runs.
 """
 from __future__ import annotations
 
@@ -31,6 +31,9 @@ import unicodedata
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]
                         / "verification/local-coverage-foundation/validators"))
 from gatelib import allocator_report, unload_verdict, vram_used  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import qualification_performance as performance
 
 ROOT = Path(__file__).resolve().parent
 EVIDENCE = ROOT / "evidence"
@@ -77,7 +80,7 @@ MALFORMED = [
 LONG_INPUT_WORDS = 400
 # Hard deadline for the separate ASR process. Generous, because it loads a model
 # on a possibly busy host, but finite: an unbounded wait here would hold the
-# serialized mission open indefinitely.
+# serialized qualification open indefinitely.
 ASR_ROUNDTRIP_TIMEOUT = 3600
 
 
@@ -188,7 +191,7 @@ def main() -> int:
         broken = finalize({
             "gate": "tts-local",
             "model": "Qwen3-TTS-12Hz-1.7B-Base",
-            "throughput_measured": False,
+            "benchmark_performed": False,
             "problems": [f"runtime unavailable: {type(error).__name__}: {error}"[:300]],
             "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         })
@@ -204,7 +207,7 @@ def main() -> int:
         "mode": "voice clone from the ASR gate's validated LibriSpeech reference",
         "reference_audio": str(REF_AUDIO),
         "reference_text": REF_TEXT,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "problems": [],
     }
     problems = summary["problems"]
@@ -239,7 +242,7 @@ def main() -> int:
         # --- normal synthesis -------------------------------------------------
         generated = []
         for name, text in UTTERANCES:
-            wavs, sr = model.generate_voice_clone(
+            wavs, sr = performance.call(model.generate_voice_clone, operation="tts-generate", model_id="Qwen3-TTS-12Hz-1.7B-Base", mode="audio",
                 text=text, language="English",
                 ref_audio=str(REF_AUDIO), ref_text=REF_TEXT)
             wav = np.asarray(wavs[0] if isinstance(wavs, list) else wavs).reshape(-1)
@@ -264,7 +267,7 @@ def main() -> int:
                               "continues without measuring speed."] * 12)
         long_text = " ".join(long_text.split()[:LONG_INPUT_WORDS])
         try:
-            wavs, sr = model.generate_voice_clone(
+            wavs, sr = performance.call(model.generate_voice_clone, operation="tts-generate", model_id="Qwen3-TTS-12Hz-1.7B-Base", mode="audio",
                 text=long_text, language="English",
                 ref_audio=str(REF_AUDIO), ref_text=REF_TEXT, max_new_tokens=4096)
             wav = np.asarray(wavs[0] if isinstance(wavs, list) else wavs).reshape(-1)
@@ -289,7 +292,7 @@ def main() -> int:
         for name, text in MALFORMED:
             entry = {"name": name, "repr": repr(text)[:80]}
             try:
-                wavs, sr = model.generate_voice_clone(
+                wavs, sr = performance.call(model.generate_voice_clone, operation="tts-generate", model_id="Qwen3-TTS-12Hz-1.7B-Base", mode="audio",
                     text=text, language="English",
                     ref_audio=str(REF_AUDIO), ref_text=REF_TEXT, max_new_tokens=256)
                 wav = np.asarray(wavs[0] if isinstance(wavs, list) else wavs).reshape(-1)

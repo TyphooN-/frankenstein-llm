@@ -114,7 +114,7 @@ PORT = 8188
 # competes with a GPU gate for the same cores and memory bandwidth, whether or
 # not the tree it is building is the kernel. "kernel-build" below is the name of
 # that whole class rather than a claim that vmlinux specifically is being
-# linked. The mission supervisor's conflict_reason() holds the canonical list
+# linked. The qualification supervisor's conflict_reason() holds the canonical list
 # and this one tracks it; test_media_policy asserts the two do not drift.
 BUILD_COMMANDS = frozenset({
     "make", "gmake", "makepkg", "cmake", "ninja", "samu", "meson", "scons",
@@ -138,7 +138,7 @@ UNAVAILABLE = "process-inspection-unavailable"
 def host_exclusive_blockers(proc_root: Path = Path("/proc")) -> list[str]:
     """Return the first build blocker, or why the scan could not tell.
 
-    ``proc_root`` is injectable for the reason the mission supervisor's is: a
+    ``proc_root`` is injectable for the reason the qualification supervisor's is: a
     classification checked against whatever the host happens to be running at
     the time is not really checked at all.
 

@@ -88,7 +88,7 @@ original name because its completion stamp records what was downloaded) installs
 Qwen3-Coder-Next Q4_K_M, Gemma-4 Heretic Q6_K with its projector, UI-Mate-9B,
 WeMM-Embedding-2B, and the non-duplicated FLUX.2-klein-4B runtime files.
 Qwen3-ASR-1.7B is not duplicated because the same pinned revision was already
-verified by the core-capability queue. The mission supervisor treats that queue's
+verified by the core-capability queue. The qualification supervisor treats that queue's
 successful completion as a prerequisite for subsequent serialized functional
 qualification. It then runs the non-inference candidate policy gate before loading
 anything. That gate verifies manifest-backed inventory, the core-capability ASR

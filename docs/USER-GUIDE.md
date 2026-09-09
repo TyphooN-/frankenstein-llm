@@ -1,6 +1,10 @@
 # User guide
 
-## Mission progress at a glance
+## Qualification progress at a glance
+
+See [naming and state migration](reference/QUALIFICATION-MIGRATION.md) for existing
+installations, and [passive performance observations](reference/QUALIFICATION-PERFORMANCE.md)
+for per-attempt timing without extra inference runs.
 
 ### Incremental qualification and explicit retests
 
@@ -21,7 +25,7 @@ The supervisor carries that distinction to the end of the run. A gate that exits
 for the next invocation; the gates after it are still attempted. A pass with
 nothing but blocked gates ends in status `admission-blocked` and exit `75`, while
 any genuine failure still ends in `functional-foundation-incomplete` and exit `1`.
-An operator stop is recorded as `interrupted` in the mission state and as
+An operator stop is recorded as `interrupted` in the qualification state and as
 `inconclusive` in the receipt, so a forwarded SIGTERM is never filed as a model
 failure. Losing the race for a receipt another qualification already holds is
 also blocked rather than failed: nothing ran.
@@ -29,15 +33,15 @@ also blocked rather than failed: nothing ran.
 A preset whose weights are absent, quarantined or still a `.partial` has no
 readable identity. Both model gates refuse it (`qualification-inputs-unreadable`,
 exit `75`) rather than raising `FileNotFoundError` out of the gate, and the
-mission waits for a destination that a transfer is actively staging instead of
+qualification waits for a destination that a transfer is actively staging instead of
 running the policy gate against a file that has not finished arriving.
 
 Reading the checkout is a query about the host, not about a model. If
 `git ls-files`/`git diff` cannot answer within the retry budget -- a saturated
-disk, a contended index -- the mission records status `inputs-unreadable`, exits
+disk, a contended index -- the qualification records status `inputs-unreadable`, exits
 `75` and attempts no gate, instead of ending the run on an unhandled exception.
 
-`run_functional_mission.py --plan` explains receipt misses using per-component
+`run_qualification.py --plan` explains receipt misses using per-component
 digests. The router and repository-agent gates also accept `--plan` for their
 per-model receipts. These commands do not dispatch models or write receipts.
 Old receipts without component diagnostics still require an exact composite-key
@@ -46,7 +50,7 @@ receipts, and this tooling update does not claim to qualify any model or repair
 filesystem corruption.
 
 Successful qualifications now have durable local receipts under
-`verification/mission-supervisor/qualification-cache/` (ignored by Git).
+`verification/qualification-supervisor/qualification-cache/` (ignored by Git).
 Router and repository-agent receipts are independent per preset; a failed
 neighbor does not cause a passed preset to execute again. Other model-backed
 gates retain their fixed workflow receipts. Media is a composite workflow:
@@ -64,28 +68,28 @@ checks still apply before new work.
 Inspect the execution plan without starting services or model workloads:
 
 ```bash
-python3 verification/mission-supervisor/run_functional_mission.py --plan
+python3 verification/qualification-supervisor/run_qualification.py --plan
 ```
 
 Run only a selected router preset (other successful presets are untouched):
 
 ```bash
-python3 verification/mission-supervisor/run_functional_mission.py --gate router-models --model heretic
+python3 verification/qualification-supervisor/run_qualification.py --gate router-models --model heretic
 ```
 
 Explicitly requalify that preset, or run a bounded stability test that stops on
 the first failed invocation:
 
 ```bash
-python3 verification/mission-supervisor/run_functional_mission.py --gate router-models --model heretic --requalify
-python3 verification/mission-supervisor/run_functional_mission.py --gate router-models --model heretic --stability-runs 3
+python3 verification/qualification-supervisor/run_qualification.py --gate router-models --model heretic --requalify
+python3 verification/qualification-supervisor/run_qualification.py --gate router-models --model heretic --stability-runs 3
 ```
 
 `--gate` and `--model` may be repeated. Model selection currently addresses
 router/repository presets; fixed ASR, embedding and media workflows are selected
 by gate. Candidate registration and policy admission are still required; adding a
 research URL alone never authorizes model execution. A targeted successful run is
-reported as `selected-qualifications-complete`, not whole-mission completion.
+reported as `selected-qualifications-complete`, not whole-qualification completion.
 
 The receipt is revoked before an explicit test begins. Failed or interrupted
 retests cannot fall back to an older green result; the previous successful result
@@ -100,7 +104,7 @@ No passing result is synthesized from partial checks or a failed aggregate.
 
 ### Automatic recovery after reboot
 
-When `local-ai-functional-mission.service` is enabled, the user systemd manager
+When `local-ai-qualification.service` is enabled, the user systemd manager
 starts it with its default target (normally login, or boot with user lingering).
 Each invocation retries failed, interrupted and blocked gates; matching passed
 gates are skipped. Changed input fingerprints invalidate old passes. The
@@ -108,17 +112,17 @@ supervisor waits for its host-safety checks and holds a single-writer lock.
 Persistent failures are attempted once per invocation, not retried endlessly.
 This recovers transient failures after a reboot without claiming a permanent
 model or runtime defect has healed. Check enablement with
-`systemctl --user is-enabled local-ai-functional-mission.service`.
+`systemctl --user is-enabled local-ai-qualification.service`.
 To request a retry without blocking your terminal, use
-`systemctl --user start --no-block local-ai-functional-mission.service`.
+`systemctl --user start --no-block local-ai-qualification.service`.
 
-From the repository root, run `python3 scripts/mission_status.py`, or use
-`python3 scripts/mission_status.py --watch 5` for repeated snapshots. Automation
-can use `python3 scripts/mission_status.py --json`.
+From the repository root, run `python3 scripts/qualification_status.py`, or use
+`python3 scripts/qualification_status.py --watch 5` for repeated snapshots. Automation
+can use `python3 scripts/qualification_status.py --json`.
 
 This read-only command reports passed gates separately from finished attempts,
 with each gate's status, duration, exit code and log age. It does not start or
-stop services, load models, or change mission state. A failed attempt is not a
+stop services, load models, or change qualification state. A failed attempt is not a
 qualified capability. The denominator counts recorded functional gates, **not**
 all researched models, downloads, or optimization tasks. Historical passes with
 different input fingerprints are reported as stale, not as current success.
@@ -167,7 +171,7 @@ guide gives you the command rather than an answer.
 - [Everyday chat](#everyday-chat)
 - [Picking a model](#picking-a-model)
 - [Tools and structured output](#tools-and-structured-output)
-- [Sharing the host with the qualification mission](#sharing-the-host-with-the-qualification-mission)
+- [Sharing the host with the qualification qualification](#sharing-the-host-with-the-qualification-qualification)
 - [Sharing one model between several agents](#sharing-one-model-between-several-agents)
 - [Vision](#vision)
 - [Embeddings, reranking and RAG](#embeddings-reranking-and-rag)
@@ -296,7 +300,7 @@ safe — the next run revalidates and continues. Details:
 
 Local chat, writing and coding through the router are usable as soon as the
 router is up and a GGUF is on disk. You do **not** need to wait for the full
-qualification mission: grounding, ComfyUI, TTS and WeMM retrieval are separate
+qualification qualification: grounding, ComfyUI, TTS and WeMM retrieval are separate
 lanes and none of them gates ordinary chat.
 
 Cloud remains the Hermes default. To use a local model, pick it in the Desktop
@@ -386,9 +390,9 @@ An alias the policy does not know is refused, not defaulted. Adding a preset
 without a privilege decision fails the router gate — that is the intended
 behaviour, not an obstacle.
 
-## Sharing the host with the qualification mission
+## Sharing the host with the qualification qualification
 
-The mission is serialized and fail-closed, but it does not pause when you start
+The qualification is serialized and fail-closed, but it does not pause when you start
 using the router, and it does not require the router to be stopped between steps.
 Sharing the host is normal. What follows is how to read the risk, not a
 guarantee that any particular moment is free.
@@ -403,11 +407,11 @@ It reports one of three verdicts, and none of them means "safe":
 
 | Verdict | What it means |
 |---|---|
-| `mission-step-running` | The supervisor's last write says a step was executing. Treat it as potentially active until process state is checked. |
-| `mission-may-take-the-gpu` | The last write records preparation for a step, **or** state/host inspection is unavailable. This is not proof of a live supervisor. |
-| `mission-idle-per-last-write` | The last thing the supervisor durably wrote was a terminal status. Nothing is reserved by that. |
+| `qualification-step-running` | The supervisor's last write says a step was executing. Treat it as potentially active until process state is checked. |
+| `qualification-may-take-the-gpu` | The last write records preparation for a step, **or** state/host inspection is unavailable. This is not proof of a live supervisor. |
+| `qualification-idle-per-last-write` | The last thing the supervisor durably wrote was a terminal status. Nothing is reserved by that. |
 
-The command reads the router over loopback, the mission's state file and the
+The command reads the router over loopback, the qualification's state file and the
 process table. It starts nothing, stops nothing and loads nothing, and it exits
 `0` when it produces a report, regardless of verdict. **Do not** chain it into
 `… && load-a-model`: that would launch the model even when conflicts are reported.
@@ -419,28 +423,28 @@ answer and is not: it is set only after the supervisor's quiet-host wait has
 already succeeded, it is never cleared when an individual step ends, and it does
 not exist at all in a freshly initialised state. So it is empty exactly when the
 supervisor is starting up and closest to claiming the GPU, and it goes on naming
-a step for as long as the mission has nothing else to write. A missing,
+a step for as long as the qualification has nothing else to write. A missing,
 truncated or unreadable state file means *unknown*, never *idle* — the file is
 untracked runtime state and a supervisor killed outright never gets to correct
 it. The mechanism is in
-[operations → sharing the host](reference/OPERATIONS.md#sharing-the-host-with-the-mission).
+[operations → sharing the host](reference/OPERATIONS.md#sharing-the-host-with-the-qualification).
 
 **The status is advisory, not an admission ticket.** It describes the instant it
-was read. The mission unit is `WantedBy=default.target`, so it can start — or
+was read. The qualification unit is `WantedBy=default.target`, so it can start — or
 reach the end of its own quiet-host wait — in the gap between the check and your
 next request. Nothing you can read reserves the GPU.
 
-To use a local model alongside the mission:
+To use a local model alongside the qualification:
 
 1. Keep the router the only model owner. Do not run a second `llama-server`, a
    benchmark, a download, or a ComfyUI/TTS/grounding gate alongside it. A
    sidecar left resident by a failed gate counts as a second owner.
 2. Start a fresh chat after switching families; do not hand a local model a long
    history written under a different model.
-3. Keep the session short if the mission still needs to run. The mission resumes
+3. Keep the session short if the qualification still needs to run. The qualification resumes
    from the first step that is not recorded `passed` with a matching input
    fingerprint.
-4. If the mission is the priority, stop the router before the next step starts:
+4. If the qualification is the priority, stop the router before the next step starts:
 
    ```bash
    systemctl --user stop llama-router.service
@@ -450,8 +454,8 @@ To use a local model alongside the mission:
 
 Stopping the router is not required for stability in every case, and it does not
 make the host quiet by itself — it removes one owner from the GPU and RAM
-equation. Note that the mission restarts the router itself as its
-`router-reload-presets` step, so a stop is not durable across a mission run.
+equation. Note that the qualification restarts the router itself as its
+`router-reload-presets` step, so a stop is not durable across a qualification run.
 
 ## Sharing one model between several agents
 
@@ -655,11 +659,11 @@ document here contains a locally measured model number.
 ## Qualifying the stack
 
 ```bash
-systemctl --user start local-ai-functional-mission.service
-tail -f verification/mission-supervisor/mission.log
+systemctl --user start local-ai-qualification.service
+tail -f verification/qualification-supervisor/qualification.log
 ```
 
-The mission is serialized, resumable and fail-closed. It waits for all four
+The qualification is serialized, resumable and fail-closed. It waits for all four
 download stamps, then for a quiet host, then runs twelve steps starting with the
 non-inference candidate policy gate — which blocks every model-backed step behind
 it. Later steps continue past a failure so one capability cannot hide the status
@@ -670,7 +674,7 @@ the step name and the next run repeats that step, while steps that genuinely
 passed are skipped. A step is only skipped when its input fingerprint still
 matches, so editing a gate or replacing a weight re-runs what it affects.
 
-See [operations → running the mission](reference/OPERATIONS.md#running-the-mission).
+See [operations → running the qualification](reference/OPERATIONS.md#running-the-qualification).
 
 ## Checking the workspace
 
@@ -713,13 +717,13 @@ Do not relax these.
 - **Authorized security work only.** Owned systems, lab or CTF targets, or
   explicit written authorization within the program's current scope. A model's
   willingness to answer is not authorization.
-- **Functional qualification and throughput are separate.** The mission does
+- **Functional qualification and throughput are separate.** The qualification does
   not measure tokens/sec. Explicitly authorized native benchmarks run separately
   on a healthy, uncontended host after kernel confirmation; reboot alone does
   not authorize them ([ADR 0002](decisions/0002-serialized-functional-qualification.md)).
   [Published benchmark artifacts](benchmarks/README.md) record completed runs,
   not current router speed or model-quality rankings. Use the
-  [model-run interface](MODEL-RUNS.md) and never overlap a benchmark with the mission.
+  [model-run interface](MODEL-RUNS.md) and never overlap a benchmark with the qualification.
 - **Preserve three 1 GiB HugeTLB pages** for XMRig, and do not retune ARC, swap,
   kernel or clock policy to make a candidate model fit.
 

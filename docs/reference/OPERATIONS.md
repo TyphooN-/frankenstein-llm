@@ -20,11 +20,11 @@ Related: [user guide](../USER-GUIDE.md) · [configuration](CONFIGURATION.md) ·
 - [Installing the user units](#installing-the-user-units)
 - [Checking the backend](#checking-the-backend)
 - [Service control](#service-control)
-- [Sharing the host with the mission](#sharing-the-host-with-the-mission)
+- [Sharing the host with the qualification](#sharing-the-host-with-the-qualification)
 - [Sidecars](#sidecars)
 - [GPU handoff](#gpu-handoff)
 - [Downloading weights](#downloading-weights)
-- [Running the mission](#running-the-mission)
+- [Running the qualification](#running-the-qualification)
 - [Running one gate](#running-one-gate)
 - [Repository checks](#repository-checks)
 - [Upgrading llamacpp](#upgrading-llamacpp)
@@ -90,7 +90,7 @@ and restarts on a five-second timer.
 systemctl --user is-active llama-router.service
 scripts/local-model-status.sh
 scripts/local-model-status.sh --json             # bounded machine-readable summary
-scripts/local-model-status.sh --host-sharing     # + mission state and host conflicts
+scripts/local-model-status.sh --host-sharing     # + qualification state and host conflicts
 ```
 
 `local-model-status.sh` execs `scripts/local_model_status.py`. It accepts
@@ -108,12 +108,12 @@ rather than shown bare; unreadable local configuration degrades the description
 but never fails the status read, which describes a live service rather than
 gating configuration.
 
-`--host-sharing` answers the second question — whether the qualification mission
-is about to take the GPU — by combining that router read with the mission's
+`--host-sharing` answers the second question — whether the qualification qualification
+is about to take the GPU — by combining that router read with the qualification's
 durable state and the supervisor's own `/proc` classifier, which it imports
 rather than reimplements so the report cannot drift from the decision it
 describes. It is read-only and advisory; see
-[sharing the host with the mission](#sharing-the-host-with-the-mission).
+[sharing the host with the qualification](#sharing-the-host-with-the-qualification).
 
 It classifies each model by llama.cpp's own six-state vocabulary rather than
 guessing. `loading`, `loaded` and `sleeping` occupy the single resident slot;
@@ -143,13 +143,13 @@ the installed build's `--help`:
 python3 -m pytest verification/upstream-pin/test_llama_cpp_pin.py
 ```
 
-## Sharing the host with the mission
+## Sharing the host with the qualification
 
-Starting or stopping the router for interactive use does not stop the mission,
-and the mission does not stop for you. The two share the host by default.
+Starting or stopping the router for interactive use does not stop the qualification,
+and the qualification does not stop for you. The two share the host by default.
 
 Read the situation with the status helper, which reports the router, the
-mission's durable state and the supervisor's own host classification in one
+qualification's durable state and the supervisor's own host classification in one
 bounded, read-only pass:
 
 ```bash
@@ -162,62 +162,62 @@ scripts/local-model-status.sh --host-sharing --json
 exits `0` when the report is produced, regardless of verdict. Do not use
 `… && start-something`: it would start even when the report finds conflicts.
 Conflict details are capped at eight samples per category; accompanying counts
-retain the complete classified totals. Nothing in this report reserves the GPU: the mission
+retain the complete classified totals. Nothing in this report reserves the GPU: the qualification
 unit is `WantedBy=default.target` and can begin, or finish its own quiet-host
 wait, between your read and your next request.
 
-Three verdicts, taken from the mission's `status` field:
+Three verdicts, taken from the qualification's `status` field:
 
-| Verdict | Mission `status` | Reading |
+| Verdict | Qualification `status` | Reading |
 |---|---|---|
-| `mission-step-running` | `running`, `running-with-failures` | Last write recorded an executing step; not live process proof |
-| `mission-may-take-the-gpu` | `starting`, `waiting-artifacts`, `waiting-safe-host`, or unclassifiable | Last write recorded preparation, or state/host inspection is unavailable |
-| `mission-idle-per-last-write` | `blocked-policy`, `failed`, `interrupted`, `functional-foundation-complete`, `functional-foundation-incomplete` | The last durable write was terminal |
+| `qualification-step-running` | `running`, `running-with-failures` | Last write recorded an executing step; not live process proof |
+| `qualification-may-take-the-gpu` | `starting`, `waiting-artifacts`, `waiting-safe-host`, or unclassifiable | Last write recorded preparation, or state/host inspection is unavailable |
+| `qualification-idle-per-last-write` | `blocked-policy`, `failed`, `interrupted`, `functional-foundation-complete`, `functional-foundation-incomplete` | The last durable write was terminal |
 
 **`current_step` is not a liveness signal**, and a state read that treats it as
 one inverts the answer in the dangerous direction. Three properties of
-`run_functional_mission.py` are why:
+`run_qualification.py` are why:
 
 - `run_step` sets it *after* `wait_for_quiet` has already returned, so during the
   quiet-host wait it still names the previous step — or, before the first step,
   nothing at all.
-- It is cleared to `None` only at the three whole-mission exits, never when an
+- It is cleared to `None` only at the three whole-qualification exits, never when an
   individual step ends. Between steps it goes on naming a step that has finished.
 - A freshly initialised state has no such key, so a supervisor in
   `waiting-safe-host` counting the two polls that release it — the moment it is
   closest to claiming the GPU — reads as "no step running".
 
 **A missing, truncated or unparseable state file means unknown, never idle.**
-`verification/mission-supervisor/mission-state.json` is ignored runtime state
+`verification/qualification-supervisor/qualification-state.json` is ignored runtime state
 (`.gitignore`), written by the supervisor and by nothing else. A supervisor
 killed outright never gets to correct it, and a host that has never run the
-mission has no file at all. The helper classifies all of those as `unknown` and
-reports `mission-may-take-the-gpu`. It does the same when the process table
+qualification has no file at all. The helper classifies all of those as `unknown` and
+reports `qualification-may-take-the-gpu`. It does the same when the process table
 cannot be read: a host that cannot be inspected is not a quiet one.
 
 Given that, the working rules are:
 
-1. If the verdict is anything but `mission-idle-per-last-write`, expect
-   contention. The mission runner owns the GPU handoff for its own steps and
+1. If the verdict is anything but `qualification-idle-per-last-write`, expect
+   contention. The qualification runner owns the GPU handoff for its own steps and
    restores the router afterwards; your request is what is unaccounted for.
-2. If the verdict is `mission-idle-per-last-write`, check the reported host
+2. If the verdict is `qualification-idle-per-last-write`, check the reported host
    conflicts and current service/process ownership before starting work. A saved
    terminal status alone does not establish that the host is free. The supervisor
    exempts the managed router by cgroup; that exemption does not protect an
-   interactive request from a subsequent mission step.
+   interactive request from a subsequent qualification step.
 3. Avoid work that confounds the next gate while a model is loading, unloaded or
    being measured. Large builds, downloads, other model servers and a new
    interactive request all change memory or GPU residency during qualification.
-   Note that only some of those actually *hold* the mission (below); the rest
+   Note that only some of those actually *hold* the qualification (below); the rest
    are recorded and proceed anyway, which is exactly why they are your problem
    and not the supervisor's.
 4. If you must use a model immediately, prefer a short request and keep the
    router the only model owner. Do not run a second `llama-server`, a benchmark,
    a download, or a ComfyUI/TTS/grounding gate alongside it.
-5. If the mission is the priority, stop the router and wait for the step to
+5. If the qualification is the priority, stop the router and wait for the step to
    finish before another GPU experiment. Stopping the router removes one owner
    from the equation; it does not make the host quiet, and it is not durable —
-   `router-reload-presets` restarts the router as a mission step.
+   `router-reload-presets` restarts the router as a qualification step.
 
 For several clients sharing one router, see
 [GPU execution → several agents, one router](GPU-EXECUTION-AND-MODEL-LOADING.md#several-agents-one-router).
@@ -235,7 +235,7 @@ systemctl --user stop  llama-sidecar@embeddings.service
 
 Sidecars are independent of the router by design, so restarting the router does
 not cycle them, and a sidecar left resident by a failed gate is exactly what can
-keep the mission's quiet-host wait from ever clearing. Check for stragglers with
+keep the qualification's quiet-host wait from ever clearing. Check for stragglers with
 `systemctl --user list-units 'llama-sidecar@*'`.
 
 ## GPU handoff
@@ -324,17 +324,17 @@ files with byte accounting, and cross-checks that on-disk model trees contain no
 unaccounted large files. Neither script downloads, moves or deletes anything; a
 discrepancy is surfaced, never silently repaired.
 
-## Running the mission
+## Running the qualification
 
 ```bash
-systemctl --user start local-ai-functional-mission.service
-tail -f verification/mission-supervisor/mission.log
+systemctl --user start local-ai-qualification.service
+tail -f verification/qualification-supervisor/qualification.log
 ```
 
 The supervisor waits, without a deadline, for all four download stamps. It then
 waits for a quiet host — two consecutive polls with `MemAvailable ≥ 32 GiB` and
-no *blocking* conflict — bounded by `HERMES_MISSION_QUIET_TIMEOUT` (default six
-hours). Its per-step logs are `verification/mission-supervisor/<step>.log`.
+no *blocking* conflict — bounded by `HERMES_QUALIFICATION_QUIET_TIMEOUT` (default six
+hours). Its per-step logs are `verification/qualification-supervisor/<step>.log`.
 
 Three of the classifier's reasons block: `kernel-build` (a task whose `cwd`
 is inside a kernel tree), `inference` (a model server that is not the managed
@@ -343,18 +343,18 @@ process in the `local-ai-model-downloads` slice, also matched by cgroup). The
 third is there because `gate_router_models` refuses to qualify beside competing
 work: starting the router gate while a queue re-verifies produces a refusal
 recorded as nine model failures, not a verdict. Generic builds, transfers and
-workspace Python are classified and reported, but they do not hold the mission —
-`MISSION_BLOCKING_REASONS` in `run_functional_mission.py` is the list, and
+workspace Python are classified and reported, but they do not hold the qualification —
+`QUALIFICATION_BLOCKING_REASONS` in `run_qualification.py` is the list, and
 [architecture → layer 5](ARCHITECTURE.md#layer-5--supervision)
 explains why unrelated `cargo`/`rustc`, a download re-hash and desktop load must
-not delay a mission after a new-kernel boot. **Load average is not part of this
+not delay a qualification after a new-kernel boot. **Load average is not part of this
 check at all**; the supervisor never reads `/proc/loadavg`.
 
 To read progress, use the durable state:
 
 ```bash
-python3 scripts/mission_status.py          # per-gate status, duration, exit code, log age
-python3 scripts/mission_status.py --json   # same snapshot for automation
+python3 scripts/qualification_status.py          # per-gate status, duration, exit code, log age
+python3 scripts/qualification_status.py --json   # same snapshot for automation
 ```
 
 That reader starts nothing and changes nothing. It reports a recorded `passed`
@@ -364,7 +364,7 @@ or a reboot is not read as progress. The raw document is still there if you want
 it:
 
 ```bash
-python3 -c "import json;s=json.load(open('verification/mission-supervisor/mission-state.json'));\
+python3 -c "import json;s=json.load(open('verification/qualification-supervisor/qualification-state.json'));\
 print(s['status']);[print(f\"{k:28s} {v['status']}\") for k,v in sorted(s['steps'].items())]"
 ```
 
@@ -374,11 +374,11 @@ that step. A step that had already exited 0 is kept, so hours of GPU work are no
 repeated.
 
 Re-running skips a step two ways, and they are not equivalent. The older one is
-the whole-mission `input_fingerprint`: it covers every tracked source file, every
+the whole-qualification `input_fingerprint`: it covers every tracked source file, every
 download queue and every destination file's size and mtime at once, so any change
 anywhere — a gate edit, one replaced weight, a reordered step list — invalidates
 **every** recorded pass, not just the affected one. The newer one is the
-per-gate receipt under `verification/mission-supervisor/qualification-cache/`,
+per-gate receipt under `verification/qualification-supervisor/qualification-cache/`,
 whose key names only that gate's own code, environment, artifacts and runtime, so
 replacing a media weight no longer re-runs the embedding gate. A gate is reused
 only when its receipt key still matches; otherwise the fingerprint rule applies.
@@ -390,14 +390,14 @@ weights on disk still read back correctly.
 Setting a shorter quiet timeout for an experiment:
 
 ```bash
-systemctl --user set-environment HERMES_MISSION_QUIET_TIMEOUT=900
+systemctl --user set-environment HERMES_QUALIFICATION_QUIET_TIMEOUT=900
 ```
 
 An unparseable or non-positive value raises rather than silently defaulting.
 
 ## Running one gate
 
-Every gate can run outside the mission. Each publishes its own evidence artifact
+Every gate can run outside the qualification. Each publishes its own evidence artifact
 and each is fail-closed on its own terms.
 
 ```bash
@@ -481,7 +481,7 @@ Offline, no model, no service, no GPU, no download, no throughput. See
 ```bash
 python3 -m pytest                                    # whole tracked suite
 python3 -m pytest verification/upstream-pin/         # the llama.cpp pin
-python3 -m pytest verification/mission-supervisor/   # supervisor contracts
+python3 -m pytest verification/qualification-supervisor/   # supervisor contracts
 python3 -m pytest verification/docs/                 # documentation map and links
 python3 verification/generative-media/preflight.py   # static media preflight
 python3 verification/local-coverage-foundation/build_capability_ledger.py --print-only
@@ -573,7 +573,7 @@ for the full path. The short operational version:
 1. Collect exact metadata (`research/collect_hf_metadata.py`) and build a queue
    entry from it. Never hand-type a size or digest.
 2. Update the queue's `total_bytes` **and** every copy of it — the phase runner
-   and the mission supervisor — then run `test_queue_manifests.py`.
+   and the qualification supervisor — then run `test_queue_manifests.py`.
 3. Download through the queue.
 4. Add the router preset or sidecar env file.
 5. Give it a privilege tier in `candidate_policy`, or the router gate will fail
@@ -615,8 +615,8 @@ decision rather than blind deletion.
 | 3 | another instance already running | `gate_computer_use.py`; `post_reboot_gate.py` uses 3 for "not ready" |
 | 4 | interrupted by a handled signal | `gate_computer_use.py` |
 | 5 | ran but produced no usable artifact | `run_when_idle.sh` (`EXIT_NO_ARTIFACT`) |
-| 75 | another writer holds the lock, or the host is no longer idle | `download_queue.py`, mission supervisor, serialized runners |
-| 128+N | terminated by signal N | mission supervisor |
+| 75 | another writer holds the lock, or the host is no longer idle | `download_queue.py`, qualification supervisor, serialized runners |
+| 128+N | terminated by signal N | qualification supervisor |
 
 `local-ai-computer-use-gate.service` excludes 1, 3 and 5 from `Restart=`
 precisely because retrying them cannot change the outcome; exit 4 and death by

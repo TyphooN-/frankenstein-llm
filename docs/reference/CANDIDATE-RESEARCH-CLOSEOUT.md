@@ -79,7 +79,7 @@ admit a candidate and does not disable redaction to make one look better; ADR
 pass. The abliterated lineage also puts this model under
 [ADR 0004](../decisions/0004-prompt-corpus-admission.md) rather than outside it.
 
-**Next action, unchanged by this intake:** none, until the mission's existing
+**Next action, unchanged by this intake:** none, until the qualification's existing
 failed gates are repaired. This is a research record.
 
 ## Submitted candidate intake — 2026-09-08, second batch
@@ -114,7 +114,7 @@ intake a deduplicated queue rather than a growing pile of restatements.
 primary-source collection through
 `verification/local-coverage-foundation/research/collect_hf_metadata.py` before
 anything can be said about them, and that is research, not admission. Every
-candidate in this batch is behind the mission's existing failed gates.
+candidate in this batch is behind the qualification's existing failed gates.
 
 ## Additional submitted candidates — 2026-09-07 screening
 
@@ -498,7 +498,7 @@ These are the same 27B uncensored/abliterated role as installed
 `Qwen3.8-27B-OBLITERATED-Q6_K.gguf` (and `heretic`). Filename and imatrix
 label are not quality or refusal-removal proof. Operator authorization:
 *slot A/B on speed and usefulness* against those two occupants,
-Q6_K only, after the functional mission releases the GPU. Queue:
+Q6_K only, after the functional qualification releases the GPU. Queue:
 [download-queue-slot-uncensored-27b.json](../../verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json).
 Do not add production aliases first. Disclose MTP/speculative differences;
 heretic and obliterated use `draft-mtp`. Read GGUF headers on the challengers

@@ -133,7 +133,7 @@ def main() -> int:
     summary: dict = {
         "gate": "glm-32k", "model": str(MODEL), "command": COMMAND,
         "runtime_source": str(GLM_SRC), "runtime_revision": None,
-        "started_at": started_at, "throughput_measured": False,
+        "started_at": started_at, "benchmark_performed": False,
         "baseline_memory": baseline_mem, "baseline_vram": baseline_vram,
         "minimum_mem_available_bytes": baseline_mem["MemAvailable"],
         "peak_vram": baseline_vram.copy(), "samples": 0,

@@ -81,25 +81,17 @@ class InProcessUnloadTests(unittest.TestCase):
 
     CLEAN = {"cuda:0": {"allocated_bytes": 0, "reserved_bytes": 0}}
 
-    def test_context_residue_is_recorded_as_context_not_as_a_leak(self):
-        # The grounding gate's own numbers: every parameter came back, and what
-        # is left is the same few hundred megabytes on the card that held 2.8 GiB
-        # as on the one that held 6.8 GiB.
+    def test_clean_allocator_does_not_waive_unattributed_device_residue(self):
         verdict = gatelib.unload_verdict(
             {"card0": 27_836_416, "card1": 404_557_824, "card2": 2_195_812_352},
             {"card0": 525_914_112, "card1": 704_323_584, "card2": 2_493_698_048},
             TOLERANCE,
             allocator={f"cuda:{index}": {"allocated_bytes": 0, "reserved_bytes": 0}
                        for index in range(3)})
-        self.assertTrue(verdict["pass"], verdict["problems"])
-        self.assertEqual({"card0": 498_077_696, "card1": 299_765_760,
-                          "card2": 297_885_696}, verdict["runtime_context_bytes"])
-        self.assertLess(verdict["runtime_context_bytes"]["card2"],
-                        verdict["runtime_context_bytes"]["card0"],
-                        "context size does not track how much the card carried")
-        self.assertIn("runtime device context", verdict["note"])
-        self.assertEqual(498_077_696, verdict["vram_residue_bytes"]["card0"],
-                         "the host reading is still recorded in full")
+        self.assertFalse(verdict["pass"])
+        self.assertEqual(498_077_696, verdict["unattributed_device_bytes"]["card0"])
+        self.assertNotIn("runtime_context_bytes", verdict)
+        self.assertIn("release remains unproven", " ".join(verdict["problems"]))
 
     def test_a_live_tensor_fails_even_under_the_card_tolerance(self):
         verdict = gatelib.unload_verdict(
@@ -314,7 +306,7 @@ class ExitAfterVerdictTests(unittest.TestCase):
     ROCm's HSA runtime segfaults in its own exit teardown on this host. On boot
     1669f3ad the ASR gate transcribed the fixture exactly, proved a clean unload,
     wrote ``"pass": true`` to gate-asr.json, and *then* died with SIGSEGV -- and
-    the mission recorded exit -11 as the gate's answer. These tests pin the two
+    the qualification recorded exit -11 as the gate's answer. These tests pin the two
     properties that keep that from happening again without softening anything:
     the code the gate computed is the code the process returns, and stdout that
     the gate printed is not lost to the bypassed finalization.

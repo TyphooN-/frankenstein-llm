@@ -26,7 +26,7 @@
 - [SALINE LOOP](AI-METAL-BAND.md): an operator creative brief for a war metal / blackened death / deathgrind project, mapped to the local weights that would produce each asset, including what character-consistent music video this stack can and cannot do. A concept note, not a capability claim.
 
 - [Handoff 2026-09-07](HANDOFF-2026-09-07.md): state at the 2026-09-07 reboot — what is
-  proven, what the boot-time mission run is expected to prove, the authorized 27B
+  proven, what the boot-time qualification run is expected to prove, the authorized 27B
   download that was not started, and what a reboot invalidates.
 
 ## Reading status correctly

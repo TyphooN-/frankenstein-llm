@@ -17,7 +17,7 @@ router-state.json
 *.recovered
 # Durable state is published by writing "<name>.tmp" and renaming. A crash
 # between those two steps leaves the temp file behind; "*.tmp.*" only covers the
-# pid-suffixed mission variant, so cover the plain suffix too.
+# pid-suffixed qualification variant, so cover the plain suffix too.
 *.tmp
 *.tmp.*
 *.ok
@@ -38,12 +38,12 @@ __pycache__/
 /verification/workspace-move-report.json
 /verification/obliterated-mmproj-download.log
 /verification/**/evidence/
-/verification/mission-supervisor/qualification-cache/
+/verification/qualification-supervisor/qualification-cache/
 # Waveforms the TTS gate synthesises on every run. Same class as evidence: gate
 # output, not repository state, and not a fixture -- the gate's inputs are the
 # tracked reference clips under local-coverage-foundation/fixtures/asr/. Four of
 # them were swept into e86383b by an unscoped `git add`, where they broke the
-# tracked-file coverage check and made each gate run dirty the tree the mission
+# tracked-file coverage check and made each gate run dirty the tree the qualification
 # fingerprints. Named exactly rather than as `*.wav`, which would also swallow
 # those fixtures.
 /verification/tts-local/artifacts/
@@ -51,10 +51,10 @@ __pycache__/
 /verification/glm53flash-local/build-*/
 /verification/**/transcript-*.jsonl
 /verification/**/download-state*.json
-/verification/**/mission-state.json
+/verification/**/qualification-state.json
 /verification/tmp/
 # MIOpen's user performance database and compiled-kernel cache. Redirected
-# here by the mission unit because ProtectHome=read-only blocks the default
+# here by the qualification unit because ProtectHome=read-only blocks the default
 # under $HOME; it is a rebuildable runtime cache, not repository state.
 /verification/miopen/
 /verification/**/lane.json
@@ -73,3 +73,7 @@ __pycache__/
 .DS_Store
 *~
 *.swp
+
+# Legacy runtime backup retained by the naming migration.
+verification/mission-supervisor/
+verification/qualification-supervisor/*.performance.jsonl

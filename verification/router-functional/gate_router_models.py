@@ -14,12 +14,15 @@ import urllib.parse
 import urllib.request
 
 # Resolve this gate's own checkout rather than naming one. A linked worktree is
-# how this repository is edited while the mission supervisor owns the primary
+# how this repository is edited while the qualification supervisor owns the primary
 # checkout; a literal path there would import the other tree's policy and cache
 # modules, so a change under test would never be the change that ran.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import qualification_performance as performance
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "verification/candidate-qualification"))
-sys.path.insert(0, str(ROOT / "verification/mission-supervisor"))
+sys.path.insert(0, str(ROOT / "verification/qualification-supervisor"))
 import candidate_policy  # noqa: E402
 import qualification_cache  # noqa: E402
 from candidate_policy import tool_grant_allowed_for_preset  # noqa: E402
@@ -37,8 +40,8 @@ from qualification_cache import (  # noqa: E402
     run_cached,
     unreadable_identity,
 )
-from run_functional_mission import (  # noqa: E402
-    MISSION_BLOCKING_REASONS,
+from run_qualification import (  # noqa: E402
+    QUALIFICATION_BLOCKING_REASONS,
     conflict_reason,
     process_metadata,
 )
@@ -63,7 +66,7 @@ VRAM_TOLERANCE = 768 << 20
 RAM_TOLERANCE = 2 << 30
 # Functional checks are not throughput claims. cargo/rustc/makepkg outside the
 # kernel tree and desktop load do not confound a PONG / tool-call / unload
-# verdict. Refuse only what the mission itself waits out, plus an in-flight
+# verdict. Refuse only what the qualification itself waits out, plus an in-flight
 # download queue that can replace the weights under the router.
 DOWNLOAD_UNIT_PREFIX = "local-ai-model-downloads"
 
@@ -82,6 +85,12 @@ def http_json(path: str, payload: dict | None = None, timeout: int = 900) -> dic
         data=data,
         headers={"Content-Type": "application/json"},
     )
+    if payload is not None and path in ("/v1/chat/completions", "/completion", "/v1/completions"):
+        with performance.measure("router-inference", model=payload.get("model")) as observed:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                result = json.load(response)
+            observed["response"] = result
+            return result
     with urllib.request.urlopen(req, timeout=timeout) as response:
         return json.load(response)
 
@@ -146,8 +155,8 @@ def blocked_workloads(proc_root: Path = Path("/proc")) -> list[dict[str, object]
     """Find workloads that would confound a functional router qualification.
 
     Reads only kernel metadata (``comm``, ``cwd``, ``cgroup``). Never opens
-    ``cmdline``. Classification is the mission supervisor's ``conflict_reason``;
-    this gate then refuses the same classes the mission waits for, plus an
+    ``cmdline``. Classification is the qualification supervisor's ``conflict_reason``;
+    this gate then refuses the same classes the qualification waits for, plus an
     in-flight download queue.
     """
     blocked: list[dict[str, object]] = []
@@ -161,7 +170,7 @@ def blocked_workloads(proc_root: Path = Path("/proc")) -> list[dict[str, object]
         if not command:
             continue
         reason = conflict_reason(command, cwd, cgroup)
-        if reason in MISSION_BLOCKING_REASONS:
+        if reason in QUALIFICATION_BLOCKING_REASONS:
             pass
         elif DOWNLOAD_UNIT_PREFIX in cgroup:
             reason = "download-queue"
@@ -577,7 +586,7 @@ def main(argv=()) -> int:
     summary = {
         "gate": "router-functional",
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "boot_id": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
         "kernel_release": os.uname().release,
         "kernel_build_signature": Path("/proc/version").read_text().strip(),

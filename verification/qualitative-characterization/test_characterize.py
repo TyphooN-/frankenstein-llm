@@ -283,7 +283,7 @@ class ReportShapeTests(unittest.TestCase):
 
     def test_a_run_records_weights_corpus_digest_and_no_timing(self):
         report = self.run_with({"quality-exact-format": "1. a\n2. b\n3. c"})
-        self.assertFalse(report["throughput_measured"])
+        self.assertFalse(report["benchmark_performed"])
         self.assertFalse(report["timing_recorded"])
         self.assertTrue(report["willingness_is_not_quality"])
         self.assertEqual(64, len(report["corpus"]["sha256"]))

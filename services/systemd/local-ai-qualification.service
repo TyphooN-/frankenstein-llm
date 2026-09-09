@@ -1,5 +1,5 @@
 [Unit]
-Description=Serialized non-benchmark local AI functional qualification mission
+Description=Serialized non-benchmark local AI qualification
 After=network-online.target llama-router.service local-ai-model-downloads.service local-ai-model-downloads-phase2.service local-ai-model-downloads-phase3.service local-ai-model-downloads-phase4.service
 Wants=network-online.target
 
@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=oneshot
 ExecStartPre=/usr/bin/mkdir -p /home/typhoon/git/frankenstein-llm/verification/tmp
 ExecStartPre=/usr/bin/mkdir -p /home/typhoon/git/frankenstein-llm/verification/miopen/cache
-ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/mission-supervisor/run_functional_mission.py
+ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/qualification-supervisor/run_qualification.py
 TimeoutStartSec=infinity
 Nice=5
 NoNewPrivileges=true
@@ -30,7 +30,7 @@ Environment=TEMP=/home/typhoon/git/frankenstein-llm/verification/tmp
 # the 2026-09-07 00:38 run, each with the same opaque code. Redirect both paths
 # into the checkout, which ReadWritePaths already covers, rather than opening a
 # hole in ProtectHome. The cache persists between runs on purpose: recompiling
-# kernels on every mission is minutes of GPU time for no benefit.
+# kernels on every qualification is minutes of GPU time for no benefit.
 Environment=MIOPEN_USER_DB_PATH=/home/typhoon/git/frankenstein-llm/verification/miopen
 Environment=MIOPEN_CUSTOM_CACHE_DIR=/home/typhoon/git/frankenstein-llm/verification/miopen/cache
 

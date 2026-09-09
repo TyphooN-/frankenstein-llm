@@ -117,32 +117,32 @@ class QualificationReuseTests(unittest.TestCase):
     def test_real_supervisor_reuses_step_and_force_executes(self):
         import sys
         sys.path.insert(0, str(Path(__file__).parent))
-        import run_functional_mission as mission
+        import run_qualification as qualification
         state = {'steps': {}, 'input_fingerprint': 'unrelated-new-fingerprint'}
         def run(name, command, state, before_start=None):
             if before_start:
                 before_start()
             state['steps'][name] = {'status': 'passed', 'exit_code': 0}
             return 0
-        with patch.object(mission, 'HERE', Path(self.temp.name)), \
-                patch.object(mission, 'qualification_key', return_value='stable-input'), \
-                patch.object(mission, 'atomic_json'), patch.object(mission, 'log'), \
-                patch.object(mission, 'run_step', side_effect=run) as execute:
-            self.assertEqual(0, mission.execute_qualification('embeddings', [], state))
-            self.assertTrue(mission.reuse_step('embeddings', [], state))
-            self.assertFalse(mission.reuse_step('embeddings', [], state, True))
+        with patch.object(qualification, 'HERE', Path(self.temp.name)), \
+                patch.object(qualification, 'qualification_key', return_value='stable-input'), \
+                patch.object(qualification, 'atomic_json'), patch.object(qualification, 'log'), \
+                patch.object(qualification, 'run_step', side_effect=run) as execute:
+            self.assertEqual(0, qualification.execute_qualification('embeddings', [], state))
+            self.assertTrue(qualification.reuse_step('embeddings', [], state))
+            self.assertFalse(qualification.reuse_step('embeddings', [], state, True))
             execute.assert_called_once()
 
     def test_stability_mode_is_bounded_and_forces_each_selected_run(self):
         import sys
         sys.path.insert(0, str(Path(__file__).parent))
-        import run_functional_mission as mission
-        original = mission.main
-        with patch.object(mission, 'main', return_value=0) as child:
+        import run_qualification as qualification
+        original = qualification.main
+        with patch.object(qualification, 'main', return_value=0) as child:
             self.assertEqual(0, original(['--gate', 'asr', '--stability-runs', '3']))
             self.assertEqual(3, child.call_count)
             self.assertEqual(['--gate', 'asr', '--requalify'], child.call_args.args[0])
-        with patch.object(mission, 'main', return_value=1) as child:
+        with patch.object(qualification, 'main', return_value=1) as child:
             self.assertEqual(1, original(['--gate', 'asr', '--stability-runs=3']))
             child.assert_called_once()
 
@@ -376,55 +376,55 @@ class InconclusiveOutcomeTests(QualificationReuseTests):
 
 
 def test_supervisor_preserves_pass_on_refusal_and_wait_failure(tmp_path, monkeypatch):
-    import run_functional_mission as mission
+    import run_qualification as qualification
     store = cache.Store(tmp_path / 'qualification-cache')
     store.publish('asr', 'asr', 'same', {'pass': True, 'step': {'status': 'passed'}})
     original = store.read('asr', 'asr')
-    monkeypatch.setattr(mission, 'HERE', tmp_path)
-    monkeypatch.setattr(mission, 'qualification_key', lambda *a: 'same')
-    monkeypatch.setattr(mission, 'qualification_components', lambda *a: {'runtime': 'x'})
-    monkeypatch.setattr(mission, 'atomic_json', lambda *a: None)
+    monkeypatch.setattr(qualification, 'HERE', tmp_path)
+    monkeypatch.setattr(qualification, 'qualification_key', lambda *a: 'same')
+    monkeypatch.setattr(qualification, 'qualification_components', lambda *a: {'runtime': 'x'})
+    monkeypatch.setattr(qualification, 'atomic_json', lambda *a: None)
     state = {'steps': {}}
     def refused(name, command, state, before_start=None):
         assert before_start is not None
         before_start()
         state['steps'][name] = {'status': 'failed'}
         return cache.EXIT_ADMISSION_REFUSED
-    monkeypatch.setattr(mission, 'run_step', refused)
-    assert mission.execute_qualification('asr', [], state) == 75
+    monkeypatch.setattr(qualification, 'run_step', refused)
+    assert qualification.execute_qualification('asr', [], state) == 75
     assert state['steps']['asr']['status'] == 'blocked'
     assert store.read('asr', 'asr') == original
     def wait_failed(*args, **kwargs):
         raise RuntimeError('host unavailable before admission')
-    monkeypatch.setattr(mission, 'run_step', wait_failed)
+    monkeypatch.setattr(qualification, 'run_step', wait_failed)
     import pytest
     with pytest.raises(RuntimeError):
-        mission.execute_qualification('asr', [], state)
+        qualification.execute_qualification('asr', [], state)
     assert store.read('asr', 'asr') == original
 
 
 def test_supervisor_interruption_is_inconclusive_not_a_model_failure(tmp_path, monkeypatch):
     """An operator stop is forwarded to the gate, which then exits non-zero.
 
-    The mission state already called that ``interrupted``. The receipt called it
+    The qualification state already called that ``interrupted``. The receipt called it
     ``failed``, so the two records of one event disagreed and the durable one
     blamed the model for being stopped.
     """
-    import run_functional_mission as mission
-    monkeypatch.setattr(mission, 'HERE', tmp_path)
-    monkeypatch.setattr(mission, 'qualification_key', lambda *a: 'same')
-    monkeypatch.setattr(mission, 'qualification_components', lambda *a: {'runtime': 'x'})
-    monkeypatch.setattr(mission, 'atomic_json', lambda *a: None)
-    monkeypatch.setattr(mission, 'stop_signal', 15)
+    import run_qualification as qualification
+    monkeypatch.setattr(qualification, 'HERE', tmp_path)
+    monkeypatch.setattr(qualification, 'qualification_key', lambda *a: 'same')
+    monkeypatch.setattr(qualification, 'qualification_components', lambda *a: {'runtime': 'x'})
+    monkeypatch.setattr(qualification, 'atomic_json', lambda *a: None)
+    monkeypatch.setattr(qualification, 'stop_signal', 15)
 
     def stopped(name, command, state, before_start=None):
         before_start()
         state['steps'][name] = {'status': 'failed', 'exit_code': 143}
         return 143
 
-    monkeypatch.setattr(mission, 'run_step', stopped)
+    monkeypatch.setattr(qualification, 'run_step', stopped)
     state = {'steps': {}}
-    assert mission.execute_qualification('asr', [], state) == 143
+    assert qualification.execute_qualification('asr', [], state) == 143
     assert state['steps']['asr']['status'] == 'interrupted'
     store = cache.Store(tmp_path / 'qualification-cache')
     assert store.read('asr', 'asr')['status'] == 'inconclusive'
@@ -432,41 +432,41 @@ def test_supervisor_interruption_is_inconclusive_not_a_model_failure(tmp_path, m
 
 
 def test_supervisor_interruption_does_not_demote_a_gate_that_finished(tmp_path, monkeypatch):
-    import run_functional_mission as mission
-    monkeypatch.setattr(mission, 'HERE', tmp_path)
-    monkeypatch.setattr(mission, 'qualification_key', lambda *a: 'same')
-    monkeypatch.setattr(mission, 'qualification_components', lambda *a: {'runtime': 'x'})
-    monkeypatch.setattr(mission, 'atomic_json', lambda *a: None)
-    monkeypatch.setattr(mission, 'stop_signal', 15)
+    import run_qualification as qualification
+    monkeypatch.setattr(qualification, 'HERE', tmp_path)
+    monkeypatch.setattr(qualification, 'qualification_key', lambda *a: 'same')
+    monkeypatch.setattr(qualification, 'qualification_components', lambda *a: {'runtime': 'x'})
+    monkeypatch.setattr(qualification, 'atomic_json', lambda *a: None)
+    monkeypatch.setattr(qualification, 'stop_signal', 15)
 
     def finished(name, command, state, before_start=None):
         before_start()
         state['steps'][name] = {'status': 'passed', 'exit_code': 0}
         return 0
 
-    monkeypatch.setattr(mission, 'run_step', finished)
-    assert mission.execute_qualification('asr', [], {'steps': {}}) == 0
+    monkeypatch.setattr(qualification, 'run_step', finished)
+    assert qualification.execute_qualification('asr', [], {'steps': {}}) == 0
     store = cache.Store(tmp_path / 'qualification-cache')
     assert store.read('asr', 'asr')['status'] == 'passed'
     assert store.reuse('asr', 'asr', 'same') is not None
 
 
 def test_supervisor_changed_inputs_are_inconclusive(tmp_path, monkeypatch):
-    import run_functional_mission as mission
-    monkeypatch.setattr(mission, 'HERE', tmp_path)
+    import run_qualification as qualification
+    monkeypatch.setattr(qualification, 'HERE', tmp_path)
     keys = iter(['before', 'after'])
-    monkeypatch.setattr(mission, 'qualification_key', lambda *a: next(keys))
-    monkeypatch.setattr(mission, 'qualification_components', lambda *a: {'runtime': 'old'})
-    monkeypatch.setattr(mission, 'atomic_json', lambda *a: None)
-    monkeypatch.setattr(mission, 'stop_signal', None)
+    monkeypatch.setattr(qualification, 'qualification_key', lambda *a: next(keys))
+    monkeypatch.setattr(qualification, 'qualification_components', lambda *a: {'runtime': 'old'})
+    monkeypatch.setattr(qualification, 'atomic_json', lambda *a: None)
+    monkeypatch.setattr(qualification, 'stop_signal', None)
     def passed(name, command, state, before_start=None):
         assert before_start is not None
         before_start()
         state['steps'][name] = {'status': 'passed', 'exit_code': 0}
         return 0
-    monkeypatch.setattr(mission, 'run_step', passed)
+    monkeypatch.setattr(qualification, 'run_step', passed)
     state = {'steps': {}}
-    assert mission.execute_qualification('asr', [], state) == 76
+    assert qualification.execute_qualification('asr', [], state) == 76
     assert state['steps']['asr']['status'] == 'inconclusive'
     store = cache.Store(tmp_path / 'qualification-cache')
     assert store.read('asr', 'asr')['status'] == 'inconclusive'

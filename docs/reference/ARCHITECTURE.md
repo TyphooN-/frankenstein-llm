@@ -54,10 +54,11 @@ Two rules constrain nearly every module:
 - **Fail closed.** Absent evidence is never a pass. A missing artifact, an
   interrupted run, an unreadable timestamp, an unknown model status and an
   unknown router alias all resolve to "not allowed" rather than "probably fine".
-- **No throughput.** Functional load, coherence, memory fit and clean unload are
-  in scope. Tokens/sec, latency and comparative benchmarks are not, per
+- **Passive performance observations.** Functional load, coherence, memory fit
+  and clean unload decide acceptance; timing existing inference does not. Extra
+  comparative benchmark runs remain separate, per
   [ADR 0002](../decisions/0002-serialized-functional-qualification.md). Gate
-  artifacts carry an explicit `throughput_measured: false`, and the capability
+  artifacts carry an explicit `benchmark_performed: false`, and the capability
   ledger reports an artifact that claims otherwise as a problem.
 
 ## Layer map
@@ -98,8 +99,8 @@ Two rules constrain nearly every module:
                   ▼
   ┌────────────────────────────────────────┐
   │ layer 5  SUPERVISION                   │
-  │   mission-supervisor/run_functional_   │
-  │     mission.py  (serialized, resumable)│
+  │   qualification-supervisor/run_functional_   │
+  │     qualification.py  (serialized, resumable)│
   └────────────────────────────────────────┘
 ```
 
@@ -171,8 +172,8 @@ mechanism that prevents contention:
   sidecar and the router is VRAM residency, and a resident sidecar holds its
   share of a card whatever its nice value. GPU command submission is not ordered
   by a CPU nice value either.
-- `Nice=5` is also what `local-ai-functional-mission.service` runs at, so it does
-  not order the sidecars against the mission.
+- `Nice=5` is also what `local-ai-qualification.service` runs at, so it does
+  not order the sidecars against the qualification.
 - The I/O settings are one notch below the kernel default — best-effort priority
   4 (`systemd.exec(5)`) — and take effect at all only "in conjunction with an I/O
   scheduler that supports I/O priorities" (`ioprio_set(2)`). Which scheduler a
@@ -181,7 +182,7 @@ mechanism that prevents contention:
 
 The real serialization is elsewhere: `--models-max 1` on the router, the
 supervisor's quiet-host wait, and the fact that a resident sidecar is classified
-as an `inference` conflict and therefore blocks a mission step outright.
+as an `inference` conflict and therefore blocks a qualification step outright.
 
 | Instance | Port | Alias | Purpose |
 |---|---|---|---|
@@ -248,7 +249,7 @@ describing bytes that are not there.
 On success the queue writes `downloads[-phaseN]-complete.ok` containing the exact
 byte total. Phases 2–4 refuse to start until every earlier phase's state says
 `complete` *and* its stamp matches the byte total compiled into the runner; the
-mission supervisor makes the same check across all four. Those repeated totals
+qualification supervisor makes the same check across all four. Those repeated totals
 are cross-checked offline by `test_queue_manifests.py`, because a queue edited
 without updating its copies produces either a post-transfer stamp mismatch or a
 supervisor waiting forever for a number nothing will write.
@@ -300,7 +301,7 @@ refuses to let dimension difference alone be the justification.
 `gate_candidate_policy.py` runs all of it, adds an exact-size inventory of every
 phase-four file, proves the phase-four "already satisfied" ASR claim against the
 phase-one queue rather than trusting it, and publishes
-`evidence/candidate-policy.json`. It is step one of the mission and blocks every
+`evidence/candidate-policy.json`. It is step one of the qualification and blocks every
 model-backed step behind it.
 
 ### Remote-code review
@@ -407,17 +408,17 @@ owns.
 
 ## Layer 5 — supervision
 
-`verification/mission-supervisor/run_functional_mission.py` runs the serialized
-qualification mission. It is a `oneshot` unit, holds an exclusive `flock`
+`verification/qualification-supervisor/run_qualification.py` runs the serialized
+qualification qualification. It is a `oneshot` unit, holds an exclusive `flock`
 (exit 75 if another supervisor owns it), and is designed to be resumed across
 reboots and operator stops.
 
 **Reuse.** `qualification_cache.py` gives each gate a durable receipt under
-`verification/mission-supervisor/qualification-cache/` (ignored by Git), keyed by
+`verification/qualification-supervisor/qualification-cache/` (ignored by Git), keyed by
 a digest of that gate's own code, virtualenv record files, model artifacts and
 runtime identity. A gate is skipped only when its receipt key still matches, so
 one replaced weight no longer re-runs unrelated capabilities the way the
-whole-mission `input_fingerprint` does. Aggregates (`router-models`,
+whole-qualification `input_fingerprint` does. Aggregates (`router-models`,
 `repository-agent`) hold no receipt of their own: they dispatch, and each preset
 owns its own. Eligibility is revoked before a test starts, so a crashed or failed
 retest cannot fall back to the previous pass; that pass is kept as `last_pass`,
@@ -428,7 +429,7 @@ a receipt is evidence about inputs, not proof the host is currently healthy.
 **Ordering.** `candidate-policy` is step one and is a blocking prerequisite: if
 it fails, every later step is recorded `blocked-policy` and nothing model-backed
 runs. After it passes, the remaining eleven steps continue past a failure so one
-capability cannot hide the status of every later one; the aggregate mission still
+capability cannot hide the status of every later one; the aggregate qualification still
 fails closed.
 
 The twelve steps, in order: `candidate-policy`, `wemm-embeddings`,
@@ -446,10 +447,10 @@ aborts; a stamp that does not match its expected byte total aborts.
 polls with `MemAvailable ≥ 32 GiB` and no competing kernel-tree build, unmanaged
 llama.cpp/inference process, or active download queue. Unrelated cargo/rustc and
 desktop load average are not blockers: they are not a missing kernel and must not
-hold the mission after a new-kernel boot. A download queue is a blocker for a
+hold the qualification after a new-kernel boot. A download queue is a blocker for a
 narrower reason — `gate_router_models` refuses to qualify beside competing work,
-so a mission that starts it during a queue run collects refusals, not verdicts. Unlike the input wait it is
-bounded — default six hours, overridable with `HERMES_MISSION_QUIET_TIMEOUT`,
+so a qualification that starts it during a queue run collects refusals, not verdicts. Unlike the input wait it is
+bounded — default six hours, overridable with `HERMES_QUALIFICATION_QUIET_TIMEOUT`,
 which rejects a non-positive or unparseable value rather than silently
 substituting a default. On timeout it records the blockers it actually observed
 into durable state *before* raising.
@@ -471,13 +472,13 @@ bounded — counts by reason plus at most eight samples — so a 44-thread compi
 fan-out cannot flood the log or an error string.
 
 **Resume.** State is published atomically and durably (`.tmp.<pid>`, fsync, rename,
-directory fsync) as `frankenstein-functional-mission/1`. A step is skipped on a
+directory fsync) as `frankenstein-functional-qualification/1`. A step is skipped on a
 later run only when it is recorded `passed` *and* its `input_fingerprint` still
 matches. That fingerprint covers `git ls-files -s` and `git diff --binary HEAD`
 over `verification/`, `llama-models.ini` and `scripts/`, the four promotion
 records and stamps, every queue file, the size and mtime of every queued
 destination, and the step list itself — so editing a gate, replacing a weight or
-reordering the mission re-runs the affected steps instead of trusting a stale
+reordering the qualification re-runs the affected steps instead of trusting a stale
 pass.
 
 **Signals.** `SIGHUP`/`SIGINT`/`SIGTERM` are forwarded to the running step's
@@ -513,7 +514,7 @@ States it can assign, and the fail-closed rules behind them:
 
 Two further bindings: an artifact only counts when its `gate` field matches the
 expected gate identity, so copying any passing JSON onto a declared path cannot
-qualify an unrelated capability; and an artifact reporting measured throughput is
+qualify an unrelated capability; and an artifact declaring a dedicated benchmark is
 surfaced as a `problem` rather than copied forward. The ledger's own `pass` field
 is a statement about the ledger, not about the stack.
 
@@ -569,7 +570,7 @@ stricter for model promotion, because downstream execution trusts the stamp.
 leaves the plain suffix behind.
 
 **Single writer.** Every long-running writer takes an exclusive `flock` and exits
-75 rather than racing: the download queue per phase, the mission supervisor, the
+75 rather than racing: the download queue per phase, the qualification supervisor, the
 computer-use gate. The kernel releases the lock on any death, including SIGKILL.
 
 **Untrusted data.** Screen text, retrieved documents and corpus rows are data,
@@ -590,7 +591,7 @@ cannot be installed beside the AMD runtime.
 ## Evidence artifacts
 
 Every gate artifact is JSON with, at minimum: a `gate` identity string, a
-boolean `pass`, `throughput_measured: false`, and a timestamp
+boolean `pass`, `benchmark_performed: false`, and a timestamp
 (`recorded_at`/`finished_at`) that `datetime.fromisoformat` can parse. Gates that
 can be interrupted also carry `interrupted` and, where sections exist,
 `sections_missing`. The ledger reads exactly those fields; see

@@ -9,7 +9,7 @@
     "hash_available": "LFS files use publisher SHA-256",
     "selection": "one Q6_K per same-slot 27B uncensored candidate for isolated speed/usefulness A/B; not a production alias"
   },
-  "notes": "Do not start while local-ai-functional-mission.service holds the mission lock. Do not add these files to llama-models.ini until the slot comparison finishes.",
+  "notes": "Do not start while local-ai-qualification.service holds the qualification lock. Do not add these files to llama-models.ini until the slot comparison finishes.",
   "total_bytes": 44513531680,
   "artifacts": [
     {

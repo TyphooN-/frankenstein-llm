@@ -55,10 +55,10 @@ short-lived foreground checks, not unattended supervisors.)
 are never instructions. If you add a path that feeds external text to a model,
 carry the envelope and add an injection case.
 
-**No throughput.** Do not add a timing measurement to a gate. Every artifact
-carries `throughput_measured: false`, and the ledger reports an artifact claiming
-otherwise as a problem. See
-[why](CAPABILITY-MATRIX.md#no-numeric-model-characterization-harness).
+**Passive performance, not a benchmark.** Existing qualification inference records
+bounded timing observations in a separate sidecar. Do not add prompts or rerun
+cached passes for telemetry. `benchmark_performed: false` distinguishes these
+observations from controlled benchmarks. See [performance fields and limits](QUALIFICATION-PERFORMANCE.md).
 
 **Comment the load-bearing part.** The prevailing style here explains *why* a
 check exists and what breaks without it, usually with the incident that motivated
@@ -89,13 +89,13 @@ only after builds and other host pressure have drained.
 | Suite | Covers |
 |---|---|
 | `verification/upstream-pin/test_llama_cpp_pin.py` | lock fields, `.gitmodules`, staged gitlink vs lock, build-script/lock agreement, stale runtime paths in tracked files, every preset key against `llama-server --help` |
-| `verification/mission-supervisor/test_mission_supervisor.py` | quiet-timeout parsing, bounded quiet wait and its blocker reporting, `/proc` classification against fixtures, durable state, operator-stop vs step-failure classification |
-| `verification/mission-supervisor/test_qualification_cache.py` | receipt identity and revocation — a changed dependency invalidates, an unchanged one reuses, a failed or crashed retest cannot fall back to an older pass, and legacy migration refuses incomplete, cross-kernel or post-dated records |
-| `.../test_mission_status.py` | stale passes, records left `running` by a crash, absent and corrupt state, and the read-only guarantee |
+| `verification/qualification-supervisor/test_qualification_supervisor.py` | quiet-timeout parsing, bounded quiet wait and its blocker reporting, `/proc` classification against fixtures, durable state, operator-stop vs step-failure classification |
+| `verification/qualification-supervisor/test_qualification_cache.py` | receipt identity and revocation — a changed dependency invalidates, an unchanged one reuses, a failed or crashed retest cannot fall back to an older pass, and legacy migration refuses incomplete, cross-kernel or post-dated records |
+| `.../test_qualification_status.py` | stale passes, records left `running` by a crash, absent and corrupt state, and the read-only guarantee |
 | `verification/local-coverage-foundation/test_download_queue_cli.py` | `--help` exits before any lock/log/state side effect; unexpected arguments exit 2 |
 | `.../test_download_parallel.py` | per-file ownership after `realpath`, concurrency, per-artifact state accounting |
 | `.../test_download_resume.py` | short partial resumes, full-size-correct partial promotes, full-size-wrong partial quarantines, transport selection |
-| `.../test_queue_manifests.py` | byte totals agree across queue, phase runner and mission supervisor |
+| `.../test_queue_manifests.py` | byte totals agree across queue, phase runner and qualification supervisor |
 | `.../test_capability_ledger.py` | absent, unreadable, interrupted, failing and stale evidence; gate-identity binding; tracked mapping |
 | `.../validators/test_gatelib.py` | clean-unload fails when it could not measure; cleanup runs and never raises out of `finally` |
 | `.../rag/test_rag_store.py` | extraction, ingest safety, sync patterns |
@@ -106,7 +106,7 @@ only after builds and other host pressure have drained.
 | `.../test_grounding_contract.py` | the two checkpoints' geometry, action-space and injection-judging differences |
 | `verification/operator-runs/test_serve_model.py` | preset/catalog agreement, weight-filename listings, fail-closed catalog validation |
 | `verification/router-functional/test_gate_router_models.py` | per-preset check lists, privilege profile, model coverage, release accounting, contended-host detection without reading `cmdline` |
-| `.../test_local_model_status.py` | status classification, error handling against fake responses, alias-to-weight-file resolution; the `--host-sharing` report — absent/corrupt/unknown-schema mission state never read as idle, `current_step` excluded from the verdict in both directions, every supervisor status classified exactly once, blocking vs advisory conflicts, an unreadable process table downgrading the verdict, and exit 0 for every verdict |
+| `.../test_local_model_status.py` | status classification, error handling against fake responses, alias-to-weight-file resolution; the `--host-sharing` report — absent/corrupt/unknown-schema qualification state never read as idle, `current_step` excluded from the verdict in both directions, every supervisor status classified exactly once, blocking vs advisory conflicts, an unreadable process table downgrading the verdict, and exit 0 for every verdict |
 | `verification/generative-media/test_media_policy.py` | GPU policy, build detection from `comm`/`cwd`, fail-closed vs routine `/proc` errors, build-name agreement with the supervisor, workflow claims, graph reference resolution |
 | `.../test_functional_gate.py` | workflow graph construction |
 | `verification/tts-local/test_tts_gate.py` | round-trip scoring, admission rules, text normalisation |
@@ -173,7 +173,7 @@ nothing supports.
    `build_candidate_queue.py`. Choose a `capability` string; it is the join key
    the ledger groups by.
 4. **Update every copy of the byte total** — the queue's `total_bytes`, the next
-   phase runner's expectation, the mission supervisor's `UPSTREAM` tuple — then
+   phase runner's expectation, the qualification supervisor's `UPSTREAM` tuple — then
    run `test_queue_manifests.py`.
 5. **Download** through the queue unit.
 6. **Serve it**: a router preset, a sidecar env file, a ComfyUI path category, or
@@ -186,7 +186,7 @@ nothing supports.
    map can never be qualified, and that is the correct default for anything newly
    downloaded — but leaving it absent forever is how a gap turns invisible, so
    record the reason in [the matrix](CAPABILITY-MATRIX.md#the-matrix).
-10. **Add the step** to `run_functional_mission.STEPS` in dependency order.
+10. **Add the step** to `run_qualification.STEPS` in dependency order.
 11. **Update the docs and the [coverage map](COVERAGE-MAP.md).**
 
 ## Writing a gate
@@ -222,7 +222,7 @@ The ledger reads exactly these fields. Anything else is for humans.
   "recorded_at": "2026-09-04T20:31:32-04:00",   // or finished_at; must parse with
                                                 //  datetime.fromisoformat
   "sections_missing": [],                // non-empty ⇒ forced to fail
-  "throughput_measured": false,          // true ⇒ reported as a ledger problem
+  "benchmark_performed": false,          // true ⇒ reported as a ledger problem
   "benchmarking_performed": false
 }
 ```
@@ -252,7 +252,7 @@ mismatch` verbatim, because that is the literal text
 3. Add `local-ai-model-downloads-phaseN.service` with `After=` the previous
    queue, `ProtectSystem=strict`, `ProtectHome=read-only` and `ReadWritePaths`
    limited to `models/` and the foundation directory.
-4. Add the queue to `run_functional_mission.UPSTREAM` with its exact byte total.
+4. Add the queue to `run_qualification.UPSTREAM` with its exact byte total.
 5. Extend `build_capability_ledger.QUEUES`.
 6. Extend `test_queue_manifests.py` so the new copies are reconciled.
 7. Describe it in the operator docs by its contents, not by its number.

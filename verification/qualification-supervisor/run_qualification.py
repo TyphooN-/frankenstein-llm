@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Reboot-resumable, fail-closed functional qualification supervisor.
 
-This mission deliberately records no token rate or comparative benchmark data.
+This qualification deliberately records no token rate or comparative benchmark data.
 The candidate-policy gate is a blocking prerequisite: no model-backed gate may
 run unless it passes. Independent functional gates then continue after a failure
 so one capability cannot hide the status of every later one; the aggregate
-mission still fails closed.
+qualification still fails closed.
 """
 from __future__ import annotations
 
@@ -26,10 +26,10 @@ from qualification_cache import (Store, step_key, adopt_legacy_step, key_compone
                                  INCONCLUSIVE, EXIT_ADMISSION_REFUSED, EXIT_INCONCLUSIVE)
 
 ROOT = Path(__file__).resolve().parents[2]
-HERE = ROOT / "verification" / "mission-supervisor"
-STATE = HERE / "mission-state.json"
-LOG = HERE / "mission.log"
-LOCK = HERE / "mission.lock"
+HERE = ROOT / "verification" / "qualification-supervisor"
+STATE = HERE / "qualification-state.json"
+LOG = HERE / "qualification.log"
+LOCK = HERE / "qualification.lock"
 FOUNDATION = ROOT / "verification" / "local-coverage-foundation"
 TTS_PYTHON = ROOT / "venvs" / "tts" / "bin" / "python"
 # Qwen3-ASR-1.7B declares Qwen3ASRForConditionalGeneration and model_type
@@ -65,15 +65,15 @@ def quiet_timeout(raw: str | None) -> int:
         seconds = int(raw)
     except ValueError as error:
         raise ValueError(
-            f"HERMES_MISSION_QUIET_TIMEOUT must be a positive integer, got {raw!r}"
+            f"HERMES_QUALIFICATION_QUIET_TIMEOUT must be a positive integer, got {raw!r}"
         ) from error
     if seconds <= 0:
         raise ValueError(
-            f"HERMES_MISSION_QUIET_TIMEOUT must be a positive integer, got {seconds}")
+            f"HERMES_QUALIFICATION_QUIET_TIMEOUT must be a positive integer, got {seconds}")
     return seconds
 
 
-QUIET_WAIT_TIMEOUT = quiet_timeout(os.environ.get("HERMES_MISSION_QUIET_TIMEOUT"))
+QUIET_WAIT_TIMEOUT = quiet_timeout(os.environ.get("HERMES_QUALIFICATION_QUIET_TIMEOUT"))
 UPSTREAM = (
     (FOUNDATION / "download-state.json", FOUNDATION / "downloads-complete.ok", "72134030730"),
     (FOUNDATION / "download-state-phase2.json", FOUNDATION / "downloads-phase2-complete.ok", "33184695056"),
@@ -103,7 +103,7 @@ stop_signal: int | None = None
 # Re-verifying files that already exist rewrites these on every boot: they say
 # when the downloader ran and how far it had got, not what it produced. Hashing
 # them made every reboot change the fingerprint, which invalidated every gate
-# that had already passed and restarted the whole mission from the first step.
+# that had already passed and restarted the whole qualification from the first step.
 VOLATILE_QUEUE_KEYS = frozenset({
     "started_at", "completed_at", "first_started_at", "status", "files_complete"})
 
@@ -134,7 +134,7 @@ def durable_queue_state(raw: bytes) -> bytes:
 
 
 # Reading the checkout is a query about the host, not about a model, so a host
-# that is too busy to answer it is a reason to wait rather than a mission
+# that is too busy to answer it is a reason to wait rather than a qualification
 # failure. ``git diff --binary HEAD`` walks every tracked file under
 # ``verification``; while a download queue saturates the disk that regularly
 # exceeded the original single 30-second attempt, and a concurrent git process
@@ -148,7 +148,7 @@ FINGERPRINT_RETRY_SECONDS = 20
 
 
 class InputsUnreadable(RuntimeError):
-    """The mission could not read its own inputs, so it measured nothing."""
+    """The qualification could not read its own inputs, so it measured nothing."""
 
 
 def read_git_inputs(command: list[str]) -> bytes:
@@ -169,7 +169,7 @@ def read_git_inputs(command: list[str]) -> bytes:
         f"git {command[1]} failed {FINGERPRINT_ATTEMPTS} times: {type(last).__name__}")
 
 
-def mission_inputs_fingerprint() -> str:
+def qualification_inputs_fingerprint() -> str:
     """Fingerprint source and promoted artifacts without re-hashing model weights."""
     digest = hashlib.sha256()
     source_paths = ("verification", "llama-models.ini", "scripts")
@@ -189,7 +189,7 @@ def mission_inputs_fingerprint() -> str:
             except OSError:
                 # Not promoted yet. wait_for_inputs is what blocks on that; this
                 # only has to change when the bytes do, and "absent" is a state
-                # it can fingerprint rather than a reason to abort the mission
+                # it can fingerprint rather than a reason to abort the qualification
                 # before it can report what it is waiting for.
                 digest.update(b"\0absent\0")
             else:
@@ -223,7 +223,7 @@ def log(message: str) -> None:
 
 
 def atomic_json(value: dict) -> None:
-    """Publish mission state durably; a resumed run reads it to skip passed steps."""
+    """Publish qualification state durably; a resumed run reads it to skip passed steps."""
     temp = STATE.with_suffix(f".tmp.{os.getpid()}")
     try:
         with temp.open("w", encoding="utf-8") as handle:
@@ -249,14 +249,14 @@ def atomic_json(value: dict) -> None:
 def load_state() -> dict:
     try:
         value = json.loads(STATE.read_text(encoding="utf-8"))
-        if value.get("schema") == "frankenstein-functional-mission/1":
+        if value.get("schema") == "frankenstein-functional-qualification/1":
             return value
     except (OSError, json.JSONDecodeError):
         pass
     return {
-        "schema": "frankenstein-functional-mission/1",
+        "schema": "frankenstein-functional-qualification/1",
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "steps": {},
     }
 
@@ -283,7 +283,7 @@ TRANSFER_COMMANDS = frozenset({
     "aria2c", "curl", "wget", "axel", "lftp", "rsync", "scp", "sftp",
     "git-lfs", "git-remote-http", "huggingface-cli", "hf",
 })
-# Anything that loads weights outside the router this mission manages itself.
+# Anything that loads weights outside the router this qualification manages itself.
 INFERENCE_COMMANDS = frozenset({
     "ollama", "vllm", "sglang", "koboldcpp", "whisper-cli", "whisper-server",
     "sd-server", "stable-diffusio",
@@ -298,10 +298,10 @@ KERNEL_TREE = "/linux-tkg"
 DELETED_SUFFIX = " (deleted)"
 # Only these conflict classes actually collide with a serialized GPU gate on this
 # desktop. cargo/rustc/makepkg in other trees, aria2 re-hash, and Chromium load
-# are not kernel compiles and must not hold the mission after a new kernel boot.
-MISSION_BLOCKING_REASONS = frozenset({"kernel-build", "inference", "download-queue"})
+# are not kernel compiles and must not hold the qualification after a new kernel boot.
+QUALIFICATION_BLOCKING_REASONS = frozenset({"kernel-build", "inference", "download-queue"})
 # The systemd slice every download queue runs under. gate_router_models refuses
-# to qualify beside one, so the mission has to wait for it rather than start a
+# to qualify beside one, so the qualification has to wait for it rather than start a
 # gate that will immediately refuse.
 DOWNLOAD_UNIT_PREFIX = "local-ai-model-downloads"
 
@@ -311,7 +311,7 @@ def printable(raw: bytes | str) -> str:
 
     A task name is whatever bytes the process chose for it. Left alone, an
     undecodable one raises where it is least welcome -- not here, but later,
-    when the reason the host is busy is written to the UTF-8 mission log.
+    when the reason the host is busy is written to the UTF-8 qualification log.
     """
     if isinstance(raw, str):
         raw = raw.encode("utf-8", "surrogateescape")
@@ -371,7 +371,7 @@ def conflict_reason(command: str, cwd: str, cgroup: str) -> str | None:
     if DOWNLOAD_UNIT_PREFIX in cgroup:
         # Named by cgroup, before the command tests: a queue runs python3 and
         # aria2c, which would otherwise be classified transfer or
-        # workspace-python and let the mission walk into a refused gate.
+        # workspace-python and let the qualification walk into a refused gate.
         return "download-queue"
     if KERNEL_TREE in cwd:
         return "kernel-build"
@@ -423,7 +423,7 @@ def phase_status(state_path: Path, stamp_path: Path, expected: str) -> tuple[str
 
     After reboot the downloader marks state ``running`` while it re-hashes files
     that already exist. The stamp is the durable byte-total proof; waiting for
-    the re-hash to flip status back to complete would gate the mission on work
+    the re-hash to flip status back to complete would gate the qualification on work
     that is not a missing download.
     """
     try:
@@ -527,7 +527,7 @@ def wait_for_quiet(state: dict, timeout: int = QUIET_WAIT_TIMEOUT) -> None:
     deadline = time.monotonic() + timeout
     while quiet < 2:
         active = [item for item in conflicts()
-                  if item.get("reason") in MISSION_BLOCKING_REASONS]
+                  if item.get("reason") in QUALIFICATION_BLOCKING_REASONS]
         available = mem_available()
         reasons = []
         if active:
@@ -595,15 +595,20 @@ def run_step(name: str, command: list[str], state: dict, before_start=None) -> i
         "started_at": now(),
         "status": "running",
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
     }
     state["steps"][name] = step
     state.update({"status": "running", "current_step": name, "updated_at": now()})
     atomic_json(state)
     step_log = HERE / f"{name}.log"
+    performance_path = HERE / f"{name}-{time.time_ns()}-{os.getpid()}.performance.jsonl"
+    step["performance_log"] = str(performance_path)
+    step["performance_kind"] = "passive-observations-not-a-benchmark"
+    atomic_json(state)
+    environment = dict(os.environ, QUALIFICATION_PERFORMANCE_PATH=str(performance_path))
     log(f"step start name={name}")
     with step_log.open("ab") as output:
-        child = subprocess.Popen(command, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+        child = subprocess.Popen(command, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, start_new_session=True, env=environment)
         rc = child.wait()
     child = None
     step.update({"finished_at": now(), "exit_code": rc, "status": exit_status(rc)})
@@ -679,7 +684,7 @@ def execute_qualification(name, command, state):
         return rc
     outcome = exit_status(rc)
     if stop_signal is not None and rc != 0:
-        # The operator stopped the mission and the signal was forwarded to the
+        # The operator stopped the qualification and the signal was forwarded to the
         # running gate, which then exited non-zero because it was stopped. That
         # run decided nothing about the model, so the receipt says so. Filing an
         # operator stop as a model failure is the same error as filing a refusal
@@ -757,7 +762,7 @@ def main(argv=()) -> int:
     try:
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
-        log("another mission supervisor owns the lock")
+        log("another qualification supervisor owns the lock")
         return 75
     state = load_state()
     imported = []
@@ -770,11 +775,11 @@ def main(argv=()) -> int:
         print(json.dumps({'imported': imported, 'model_workloads_started': False}))
         return 0
     try:
-        input_fingerprint = mission_inputs_fingerprint()
+        input_fingerprint = qualification_inputs_fingerprint()
     except InputsUnreadable as error:
         # Nothing was dispatched and no receipt was touched. Leave the previous
         # fingerprint in place so the next run compares against what actually
-        # ran, and report a refusal rather than a mission failure.
+        # ran, and report a refusal rather than a qualification failure.
         state.update({"status": "inputs-unreadable", "current_step": None,
                       "error": str(error), "updated_at": now()})
         atomic_json(state)
@@ -822,7 +827,7 @@ def main(argv=()) -> int:
                 "blocked_by": policy_name,
                 "updated_at": now(),
                 "benchmarking_performed": False,
-                "throughput_measured": False,
+                "benchmark_performed": False,
             }
         failure = {"name": policy_name, "exit_code": policy_rc}
         state.update({
@@ -857,7 +862,7 @@ def main(argv=()) -> int:
         rc = execute_qualification(name, command, state)
         # Order matters. A SIGTERM to this supervisor is forwarded to the running
         # step, which then exits non-zero -- so testing rc first recorded every
-        # operator stop as "step X failed" and lost the fact that the mission was
+        # operator stop as "step X failed" and lost the fact that the qualification was
         # interrupted at all. The signal is the more specific explanation, and a
         # non-zero exit under it is the stop rather than a verdict, so the step is
         # marked interrupted and the resume runs it again. A step that still

@@ -4,7 +4,7 @@
 The parent gate passes ``--pairs`` as a JSON list containing ``path``, ``text``
 and ``name``. This helper emits exactly one compact JSON object as its final
 stdout line and exits non-zero unless every generated utterance is intelligible.
-No throughput or tokens-per-second data is collected.
+Passive timing and actual output-token counts are recorded when requested by the supervisor.
 """
 from __future__ import annotations
 
@@ -12,10 +12,14 @@ import argparse
 import difflib
 import gc
 import json
+import sys
 from pathlib import Path
 import time
 import unicodedata
 from typing import Callable
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import qualification_performance as performance
 
 MODEL_DIR = Path("/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf")
 MAX_MEMORY = {0: "2GiB", 1: "4GiB", 2: "2GiB", "cpu": "8GiB"}
@@ -77,7 +81,7 @@ def evaluate_pairs(
     return {
         "gate": "tts-asr-roundtrip",
         "model": str(MODEL_DIR),
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "cases": cases,
         "pass": bool(cases) and all(case["pass"] for case in cases),
     }
@@ -114,7 +118,7 @@ def build_local_transcriber():
         inputs = processor.apply_transcription_request(audio=samples, sampling_rate=16000)
         inputs = inputs.to(first_device, model.dtype)
         with torch.inference_mode():
-            output_ids = model.generate(**inputs, max_new_tokens=256, do_sample=False)
+            output_ids = performance.call(model.generate, operation="asr-generate", model_id="Qwen3-ASR-1.7B", mode="tokens", audio_duration=len(samples) / 16000, **inputs, max_new_tokens=256, do_sample=False)
         generated = output_ids[:, inputs["input_ids"].shape[1]:]
         parsed = processor.decode(generated, return_format="parsed")[0]
         return parsed["transcription"].strip(), parsed["language"].strip()
@@ -147,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         result = {
             "gate": "tts-asr-roundtrip",
             "model": str(MODEL_DIR),
-            "throughput_measured": False,
+            "benchmark_performed": False,
             "pass": False,
             "error": f"{type(error).__name__}: {error}"[:1000],
         }

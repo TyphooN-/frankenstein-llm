@@ -379,7 +379,7 @@ def main() -> int:
         state["status"] = "complete"
         state["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         atomic_json(STATE, state)
-        # Downstream phases and the mission supervisor compare this stamp against
+        # Downstream phases and the qualification supervisor compare this stamp against
         # an exact byte total, so a torn write is not a retryable state: it reads
         # as a permanent mismatch against a queue that is in fact complete.
         atomic_text(STAMP, str(queue["total_bytes"]) + "\n")

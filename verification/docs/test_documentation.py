@@ -229,7 +229,7 @@ def test_gate_output_directories_are_not_tracked():
     those were committed by an unscoped ``git add`` in e86383b. Two things broke:
     the tracked-file inventory above went red, and -- less visibly -- the gate
     started dirtying the working tree that
-    ``run_functional_mission.mission_inputs_fingerprint`` hashes, so running it
+    ``run_qualification.qualification_inputs_fingerprint`` hashes, so running it
     invalidated every step that had already passed.
 
     The coverage map alone does not catch this; a second unscoped commit that

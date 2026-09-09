@@ -82,7 +82,7 @@ def test_gpu_selection_is_explicit():
 def test_defaults_are_plan_only():
     a = m.parser().parse_args(['qualify'])
     assert not a.execute
-    assert m.command(a)[-1].endswith('run_functional_mission.py')
+    assert m.command(a)[-1].endswith('run_qualification.py')
 
 
 def test_benchmark_requires_model():

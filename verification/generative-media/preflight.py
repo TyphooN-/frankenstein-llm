@@ -72,7 +72,7 @@ def build_report(probe: dict | None = None) -> dict:
     return {
         "gate": "generative-media-preflight",
         "mode": "read-only; no torch import; no GPU allocation",
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "artifacts": inventory,
         "node_contracts": nodes,
         "graph_resolution": resolution,

@@ -4,7 +4,7 @@ Three behaviours decide whether this supervisor can be trusted to run unattended
 across reboots and operator stops:
 
 * the quiet-host wait is bounded, and says what the host was busy with;
-* mission state reaches the disk durably, because the resume decision after a
+* qualification state reaches the disk durably, because the resume decision after a
   reboot is made from it;
 * an operator stop is classified as an interruption rather than a step failure,
   without discarding a step that genuinely passed.
@@ -12,7 +12,7 @@ across reboots and operator stops:
 Everything the supervisor would touch outside the process -- /proc, systemd, the
 step subprocess, sleeping -- is replaced with a double. The module is imported
 with STATE and LOG redirected into a sandbox so importing it can never write to
-the real mission state.
+the real qualification state.
 
 Run: python3 -m unittest discover -s . -p 'test_*.py' -v
 """
@@ -29,7 +29,7 @@ import unittest
 from unittest import mock
 import warnings
 
-SOURCE = Path(__file__).resolve().parent / "run_functional_mission.py"
+SOURCE = Path(__file__).resolve().parent / "run_qualification.py"
 
 # One conflict entry in the shape conflicts() actually produces. Shared so the
 # wait tests and the discovery tests cannot drift apart on what an entry is.
@@ -44,9 +44,9 @@ def load_supervisor(sandbox: Path):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     module.HERE = sandbox
-    module.STATE = sandbox / "mission-state.json"
-    module.LOG = sandbox / "mission.log"
-    module.LOCK = sandbox / "mission.lock"
+    module.STATE = sandbox / "qualification-state.json"
+    module.LOG = sandbox / "qualification.log"
+    module.LOCK = sandbox / "qualification.lock"
     return module
 
 
@@ -312,7 +312,7 @@ class ConflictDiscoveryTests(SupervisorTestCase):
 
     def test_a_task_name_that_is_not_utf8_does_not_crash_the_scan(self):
         # comm is whatever bytes the process chose. An undecodable one used to
-        # raise out of the poll, which is a wedged mission rather than a report.
+        # raise out of the poll, which is a wedged qualification rather than a report.
         odd = self.proc / str(next(self.pids))
         odd.mkdir()
         (odd / "comm").write_bytes(b"\xff\xfe-broken\n")
@@ -343,7 +343,7 @@ class ConflictDiscoveryTests(SupervisorTestCase):
 
 
 class DurableStateTests(SupervisorTestCase):
-    """A resumed mission skips passed steps based on this file."""
+    """A resumed qualification skips passed steps based on this file."""
 
     def test_input_fingerprint_changes_when_a_promoted_artifact_changes(self):
         foundation = self.sandbox / "foundation"
@@ -363,10 +363,10 @@ class DurableStateTests(SupervisorTestCase):
              mock.patch.object(self.supervisor, "UPSTREAM", ((state_path, stamp_path, "4"),)), \
              mock.patch.object(self.supervisor, "STEPS", (("step", ["/bin/true"]),)), \
              mock.patch.object(self.supervisor.subprocess, "run", return_value=completed):
-            first = self.supervisor.mission_inputs_fingerprint()
+            first = self.supervisor.qualification_inputs_fingerprint()
             stat = weight.stat()
             os.utime(weight, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
-            second = self.supervisor.mission_inputs_fingerprint()
+            second = self.supervisor.qualification_inputs_fingerprint()
         self.assertNotEqual(first, second)
 
     def test_upstream_artifacts_that_have_not_landed_yet_are_fingerprintable(self):
@@ -383,10 +383,10 @@ class DurableStateTests(SupervisorTestCase):
              mock.patch.object(self.supervisor, "UPSTREAM", ((state_path, stamp_path, "4"),)), \
              mock.patch.object(self.supervisor, "STEPS", (("step", ["/bin/true"]),)), \
              mock.patch.object(self.supervisor.subprocess, "run", return_value=completed):
-            absent = self.supervisor.mission_inputs_fingerprint()
+            absent = self.supervisor.qualification_inputs_fingerprint()
             state_path.write_text('{"status":"complete"}')
             stamp_path.write_text("4")
-            present = self.supervisor.mission_inputs_fingerprint()
+            present = self.supervisor.qualification_inputs_fingerprint()
         self.assertNotEqual(absent, present)
 
 
@@ -499,7 +499,7 @@ class PhaseStatusTests(SupervisorTestCase):
         self.supervisor.atomic_json({"status": "running", "steps": {}})
         self.assertEqual({"status": "running", "steps": {}},
                          json.loads(self.supervisor.STATE.read_text()))
-        self.assertEqual(["mission-state.json"],
+        self.assertEqual(["qualification-state.json"],
                          sorted(p.name for p in self.sandbox.iterdir()))
 
     def test_a_failed_publish_leaves_no_half_written_document_behind(self):
@@ -510,7 +510,7 @@ class PhaseStatusTests(SupervisorTestCase):
                                side_effect=OSError("no space left on device")):
             with self.assertRaises(OSError):
                 self.supervisor.atomic_json({"status": "complete"})
-        self.assertEqual(["mission-state.json"],
+        self.assertEqual(["qualification-state.json"],
                          sorted(p.name for p in self.sandbox.iterdir()))
         self.assertEqual("running",
                          json.loads(self.supervisor.STATE.read_text())["status"])
@@ -528,7 +528,7 @@ class PhaseStatusTests(SupervisorTestCase):
 
         with mock.patch.object(self.supervisor.os, "fsync", recording_fsync):
             self.supervisor.atomic_json({"status": "complete"})
-        self.assertGreaterEqual(len(synced), 1, "mission state was never fsynced")
+        self.assertGreaterEqual(len(synced), 1, "qualification state was never fsynced")
 
     def test_a_filesystem_that_refuses_directory_fsync_still_publishes(self):
         def only_dir_fails(fd):
@@ -540,10 +540,10 @@ class PhaseStatusTests(SupervisorTestCase):
         self.assertEqual({"status": "complete"},
                          json.loads(self.supervisor.STATE.read_text()))
 
-    def test_a_truncated_state_file_falls_back_to_a_fresh_mission(self):
+    def test_a_truncated_state_file_falls_back_to_a_fresh_qualification(self):
         self.supervisor.STATE.write_text('{"schema": "frankenstein-func')
         state = self.supervisor.load_state()
-        self.assertEqual("frankenstein-functional-mission/1", state["schema"])
+        self.assertEqual("frankenstein-functional-qualification/1", state["schema"])
         self.assertEqual({}, state["steps"])
 
     def test_state_from_another_schema_is_not_resumed(self):
@@ -552,9 +552,9 @@ class PhaseStatusTests(SupervisorTestCase):
 
 
 class InputFingerprintResilienceTests(SupervisorTestCase):
-    """A checkout too busy to read is a host condition, not a mission failure.
+    """A checkout too busy to read is a host condition, not a qualification failure.
 
-    ``git diff --binary HEAD`` over ``verification`` is the mission's own input
+    ``git diff --binary HEAD`` over ``verification`` is the qualification's own input
     query. Under sixteen concurrent downloads it exceeded a single 30-second
     attempt, and a concurrent git process made it exit 128; both escaped as
     unhandled exceptions and ended the run before any gate started.
@@ -581,7 +581,7 @@ class InputFingerprintResilienceTests(SupervisorTestCase):
         for patch in self.arrange(results):
             patch.start()
             self.addCleanup(patch.stop)
-        return self.supervisor.mission_inputs_fingerprint()
+        return self.supervisor.qualification_inputs_fingerprint()
 
     def test_a_slow_checkout_is_retried_rather_than_fatal(self):
         timeout = subprocess.TimeoutExpired(["git", "diff"], 180)
@@ -605,11 +605,11 @@ class InputFingerprintResilienceTests(SupervisorTestCase):
         self.assertLessEqual(self.supervisor.FINGERPRINT_ATTEMPTS, 8)
         self.assertLessEqual(self.supervisor.FINGERPRINT_TIMEOUT_SECONDS, 600)
 
-    def test_main_waits_instead_of_recording_a_mission_failure(self):
+    def test_main_waits_instead_of_recording_a_qualification_failure(self):
         self.supervisor.STATE.write_text(json.dumps({
-            "schema": "frankenstein-functional-mission/1", "steps": {},
+            "schema": "frankenstein-functional-qualification/1", "steps": {},
             "input_fingerprint": "earlier", "status": "functional-foundation-complete"}))
-        with mock.patch.object(self.supervisor, "mission_inputs_fingerprint",
+        with mock.patch.object(self.supervisor, "qualification_inputs_fingerprint",
                                side_effect=self.supervisor.InputsUnreadable("git diff failed")), \
              mock.patch.object(self.supervisor, "log"), \
              mock.patch.object(self.supervisor.fcntl, "flock"), \
@@ -664,7 +664,7 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
 
         with mock.patch.object(self.supervisor, "STEPS", steps), \
              mock.patch.object(self.supervisor, "run_step", fake_run_step), \
-             mock.patch.object(self.supervisor, "mission_inputs_fingerprint",
+             mock.patch.object(self.supervisor, "qualification_inputs_fingerprint",
                                return_value=fingerprint), \
              mock.patch.object(self.supervisor, "wait_for_inputs"), \
              mock.patch.object(self.supervisor, "log"), \
@@ -818,7 +818,7 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
         ))
 
     def test_a_resumed_run_clears_the_previous_interruption_markers(self):
-        # Stale "interrupted_step"/"signal" keys on a mission that later completes
+        # Stale "interrupted_step"/"signal" keys on a qualification that later completes
         # would describe a stop that is no longer true.
         self.drive([0, 143], signal_after=1)
         _, state, _ = self.drive([0, 0])
@@ -828,13 +828,13 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
                 self.assertNotIn(stale, state)
 
 
-class MissionPolicyTests(SupervisorTestCase):
-    """The mission records no performance data, by construction."""
+class QualificationPolicyTests(SupervisorTestCase):
+    """The qualification records no performance data, by construction."""
 
     def test_state_declares_that_no_benchmarking_happened(self):
         state = self.supervisor.load_state()
         self.assertFalse(state["benchmarking_performed"])
-        self.assertFalse(state["throughput_measured"])
+        self.assertFalse(state["benchmark_performed"])
 
     def test_candidate_policy_precedes_wemm_and_model_loads(self):
         names = [name for name, _command in self.supervisor.STEPS]
@@ -864,7 +864,7 @@ class MissionPolicyTests(SupervisorTestCase):
         self.assertEqual("asr", ledger.EXPECTED_EVIDENCE_GATES[
             ledger.EVIDENCE / "gate-asr.json"])
 
-    def test_mission_unit_gives_miopen_a_writable_cache(self):
+    def test_qualification_unit_gives_miopen_a_writable_cache(self):
         """MIOpen must not be pointed at $HOME while ProtectHome is read-only.
 
         MIOpen takes a lock beside its user database before reading it. Under
@@ -875,14 +875,14 @@ class MissionPolicyTests(SupervisorTestCase):
         an unrelated model bug. Both paths have to land somewhere ReadWritePaths
         already covers.
         """
-        unit = (self.supervisor.ROOT / "services/systemd/local-ai-functional-mission.service").read_text()
+        unit = (self.supervisor.ROOT / "services/systemd/local-ai-qualification.service").read_text()
         self.assertIn("ProtectHome=read-only", unit)
         writable = unit.split("ReadWritePaths=", 1)[1].splitlines()[0].split()
         for key in ("MIOPEN_USER_DB_PATH", "MIOPEN_CUSTOM_CACHE_DIR"):
             with self.subTest(variable=key):
                 line = next((row for row in unit.splitlines()
                              if row.startswith(f"Environment={key}=")), None)
-                self.assertIsNotNone(line, f"{key} is not set for the mission")
+                self.assertIsNotNone(line, f"{key} is not set for the qualification")
                 target = line.split("=", 2)[2]
                 self.assertFalse(
                     target.startswith(str(Path.home()) + "/."),
@@ -894,14 +894,14 @@ class MissionPolicyTests(SupervisorTestCase):
                 self.assertIn(f"mkdir -p {target}",
                               unit.replace("/cache", "/cache").replace(
                                   "ExecStartPre=/usr/bin/", ""),
-                              f"{key} is never created before the mission runs")
+                              f"{key} is never created before the qualification runs")
 
     def test_asr_gate_runs_in_the_venv_that_can_import_its_model(self):
         """The ASR gate needs venvs/asr, not the TTS one.
 
         Qwen3-ASR declares model_type qwen3_asr, which only the newer
         transformers in venvs/asr registers. Running the gate under the TTS venv
-        fails at import, before any GPU work, and reads in the mission log as an
+        fails at import, before any GPU work, and reads in the qualification log as an
         ASR capability failure rather than as the wrong interpreter.
         """
         step = dict(self.supervisor.STEPS)["asr"]
@@ -920,8 +920,8 @@ class MissionPolicyTests(SupervisorTestCase):
         self.assertIn('[str(ASR_PYTHON), str(ROOT / "asr_roundtrip.py")', gate)
         self.assertNotIn('[sys.executable, str(ROOT / "asr_roundtrip.py")', gate)
 
-    def test_mission_unit_keeps_a_writable_temp_dir(self):
-        unit = (self.supervisor.ROOT / "services/systemd/local-ai-functional-mission.service").read_text()
+    def test_qualification_unit_keeps_a_writable_temp_dir(self):
+        unit = (self.supervisor.ROOT / "services/systemd/local-ai-qualification.service").read_text()
         self.assertIn("ProtectSystem=strict", unit)
         self.assertIn("Environment=TMPDIR=/home/typhoon/git/frankenstein-llm/verification/tmp", unit)
         writable = unit.split("ReadWritePaths=", 1)[1].splitlines()[0]
@@ -931,9 +931,9 @@ class MissionPolicyTests(SupervisorTestCase):
 
 
 class DownloadQueueConflictTests(SupervisorTestCase):
-    """A running download queue confounds the router gate, so the mission waits.
+    """A running download queue confounds the router gate, so the qualification waits.
 
-    Before ``download-queue`` was a waited class the mission started
+    Before ``download-queue`` was a waited class the qualification started
     ``router-models`` while the queues were re-verifying ~130 GB of files that
     already existed. ``gate_router_models`` refuses a confounded qualification,
     so the step ended in under a second and was recorded as nine model failures
@@ -949,21 +949,21 @@ class DownloadQueueConflictTests(SupervisorTestCase):
                 self.assertEqual("download-queue", self.supervisor.conflict_reason(
                     command, str(self.supervisor.ROOT), self.CGROUP))
 
-    def test_the_mission_waits_for_a_download_queue(self):
-        self.assertIn("download-queue", self.supervisor.MISSION_BLOCKING_REASONS)
+    def test_the_qualification_waits_for_a_download_queue(self):
+        self.assertIn("download-queue", self.supervisor.QUALIFICATION_BLOCKING_REASONS)
 
-    def test_the_router_gate_and_the_mission_name_the_same_units(self):
+    def test_the_router_gate_and_the_qualification_name_the_same_units(self):
         gate = (self.supervisor.ROOT
                 / "verification/router-functional/gate_router_models.py").read_text()
         self.assertIn(f'DOWNLOAD_UNIT_PREFIX = "{self.supervisor.DOWNLOAD_UNIT_PREFIX}"',
                       gate)
 
-    def test_a_transfer_outside_a_queue_unit_still_does_not_hold_the_mission(self):
+    def test_a_transfer_outside_a_queue_unit_still_does_not_hold_the_qualification(self):
         # aria2 re-hash by hand and a browser download are not queue units.
-        # Blocking the mission on those is what the narrow waited set avoids.
+        # Blocking the qualification on those is what the narrow waited set avoids.
         self.assertEqual("transfer", self.supervisor.conflict_reason(
             "aria2c", "/tmp", "0::/user.slice/hand.scope\n"))
-        self.assertNotIn("transfer", self.supervisor.MISSION_BLOCKING_REASONS)
+        self.assertNotIn("transfer", self.supervisor.QUALIFICATION_BLOCKING_REASONS)
 
 
 class DownloadStateFingerprintTests(SupervisorTestCase):
@@ -971,9 +971,9 @@ class DownloadStateFingerprintTests(SupervisorTestCase):
 
     The queue units run at every boot and rewrite their state document with new
     run timestamps even when every file is already present and verified. That
-    document is hashed into the mission input fingerprint, so hashing the
+    document is hashed into the qualification input fingerprint, so hashing the
     timestamps meant every boot changed the fingerprint, every passed gate was
-    re-run, and the mission could never converge.
+    re-run, and the qualification could never converge.
     """
 
     DOCUMENT = {
@@ -1044,14 +1044,14 @@ class DownloadStateFingerprintTests(SupervisorTestCase):
                 mock.patch.object(self.supervisor, "FOUNDATION", foundation), \
                 mock.patch.object(self.supervisor.subprocess, "run",
                                   return_value=mock.Mock(stdout=b"tree")):
-            before = self.supervisor.mission_inputs_fingerprint()
+            before = self.supervisor.qualification_inputs_fingerprint()
             state.write_text(json.dumps(self.variant(
                 started_at="2026-09-08T12:40:00-0400",
                 completed_at="2026-09-08T12:47:00-0400")))
-            self.assertEqual(before, self.supervisor.mission_inputs_fingerprint())
+            self.assertEqual(before, self.supervisor.qualification_inputs_fingerprint())
             # The stamp is the durable byte total; a change there must still count.
             stamp.write_text("72134030731")
-            self.assertNotEqual(before, self.supervisor.mission_inputs_fingerprint())
+            self.assertNotEqual(before, self.supervisor.qualification_inputs_fingerprint())
 
 
 if __name__ == "__main__":

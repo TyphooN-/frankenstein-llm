@@ -7,12 +7,12 @@
     "updated": "A disagreement with the implementation was found and the document was corrected in this pass.",
     "aligned": "Checked against the named implementation evidence in this pass and found consistent. Not a claim that every line was independently re-derived.",
     "historical": "A dated record of a past observation. Preserved unchanged, and deliberately NOT re-verified against current implementation, because it does not describe current state.",
-    "added": "Created after this audit's date, in the 2026-09-08 continuation, and inventoried here so the coverage check stays complete. Each was checked against the implementation or source named in its evidence field at the time it was written; it was not re-derived in the 2026-09-07 pass."
+    "added": "Added after the original audit; inventoried and checked against the cited source during its own continuation."
   },
   "limits": [
     "This is a documentation-consistency audit. It makes no quality, performance or model-capability claim.",
     "No model was loaded, no GPU was touched, no service was started or stopped, and no throughput was measured while producing it.",
-    "It reports no current runtime health. The mission state, router residency and host conflicts observed during the pass are runtime facts that change, and none are recorded here.",
+    "It reports no current runtime health. The qualification state, router residency and host conflicts observed during the pass are runtime facts that change, and none are recorded here.",
     "'aligned' means no disagreement was found by the checks named in each entry, not that the document is proven correct."
   ],
   "mechanical_checks": [
@@ -23,12 +23,12 @@
     "Every 127.0.0.1:<port> in documentation matches a port in a tracked unit, env file or script.",
     "The CONFIGURATION.md alias table is compared field by field against llama-models.ini by an added test."
   ],
-  "inventory_count": 62,
+  "inventory_count": 65,
   "disposition_counts": {
     "updated": 11,
     "historical": 22,
     "aligned": 26,
-    "added": 3
+    "added": 6
   },
   "entries": [
     {
@@ -118,8 +118,8 @@
     {
       "path": "docs/USER-GUIDE.md",
       "disposition": "updated",
-      "finding": "The host-sharing section told the reader to decide from mission-state.json's current_step, and said an empty value means 'the host is between steps'.",
-      "source_evidence": "verification/mission-supervisor/run_functional_mission.py: run_step() sets current_step only after wait_for_quiet() returns; it is cleared to None at the three whole-mission exits and nowhere else; load_state() returns a default with no current_step key. /verification/**/mission-state.json is gitignored runtime state.",
+      "finding": "The host-sharing section told the reader to decide from qualification-state.json's current_step, and said an empty value means 'the host is between steps'.",
+      "source_evidence": "verification/qualification-supervisor/run_qualification.py: run_step() sets current_step only after wait_for_quiet() returns; it is cleared to None at the three whole-qualification exits and nowhere else; load_state() returns a default with no current_step key. /verification/**/qualification-state.json is gitignored runtime state.",
       "change": "Replaced with the scripts/local-model-status.sh --host-sharing verdict table, an explicit statement that current_step is not a liveness signal in either direction, and that missing or unreadable state means unknown rather than idle. Added a 'Sharing one model between several agents' section."
     },
     {
@@ -224,7 +224,7 @@
       "path": "docs/decisions/0002-serialized-functional-qualification.md",
       "disposition": "aligned",
       "finding": "No disagreement with the implementation found in this pass.",
-      "source_evidence": "ADR; serialization and the no-throughput rule match run_functional_mission.py, which records benchmarking_performed and throughput_measured false per step. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "source_evidence": "ADR; serialization and the no-throughput rule match run_qualification.py, which records benchmarking_performed and benchmark_performed false per step. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
       "change": "None."
     },
     {
@@ -273,8 +273,8 @@
       "path": "docs/reference/ARCHITECTURE.md",
       "disposition": "updated",
       "finding": "Sidecars 'run at Nice=5 and best-effort I/O priority so they never win a resource fight against the interactive router'.",
-      "source_evidence": "services/systemd/llama-sidecar@.service sets Nice=5, IOSchedulingClass=best-effort, IOSchedulingPriority=6; local-ai-functional-mission.service also sets Nice=5. systemd.exec(5): the kernel default is best-effort priority 4. ioprio_set(2): the calls 'have an effect only when used in conjunction with an I/O scheduler that supports I/O priorities'.",
-      "change": "Kept the unit's intent and qualified the mechanism: Nice weights CPU scheduling only and does not arbitrate VRAM residency or GPU submission, the mission runs at the same Nice, the ionice setting is one notch below default and inert under a scheduler that ignores priorities. Names --models-max 1, the quiet-host wait and inference-conflict classification as the actual serialization."
+      "source_evidence": "services/systemd/llama-sidecar@.service sets Nice=5, IOSchedulingClass=best-effort, IOSchedulingPriority=6; local-ai-qualification.service also sets Nice=5. systemd.exec(5): the kernel default is best-effort priority 4. ioprio_set(2): the calls 'have an effect only when used in conjunction with an I/O scheduler that supports I/O priorities'.",
+      "change": "Kept the unit's intent and qualified the mechanism: Nice weights CPU scheduling only and does not arbitrate VRAM residency or GPU submission, the qualification runs at the same Nice, the ionice setting is one notch below default and inert under a scheduler that ignores priorities. Names --models-max 1, the quiet-host wait and inference-conflict classification as the actual serialization."
     },
     {
       "path": "docs/reference/CANDIDATE-ADDITIONS-INVESTIGATION.md",
@@ -329,7 +329,7 @@
       "path": "docs/reference/MODEL-UPGRADE-EVALUATION.md",
       "disposition": "aligned",
       "finding": "No disagreement with the implementation found in this pass.",
-      "source_evidence": "Policy document; states its own non-measured scope and the mission-lock constraint, which matches the supervisor's flock. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
+      "source_evidence": "Policy document; states its own non-measured scope and the qualification-lock constraint, which matches the supervisor's flock. Also covered by the repository-wide mechanical sweep: every relative markdown link and heading anchor resolves (verification/docs/test_documentation.py::test_reference_links_and_anchors plus a repository-wide sweep of all tracked .md); every repository path named in a fenced command block exists on disk; every *.service name resolves to a tracked unit under services/systemd/; every HERMES_* variable named appears in tracked code; every 127.0.0.1:<port> matches a port in a tracked unit, env file or script",
       "change": "None."
     },
     {
@@ -343,7 +343,7 @@
       "path": "docs/reference/OPERATIONS.md",
       "disposition": "updated",
       "finding": "Three claims did not match the implementation: the current_step reading, 'load <= 6.0 and no conflicting build, transfer or unmanaged model server' as the quiet-host condition, and 'exit 75 if the host is no longer idle' for the serialized runners.",
-      "source_evidence": "run_functional_mission.py wait_for_quiet() reads only conflicts() filtered to MISSION_BLOCKING_REASONS = {kernel-build, inference} and mem_available() against MIN_AVAILABLE (32 GiB); it never reads /proc/loadavg. gate_computer_use.py preflight() puts load and heavy processes in advisory_blockers and only the RAM floor in hard_blockers; run_preflight_only() passes on 'clear' unless --require-quiet-host is given.",
+      "source_evidence": "run_qualification.py wait_for_quiet() reads only conflicts() filtered to QUALIFICATION_BLOCKING_REASONS = {kernel-build, inference} and mem_available() against MIN_AVAILABLE (32 GiB); it never reads /proc/loadavg. gate_computer_use.py preflight() puts load and heavy processes in advisory_blockers and only the RAM floor in hard_blockers; run_preflight_only() passes on 'clear' unless --require-quiet-host is given.",
       "change": "Host-sharing section rewritten around the three verdicts and the current_step correction; quiet-host description corrected to the two blocking reasons plus the memory floor with load explicitly excluded; runner preflight corrected to the RAM floor; --host-sharing documented under 'Checking the backend'."
     },
     {
@@ -357,7 +357,7 @@
       "path": "docs/reference/TROUBLESHOOTING.md",
       "disposition": "updated",
       "finding": "The waiting-safe-host row named load > 6.0, the blocker list presented compilers and transfers as blocking, and the exit-75 row attributed the refusal to load.",
-      "source_evidence": "Same sources as OPERATIONS.md above: MISSION_BLOCKING_REASONS and the advisory/hard split in gate_computer_use.preflight().",
+      "source_evidence": "Same sources as OPERATIONS.md above: QUALIFICATION_BLOCKING_REASONS and the advisory/hard split in gate_computer_use.preflight().",
       "change": "All three corrected, with the advisory reasons kept and labelled as reported-not-gating so a reader is not sent chasing a cargo build."
     },
     {
@@ -464,6 +464,27 @@
       "finding": "card0 and card1 had been retuned after the earlier capture, so the repository's backup no longer matched /etc/default.",
       "source_evidence": "Source hashed before copy and both source and destination re-hashed after: card0 2052c604..., card1 1f2c9467..., card2 5b3d535e... unchanged. Source mtimes 15:38:42, 16:15:42 and 08:44:30 on 2026-09-08.",
       "change": "Added the refreshed capture with its own SHA256SUMS and README. No /etc file was written, no GPU setting applied and no service restarted."
+    },
+    {
+      "path": "docs/reference/QUALIFICATION-MIGRATION.md",
+      "disposition": "added",
+      "finding": "Added during qualification naming, telemetry and profile backup continuation.",
+      "source_evidence": "scripts/migrate_qualification_state.py; verification/qualification-supervisor/test_qualification_rebrand.py",
+      "change": "Documented and verified against the referenced implementation or captured source; not part of the original audit."
+    },
+    {
+      "path": "docs/reference/QUALIFICATION-PERFORMANCE.md",
+      "disposition": "added",
+      "finding": "Added during qualification naming, telemetry and profile backup continuation.",
+      "source_evidence": "scripts/qualification_performance.py; verification/qualification-supervisor/test_qualification_performance.py",
+      "change": "Documented and verified against the referenced implementation or captured source; not part of the original audit."
+    },
+    {
+      "path": "config/hardware/amdgpu/2026-09-09T0106-0400/README.md",
+      "disposition": "added",
+      "finding": "Added during qualification naming, telemetry and profile backup continuation.",
+      "source_evidence": "config/hardware/amdgpu/2026-09-09T0106-0400/SHA256SUMS; byte-for-byte source comparisons",
+      "change": "Documented and verified against the referenced implementation or captured source; not part of the original audit."
     }
   ]
 }

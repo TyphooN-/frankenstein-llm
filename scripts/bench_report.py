@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Turn native ``llama-bench`` JSON into one markdown artifact per tested model.
 
-Throughput is not part of the functional mission and never will be: the mission
-records ``throughput_measured: false`` on purpose, because a token rate says
+Throughput is not part of the functional qualification and never will be: the qualification
+records ``benchmark_performed: false`` on purpose, because a token rate says
 nothing about whether a preset answers, obeys a schema or calls a tool. This
 module is the separate, explicitly authorized lane. It reads what
 ``scripts/model-runs.py benchmark`` already wrote under ``logs/model-runs/`` and
@@ -538,8 +538,8 @@ def render_index(records: list[dict], functional: dict) -> str:
         "",
         "One file per weight file that was actually benchmarked with the native "
         "`llama-bench` binary. Throughput is deliberately **not** part of "
-        "`local-ai-functional-mission.service`, which records "
-        "`throughput_measured: false`; these runs are a separate lane that an "
+        "`local-ai-qualification.service`, which records "
+        "`benchmark_performed: false`; these runs are a separate lane that an "
         "operator authorizes with `--confirm-kernel --execute` after confirming "
         "the intended kernel. See [Scripted model operation](../MODEL-RUNS.md).",
         "",

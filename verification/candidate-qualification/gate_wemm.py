@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Functional WeMM embedding gate. No throughput. Separate 2048-D space."""
+"""Functional WeMM embedding gate. Passive item-rate observations. Separate 2048-D space."""
 from __future__ import annotations
 
 import json
@@ -8,6 +8,9 @@ import os
 from pathlib import Path
 import sys
 import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
+import qualification_performance as performance
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -58,7 +61,7 @@ def run() -> dict:
     summary: dict = {
         "gate": "wemm-functional",
         "benchmarking_performed": False,
-        "throughput_measured": False,
+        "benchmark_performed": False,
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "problems": [],
         "checks": {},
@@ -113,7 +116,7 @@ def run() -> dict:
             encoded = tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
             encoded = {key: value.to(device) for key, value in encoded.items()}
             with torch.inference_mode():
-                return model.embedding(**encoded)
+                return performance.call(model.embedding, operation="embedding", model_id="WeMM-Embedding-2B", mode="items", **encoded)
 
         vectors = embed_texts([ANCHOR, PARAPHRASE, RELATED, NOISE])
         anchor, paraphrase, related, noise = (to_list(row) for row in vectors)

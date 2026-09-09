@@ -75,10 +75,10 @@ fatal, so a key a release drops does not degrade one alias: `load_from_ini`
 throws and the router never finishes starting. Those two cases skip rather than
 fail when the submodule has not been built yet.
 
-## Mission supervisor contracts
+## Qualification supervisor contracts
 
 ```
-python3 -m pytest verification/mission-supervisor/test_mission_supervisor.py
+python3 -m pytest verification/qualification-supervisor/test_qualification_supervisor.py
 ```
 
 The supervisor decides when a serialized gate may start, and that decision is

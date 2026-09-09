@@ -1,11 +1,11 @@
-"""Offline mission observer regression tests."""
+"""Offline qualification observer regression tests."""
 import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 
-SPEC = importlib.util.spec_from_file_location('mission_status', Path(__file__).resolve().parents[2] / 'scripts/mission_status.py')
+SPEC = importlib.util.spec_from_file_location('qualification_status', Path(__file__).resolve().parents[2] / 'scripts/qualification_status.py')
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
@@ -56,7 +56,7 @@ def test_old_failure_is_not_a_finished_current_attempt(tmp_path):
 
 
 def test_redirected_runner_log_is_observed(tmp_path):
-    state_dir = tmp_path / 'mission-supervisor'
+    state_dir = tmp_path / 'qualification-supervisor'
     state_dir.mkdir()
     log = tmp_path / 'tts-local/evidence/tts-runner.log'
     log.parent.mkdir(parents=True)

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Functional gate for local Qwen3-ASR-1.7B on the three ROCm GPUs.
 
-This is a correctness/load/unload gate only. It intentionally records no
-throughput or tokens-per-second measurements.
+This is a correctness/load/unload gate with passive performance observations.
 """
 from __future__ import annotations
 
@@ -19,8 +18,8 @@ from scipy.signal import resample_poly
 import torch
 from transformers import AutoModelForMultimodalLM, AutoProcessor
 
-sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import exit_after_verdict, unload_verdict, vram_used  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gatelib import performance, exit_after_verdict, unload_verdict, vram_used  # noqa: E402
 
 MODEL = Path("/home/typhoon/git/frankenstein-llm/models/asr/Qwen3-ASR-1.7B-hf")
 AUDIO = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav")
@@ -59,7 +58,7 @@ def main() -> int:
         "audio": str(AUDIO),
         "audio_sha256": AUDIO_SHA256,
         "device_memory_policy": {"gpu0": "2GiB", "gpu1_v620": "4GiB", "gpu2": "2GiB"},
-        "throughput_measured": False,
+        "benchmark_performed": False,
     }
     baseline = vram_used()
     model = processor = inputs = output_ids = None
@@ -90,7 +89,7 @@ def main() -> int:
         inputs = processor.apply_transcription_request(audio=waveform, sampling_rate=16000)
         inputs = inputs.to(first_device, model.dtype)
         with torch.inference_mode():
-            output_ids = model.generate(**inputs, max_new_tokens=128, do_sample=False)
+            output_ids = performance.call(model.generate, operation="asr-generate", model_id="Qwen3-ASR-1.7B", audio_duration=len(waveform) / 16000, **inputs, max_new_tokens=128, do_sample=False)
         generated = output_ids[:, inputs["input_ids"].shape[1]:]
         parsed = processor.decode(generated, return_format="parsed")[0]
         transcript = parsed["transcription"].strip()
