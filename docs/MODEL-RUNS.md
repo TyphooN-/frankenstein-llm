@@ -1,8 +1,10 @@
 # User-operated model serving, qualification and benchmarks
 
-These entry points are for both humans and AI agents. Preview is the default;
-`--execute` is required to launch a model or qualification. No service is silently stopped,
-no GPU topology is auto-rewritten, and no dependency is automatically downloaded.
+These entry points are for both humans and AI agents. Serving and benchmark
+commands default to preview and require `--execute`. Qualification is different:
+`scripts/qualify-models.sh` starts the installed qualification service in the
+background; use `--plan` for a read-only preview. No GPU topology is auto-rewritten
+and no dependency is automatically downloaded.
 
 ## Normal hardware and configuration
 
@@ -96,10 +98,9 @@ Foreground output goes to the terminal unless the caller redirects it or uses a 
 ## Run functional qualification
 
 ```bash
-bash scripts/qualify-models.sh                # plan only
-# Stop a previously active qualification before starting another owner:
-systemctl --user stop local-ai-qualification.service
-bash scripts/qualify-models.sh --execute
+./scripts/qualify-models.sh                  # start in the background
+./scripts/qualification-status.sh --watch 5  # watch saved progress
+./scripts/qualify-models.sh --plan           # preview only; does not start work
 ```
 
 This runs the existing serialized, resumable full qualification, including its policy
@@ -108,7 +109,14 @@ is not a new lightweight single-model gate. The qualification may restart the ro
 and hand GPUs between capability lanes. Do not run it while using Hermes on that
 same local backend; switch to a cloud backend or close the local chat first.
 Existing qualification progress remains under `verification/qualification-supervisor/`.
-The configured total timeout includes waiting for downloads and host readiness.
+The start command queues systemd work and returns immediately; exit zero is not
+admission or qualification success. Repeating it does not restart an already
+active service. The installed `local-ai-qualification.service` is required; an
+absent service is an error, not a fallback to an unmanaged process.
+
+For advanced foreground operation, stop the service first and run
+`bash scripts/qualify-models.sh --execute`. Only this foreground mode uses the
+configured total timeout, including waiting for downloads and host readiness.
 
 ## Build and run native benchmarks
 
@@ -247,7 +255,7 @@ documentation suite passes.
 
 Examples:
 
-- "Preview qualification with scripts/qualify-models.sh; do not execute."
+- "Preview qualification with scripts/qualify-models.sh --plan; do not execute."
 - "Run scripts/qualify-models.sh --execute and summarize the report and failed gates."
 - "I verified the intended kernel and authorize a benchmark. Run benchmark-model.sh
   for this GGUF using config/model-runs.json and report the native results."
