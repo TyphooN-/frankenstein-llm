@@ -39,7 +39,14 @@ import urllib.error
 import urllib.request
 import uuid
 
-sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'verification/candidate-qualification'))
+sys.path.insert(0, str(ROOT / 'verification/mission-supervisor'))
+sys.path.insert(0, str(ROOT / 'verification/router-functional'))
+from gate_router_models import blocked_workloads
+from qualification_cache import (model_key, run_cached, digest, key_components,
+    mark_inconclusive, mark_blocked, outcome_of, unreadable_identity, Store,
+    BLOCKED, INCONCLUSIVE, EXIT_ADMISSION_REFUSED, EXIT_INCONCLUSIVE)
 from candidate_policy import candidate_for_preset, tool_grant_allowed  # noqa: E402
 
 ROUTER = "http://127.0.0.1:8080/v1/chat/completions"
@@ -364,12 +371,18 @@ def publish_evidence(path: Path, value: dict) -> None:
         os.close(directory)
 
 
-def qualify(root: Path, model: str, call=router_call) -> dict:
+def qualify(root: Path, model: str, call=router_call, postcheck=None) -> dict:
     """Run one model after invalidating any older verdict for that model.
 
     The in-progress record lands before the first router call, so a run that
     dies mid-flight -- or a host that reboots under it -- leaves an interrupted
     artifact the ledger refuses, never the pass it superseded.
+
+    ``postcheck`` is anything that can still downgrade the verdict -- a workload
+    that appeared beside the run, inputs that moved under it -- and it runs
+    *before* the verdict is published. Correcting the returned dict afterwards
+    would leave the artifact on disk claiming a pass no check supports, and the
+    artifact is what the ledger and every operator actually read.
     """
     evidence_path = EVIDENCE / f"gate-repo-agent-{model}.json"
     run_id = str(uuid.uuid4())
@@ -394,46 +407,82 @@ def qualify(root: Path, model: str, call=router_call) -> dict:
                    "run_id": run_id, "status": result.get("status", "complete"), "interrupted": False,
                    "finished_at": timestamp(),
                    "throughput_measured": False})
+    if postcheck is not None:
+        postcheck(result)
+    result["outcome"] = outcome_of(result)
+    if result["outcome"] in (INCONCLUSIVE, BLOCKED):
+        # The run finished but said nothing about the model. Say that in the
+        # artifact too, rather than leaving "complete" beside a false pass.
+        result["status"] = result["outcome"]
     publish_evidence(evidence_path, result)
     return result
 
 
 def main() -> int:
-    import sys
-    sys.path.insert(0, str(Path(__file__).parents[1] / 'mission-supervisor'))
-    from qualification_cache import model_key, run_cached
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=DEFAULT_MODEL,
                         help=f"router preset to qualify; one of {list(ALLOWED_MODELS)}")
     parser.add_argument('--requalify', action='store_true')
+    parser.add_argument('--plan', action='store_true')
     args = parser.parse_args()
     model = resolve_model(args.model)
     selected = json.loads(os.environ.get('HERMES_QUALIFY_MODELS', '[]'))
     if selected and model not in selected:
         print(json.dumps({'model': model, 'status': 'not-selected'}))
         return 0
-    require_sandbox()
+
     # The workspace is always a fresh private copy, and it is removed on the way
     # out rather than at some later collection: a caller-named directory would
     # let the run be pointed at a real checkout, the fixture's own __pycache__
     # would carry host-built bytecode into the judged workspace, and whatever
     # candidate code wrote in there should not outlive the verdict about it.
-    sources = [Path(__file__).parent]
-    key = model_key('repository-agent', model, sources)
+    sources = [Path(__file__).parent,
+               ROOT / 'verification/router-functional/gate_router_models.py',
+               ROOT / 'verification/candidate-qualification/candidate_policy.py']
+    try:
+        details = model_key('repository-agent', model, sources, details=True)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        # A preset whose weights are mid-download has no readable identity. That
+        # is a refusal, not a verdict, and it must not reach the operator as an
+        # unhandled FileNotFoundError that the runner scores as a model failure.
+        result = unreadable_identity('repository-agent', model, error)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if args.plan else EXIT_ADMISSION_REFUSED
+    key = digest(details)
+    if args.plan:
+        print(json.dumps(Store().explain('repository-agent', model, key,
+            key_components(details), args.requalify)))
+        return 0
+    require_sandbox()
+    def postcheck(result):
+        """Everything that can still invalidate this run, before it is published."""
+        blockers = blocked_workloads()
+        result['post_load_conflicts'] = blockers
+        if blockers:
+            mark_inconclusive(result, 'competing workloads observed during qualification')
+        try:
+            unchanged = model_key('repository-agent', model, sources) == key
+        except (OSError, ValueError, KeyError, TypeError):
+            unchanged = False
+        if not unchanged:
+            mark_inconclusive(result, 'qualification inputs changed during execution')
+
     def execute():
+        blockers = blocked_workloads()
+        if blockers:
+            return mark_blocked({'model': model}, blockers, 'host admission refused before dispatch')
         with tempfile.TemporaryDirectory(prefix="hermes-repo-agent-") as temporary:
             root = Path(temporary) / "fixture"
             shutil.copytree(SOURCE_FIXTURE, root,
                             ignore=shutil.ignore_patterns("__pycache__"))
-            result = qualify(root, model, lambda messages: router_call(messages, model))
-        if model_key('repository-agent', model, sources) != key:
-            result['pass'] = False
-            result.setdefault('problems', []).append('qualification inputs changed during execution')
-        return result
+            return qualify(root, model, lambda messages: router_call(messages, model),
+                           postcheck=postcheck)
     result = run_cached('repository-agent', model, key, execute,
-                        args.requalify or os.environ.get('HERMES_REQUALIFY') == '1')
+                        args.requalify or os.environ.get('HERMES_REQUALIFY') == '1',
+                        admit=blocked_workloads, components=key_components(details))
     print(json.dumps(result, indent=2, sort_keys=True))
-    return 0 if result["pass"] else 1
+    return {'passed': 0, 'blocked': EXIT_ADMISSION_REFUSED,
+            'inconclusive': EXIT_INCONCLUSIVE}.get(outcome_of(result), 1)
 
 
 if __name__ == "__main__":

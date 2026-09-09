@@ -88,7 +88,7 @@ def snapshot(path, now=None, boot=None):
                 'so nothing it left running is live')
     return dict(status=state.get('status', 'unknown'), current_step=state.get('current_step'),
                 total=len(rows), passed=counts.get('passed', 0), counts=counts,
-                terminal_attempts=sum(counts.get(k, 0) for k in ('passed', 'failed')),
+                terminal_attempts=sum(counts.get(k, 0) for k in ('passed', 'failed', 'inconclusive')),
                 state_age_seconds=None if updated is None else max(0, now - updated),
                 steps=rows, eta='unknown: host waits and failed gates prevent a reliable completion estimate',
                 scope='Recorded functional gates, not model count or optimization completeness',

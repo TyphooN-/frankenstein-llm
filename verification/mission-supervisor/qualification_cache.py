@@ -2,6 +2,18 @@
 
 Receipts describe qualifications, not current host health. Metadata identities for
 large local weights assume trusted local storage; this is not checksum validation.
+
+A receipt records one of four outcomes, and only the first is reusable:
+
+``passed``        the gate ran and the model met the contract;
+``failed``        the gate ran and the model did not -- this revokes an older pass;
+``inconclusive``  the gate ran but produced no verdict, because its inputs moved
+                  under it or its execution boundary broke. Fail-closed like a
+                  failure, but it is not a statement about the model, and it must
+                  never resurrect the pass its own retest invalidated;
+``blocked``       nothing ran. Admission was refused because the host was busy
+                  with work that would confound the measurement. A refusal spends
+                  nothing: the receipt it found is the receipt it leaves.
 """
 from __future__ import annotations
 
@@ -35,8 +47,89 @@ REPOSITORIES = {
 }
 
 
+PASSED, FAILED, INCONCLUSIVE, BLOCKED = 'passed', 'failed', 'inconclusive', 'blocked'
+# Exit codes a gate uses to tell the supervisor which of the two non-verdicts it
+# reached. 75 is already this repository's idiom for "refused, host not idle":
+# every serialized runner exits 75 for it, so the supervisor now reads the code
+# those runners were already producing instead of filing it as a gate failure.
+EXIT_ADMISSION_REFUSED = 75
+EXIT_INCONCLUSIVE = 76
+# A receipt written before per-component provenance existed carries only the
+# composite key. That still decides reuse exactly as before -- a match is a
+# match -- but a miss cannot be attributed to a dependency, and saying so is the
+# whole point: an unexplained miss must not be read as an excusable one.
+LEGACY_PROVENANCE = 'unavailable: receipt predates per-component provenance'
+
+
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def key_components(inputs):
+    """One digest per top-level key of a cache-key document.
+
+    The key itself stays a single digest over the whole document, so this
+    changes no reuse decision. It only makes a miss diagnosable: without it,
+    "the key moved" is the entire diagnosis, and finding out which dependency
+    moved means recomputing the inputs by hand. Bounded by construction --
+    there are a handful of components and each contributes one digest of the
+    identity records that were already gathered, never a fresh read of a weight
+    file and never a value copied out of them.
+    """
+    if not isinstance(inputs, dict):
+        return {}
+    return {name: digest(value) for name, value in sorted(inputs.items())}
+
+
+def outcome_of(result):
+    """Classify a gate result: passed, blocked, inconclusive, or failed.
+
+    Fail-closed on anything unrecognised. ``blocked`` and ``inconclusive`` are
+    only ever reached when a result says so explicitly.
+    """
+    if isinstance(result, dict):
+        stated = result.get('outcome')
+        if stated in (BLOCKED, INCONCLUSIVE, FAILED):
+            return stated
+        if result.get('pass') is True:
+            return PASSED
+    return FAILED
+
+
+def mark_inconclusive(result, reason):
+    """Record that a run finished without producing a verdict about the model."""
+    result['pass'] = False
+    result['outcome'] = INCONCLUSIVE
+    result.setdefault('problems', []).append(reason)
+    return result
+
+
+def unreadable_identity(gate, model, error):
+    """Refuse a qualification whose own inputs could not be read.
+
+    A weight file that is mid-download, quarantined or replaced by a ``.partial``
+    makes the identity unreadable. Nothing can be measured against inputs that
+    cannot be enumerated, so this is a refusal on the same terms as a busy host:
+    it spends no receipt and states nothing about the model. Left unhandled it
+    escaped as ``FileNotFoundError``, which exited the gate 1 -- the code every
+    runner reads as "this model failed".
+    """
+    return dict(mark_blocked(
+        {'gate': gate, 'model': model, 'checks': {}, 'problems': []},
+        [{'reason': 'qualification-inputs-unreadable', 'gate': gate, 'model': model,
+          'error': f'{type(error).__name__}: {error}'[:300]}],
+        'refusing to qualify: this preset\'s inputs could not be read'),
+        qualification_reused=False)
+
+
+def mark_blocked(result, blockers, reason):
+    """Record that admission was refused, so nothing was measured."""
+    result['pass'] = False
+    result['outcome'] = BLOCKED
+    result['admission_refused'] = True
+    result['blocked_by'] = blockers
+    result.setdefault('problems', []).append(reason)
+    return result
 
 
 def file_identity(path):
@@ -86,13 +179,25 @@ def source_identity(paths):
     return [file_identity(p) for p in sorted(files)]
 
 
-def preset_identity(model):
+def preset_values(model):
+    """A preset's effective settings, without touching the weights it names.
+
+    Separate from :func:`preset_identity` because a caller that only needs to
+    know what a preset *is* -- whether it declares a projector, say -- must not
+    fail because a weight file is mid-download. Reading the configuration and
+    reading the artifacts are different questions with different failure modes.
+    """
     config = configparser.ConfigParser(interpolation=None)
     config.read(ROOT / 'llama-models.ini')
     if model not in config:
         raise ValueError(f'unknown model: {model}')
     values = dict(config['*']) if '*' in config else {}
     values.update(config[model])
+    return values
+
+
+def preset_identity(model):
+    values = preset_values(model)
     artifacts = []
     for name in ('model', 'mmproj', 'chat-template-file'):
         if name not in values:
@@ -107,11 +212,12 @@ def preset_identity(model):
     return {'preset': values, 'artifacts': artifacts}
 
 
-def model_key(gate, model, sources, extra=None):
-    return digest({'schema': 1, 'gate': gate, 'model': model,
-                   'preset': preset_identity(model), 'sources': source_identity(sources),
-                   'runtime': runtime_identity(), 'extra': extra,
-                   'cache_contract': file_identity(__file__)})
+def model_key(gate, model, sources, extra=None, *, details=False):
+    inputs = {'schema': 1, 'gate': gate, 'model': model,
+              'preset': preset_identity(model), 'sources': source_identity(sources),
+              'runtime': runtime_identity(), 'extra': extra,
+              'cache_contract': file_identity(__file__)}
+    return inputs if details else digest(inputs)
 
 
 def step_key(name, command, *, details=False):
@@ -212,7 +318,8 @@ def adopt_legacy_step(name, command, state, store):
     except (OSError, ValueError, KeyError, TypeError):
         return False
     store.publish(name, name, digest(inputs), {'pass': True, 'step': previous,
-                  'legacy_migration': True, 'original_finished_at': previous['finished_at']})
+                  'legacy_migration': True, 'original_finished_at': previous['finished_at']},
+                  components=key_components(inputs))
     return True
 
 
@@ -243,19 +350,83 @@ class Store:
                 or record.get('status') != 'passed'):
             return None
         result = record.get('result')
-        if not isinstance(result, dict) or result.get('pass') is not True:
+        if (not isinstance(result, dict) or outcome_of(result) != PASSED
+                or not isinstance(record.get('updated_at'), str)):
             return None
         answer: dict = dict(result)
         answer.update(qualification_reused=True, qualified_at=record['updated_at'])
         return answer
 
-    def publish(self, gate, model, key, result=None):
+    def explain(self, gate, model, key, components=None, force=False):
+        """Why this gate will or will not reuse its receipt, in read-only terms.
+
+        Never writes and never runs anything, so ``--plan`` and the status
+        reader can both call it. ``changed_components`` is ``None`` -- not an
+        empty list -- when the stored receipt cannot attribute the miss, so
+        "nothing changed" and "we cannot say what changed" stay distinguishable.
+        """
+        record = self.read(gate, model)
+        answer = {'reason': 'reusable', 'receipt_status': record.get('status') if record else None,
+                  'updated_at': record.get('updated_at') if record else None,
+                  'changed_components': [], 'component_provenance': 'recorded'}
+        stored = record.get('components') if isinstance(record, dict) else None
+        if not isinstance(stored, dict):
+            answer['component_provenance'] = LEGACY_PROVENANCE
+        if not key:
+            answer.update(reason='no-identity', changed_components=None,
+                          component_provenance='not applicable: this workflow claims no cached identity')
+            return answer
+        if not record:
+            answer.update(reason='no-receipt', changed_components=None,
+                          component_provenance='not applicable: no receipt exists')
+            return answer
+        if force:
+            answer.update(reason='forced-retest', changed_components=None)
+            return answer
+        if record.get('status') != 'passed':
+            answer.update(reason=record.get('status') or 'unknown', changed_components=None)
+            return answer
+        if record.get('key') != key:
+            answer['reason'] = 'inputs-changed'
+            answer['changed_components'] = (
+                sorted(name for name in set(stored) | set(components or {})
+                       if stored.get(name) != (components or {}).get(name))
+                if isinstance(stored, dict) and isinstance(components, dict) else None)
+            return answer
+        if self.reuse(gate, model, key) is None:
+            answer.update(reason='invalid-receipt', changed_components=None)
+        return answer
+
+    def publish(self, gate, model, key, result=None, components=None):
         old = self.read(gate, model) or {}
-        passed = isinstance(result, dict) and result.get('pass') is True
         record = {'schema': 1, 'gate': gate, 'model': model, 'key': key,
-                  'status': 'running' if result is None else ('passed' if passed else 'failed'),
+                  'status': 'running' if result is None else outcome_of(result),
                   'updated_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'), 'result': result,
+                  'components': components if isinstance(components, dict) else old.get('components'),
                   'last_pass': old.get('result') if old.get('status') == 'passed' else old.get('last_pass')}
+        self._write(gate, model, record)
+
+    def restore(self, gate, model, record):
+        """Put a receipt back exactly as it was, or remove one that was not there.
+
+        Used when a run turns out never to have begun. Rewriting the old record
+        rather than editing the new one keeps ``last_pass`` and ``updated_at``
+        honest: no attempt happened, so nothing about the receipt should move.
+        """
+        if record is None:
+            self.path(gate, model).unlink(missing_ok=True)
+            self._fsync_directory()
+            return
+        self._write(gate, model, record)
+
+    def _fsync_directory(self):
+        directory = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+
+    def _write(self, gate, model, record):
         raw = json.dumps(record, sort_keys=True).encode()
         if len(raw) > MAX_RECORD:
             raise ValueError('qualification receipt exceeds bound')
@@ -265,30 +436,61 @@ class Store:
             with os.fdopen(fd, 'wb') as f:
                 f.write(raw); f.flush(); os.fsync(f.fileno())
             os.replace(temp, self.path(gate, model))
-            directory = os.open(self.root, os.O_RDONLY | os.O_DIRECTORY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
+            self._fsync_directory()
         finally:
             Path(temp).unlink(missing_ok=True)
 
 
-def run_cached(gate, model, key, run, force=False, store=None):
+def run_cached(gate, model, key, run, force=False, store=None, admit=None,
+               components=None):
+    """Reuse, refuse, or run one qualification -- in that order.
+
+    ``admit`` is the host-admission check: a callable returning the workloads
+    that would confound this measurement, or an empty result when the host is
+    usable. It is consulted only when a test would actually run, and always
+    *before* the receipt is touched, because refusing to start is not a verdict.
+    """
     store = store or Store()
     store.root.mkdir(parents=True, exist_ok=True)
     with store.path(gate, model).with_suffix('.lock').open('a') as lock:
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return _run_cached(gate, model, key, run, force, store)
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            # Another qualification already owns this receipt. Losing the race
+            # means nothing ran here, which is an admission outcome and not a
+            # verdict: propagating the OSError instead exited the gate 1 and
+            # published a model failure out of a lock conflict.
+            holder = [{'reason': 'qualification-receipt-locked',
+                       'gate': gate, 'model': model, 'pid': os.getpid()}]
+            return dict(mark_blocked({'gate': gate, 'model': model}, holder,
+                                     'another qualification holds this receipt; nothing was run'),
+                        qualification_reused=False)
+        return _run_cached(gate, model, key, run, force, store, admit, components)
 
 
-def _run_cached(gate, model, key, run, force, store):
+def _run_cached(gate, model, key, run, force, store, admit, components):
     cached = store.reuse(gate, model, key, force)
     if cached is not None:
+        # Reuse dispatches no model, so a busy host cannot confound it and
+        # admission is not consulted: the receipt was earned on a quiet one.
         return cached
+    blockers = admit() if admit is not None else None
+    if blockers:
+        return dict(mark_blocked({'gate': gate, 'model': model}, blockers,
+                                 f'refusing confounded qualification; active workloads: {blockers}'),
+                    qualification_reused=False)
     # Revoke eligibility before running, so a crash or failed forced retest cannot
     # silently expose an old pass. last_pass remains historical, never reusable.
-    store.publish(gate, model, key)
+    # Keep the receipt this attempt found: a run that turns out never to have
+    # begun has to be able to put it back untouched.
+    previous = store.read(gate, model)
+    store.publish(gate, model, key, components=components)
     result = run()
-    store.publish(gate, model, key, result)
+    if outcome_of(result) == BLOCKED:
+        # Admission was refused after the outer check, by the workload's own
+        # guard, before it dispatched anything. Nothing was measured, so nothing
+        # is spent -- including a pass this attempt would otherwise have revoked.
+        store.restore(gate, model, previous)
+    else:
+        store.publish(gate, model, key, result, components=components)
     return dict(result, qualification_reused=False)

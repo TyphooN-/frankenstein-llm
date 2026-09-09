@@ -4,6 +4,47 @@
 
 ### Incremental qualification and explicit retests
 
+Admission refusal is not a model verdict. A host refusal before inference leaves
+the prior receipt unchanged, including when a forced retest was requested.
+Actual retests revoke the old pass before dispatch; failure, interruption, or
+an inconclusive run never resurrects that old pass. Late workload conflicts and
+changed/unreadable inputs after dispatch are recorded as `inconclusive`, not as
+fresh qualification. Individual check failures remain in the evidence.
+
+Gate exit codes are `0` (passed), `1` (failed), `75` (admission blocked), and `76`
+(inconclusive). A later refusal does not hide an earlier model failure. Status
+counts inconclusive executions as finished attempts, but never as passed gates;
+blocked admission is not a finished model attempt.
+
+The supervisor carries that distinction to the end of the run. A gate that exits
+`75` is recorded in `blocked_steps`, not `failed_steps`, and stays in `remaining`
+for the next invocation; the gates after it are still attempted. A pass with
+nothing but blocked gates ends in status `admission-blocked` and exit `75`, while
+any genuine failure still ends in `functional-foundation-incomplete` and exit `1`.
+An operator stop is recorded as `interrupted` in the mission state and as
+`inconclusive` in the receipt, so a forwarded SIGTERM is never filed as a model
+failure. Losing the race for a receipt another qualification already holds is
+also blocked rather than failed: nothing ran.
+
+A preset whose weights are absent, quarantined or still a `.partial` has no
+readable identity. Both model gates refuse it (`qualification-inputs-unreadable`,
+exit `75`) rather than raising `FileNotFoundError` out of the gate, and the
+mission waits for a destination that a transfer is actively staging instead of
+running the policy gate against a file that has not finished arriving.
+
+Reading the checkout is a query about the host, not about a model. If
+`git ls-files`/`git diff` cannot answer within the retry budget -- a saturated
+disk, a contended index -- the mission records status `inputs-unreadable`, exits
+`75` and attempts no gate, instead of ending the run on an unhandled exception.
+
+`run_functional_mission.py --plan` explains receipt misses using per-component
+digests. The router and repository-agent gates also accept `--plan` for their
+per-model receipts. These commands do not dispatch models or write receipts.
+Old receipts without component diagnostics still require an exact composite-key
+match; an unexplained mismatch is not waived. New code/criteria can invalidate
+receipts, and this tooling update does not claim to qualify any model or repair
+filesystem corruption.
+
 Successful qualifications now have durable local receipts under
 `verification/mission-supervisor/qualification-cache/` (ignored by Git).
 Router and repository-agent receipts are independent per preset; a failed

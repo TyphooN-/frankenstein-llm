@@ -48,9 +48,16 @@ def mission_statuses() -> set[str]:
         if not isinstance(argument, ast.Dict):
             continue
         for key, value in zip(argument.keys, argument.values):
-            if (isinstance(key, ast.Constant) and key.value == "status"
-                    and isinstance(value, ast.Constant) and isinstance(value.value, str)):
-                found.add(value.value)
+            if not (isinstance(key, ast.Constant) and key.value == "status"):
+                continue
+            # A status chosen by a conditional is still a status the supervisor
+            # writes. Reading only plain constants let two of them reach the
+            # status reader unclassified, which is exactly the drift this test
+            # exists to catch.
+            for candidate in ([value.body, value.orelse]
+                              if isinstance(value, ast.IfExp) else [value]):
+                if isinstance(candidate, ast.Constant) and isinstance(candidate.value, str):
+                    found.add(candidate.value)
     assert found, "no mission statuses found in the supervisor"
     return found
 

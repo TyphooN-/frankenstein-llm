@@ -32,7 +32,16 @@ for _ in $(seq 1 60); do
       python3 "$GATE" --model "$model"
       rc=$?
       printf 'repository agent model=%s rc=%s %s\n' "$model" "$rc" "$(date -Is)"
-      if [ "$rc" -ne 0 ]; then worst=$rc; fi
+      if [ "$rc" -eq 75 ]; then
+        # No new model attempt after admission is lost. Preserve any genuine
+        # earlier failure rather than allowing a later refusal to hide it.
+        if [ "$worst" -eq 1 ]; then exit 1; fi
+        exit 75
+      elif [ "$rc" -ne 0 ] && [ "$rc" -ne 76 ]; then
+        worst=1
+      elif [ "$rc" -eq 76 ] && [ "$worst" -eq 0 ]; then
+        worst=76
+      fi
     done
     printf 'runner end rc=%s %s\n' "$worst" "$(date -Is)"
     exit "$worst"

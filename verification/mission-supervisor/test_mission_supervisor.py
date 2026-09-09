@@ -23,6 +23,7 @@ import itertools
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -389,6 +390,84 @@ class DurableStateTests(SupervisorTestCase):
         self.assertNotEqual(absent, present)
 
 
+class ArtifactsInFlightTests(SupervisorTestCase):
+    """A completion stamp does not survive a quarantine and re-download.
+
+    The queue verifies SHA-256 on promotion, moves a mismatching file to
+    ``<name>.bad-<stamp>`` and fetches it again; the stamp says complete the
+    whole time. On 2026-09-09 the policy gate ran sixteen minutes before
+    ``Gemma-4-12B-it-heretic-Q6_K.gguf`` finished arriving, reported it missing,
+    and blocked eleven model-backed gates behind it.
+    """
+
+    def queue(self, size=7, present=None, partial=False):
+        destination = self.sandbox / "weights.gguf"
+        if present is not None:
+            destination.write_bytes(b"x" * present)
+        if partial:
+            destination.with_name(destination.name + ".partial").write_bytes(b"x")
+        (self.sandbox / "download-queue-fixture.json").write_text(json.dumps(
+            {"artifacts": [{"files": [{"destination": str(destination), "size": size}]}]}))
+        return mock.patch.object(self.supervisor, "FOUNDATION", self.sandbox)
+
+    def in_flight(self, **kwargs):
+        with self.queue(**kwargs):
+            return self.supervisor.artifacts_in_flight()
+
+    def test_a_short_file_with_a_partial_sibling_is_in_flight(self):
+        self.assertEqual([str(self.sandbox / "weights.gguf")],
+                         self.in_flight(present=3, partial=True))
+
+    def test_an_absent_file_with_a_partial_sibling_is_in_flight(self):
+        self.assertEqual([str(self.sandbox / "weights.gguf")],
+                         self.in_flight(present=None, partial=True))
+
+    def test_a_complete_file_is_not_in_flight(self):
+        self.assertEqual([], self.in_flight(present=7, partial=True))
+
+    def test_an_absent_file_nobody_is_fetching_is_not_waited_for(self):
+        # A permanently missing artifact is a real problem for the policy gate
+        # to report. Waiting on it would replace a clear failure with a hang.
+        self.assertEqual([], self.in_flight(present=None, partial=False))
+
+    def test_an_entry_without_a_declared_size_is_ignored(self):
+        destination = self.sandbox / "weights.gguf"
+        destination.with_name(destination.name + ".partial").write_bytes(b"x")
+        (self.sandbox / "download-queue-fixture.json").write_text(json.dumps(
+            {"artifacts": [{"files": [{"destination": str(destination)}]}]}))
+        with mock.patch.object(self.supervisor, "FOUNDATION", self.sandbox):
+            self.assertEqual([], self.supervisor.artifacts_in_flight())
+
+    def test_an_unreadable_queue_is_skipped_rather_than_fatal(self):
+        (self.sandbox / "download-queue-broken.json").write_text("{not json")
+        with mock.patch.object(self.supervisor, "FOUNDATION", self.sandbox):
+            self.assertEqual([], self.supervisor.artifacts_in_flight())
+
+    def test_the_wait_holds_while_an_artifact_is_being_re_fetched(self):
+        answers = [["/models/a.gguf"], []]
+        slept = []
+        with mock.patch.object(self.supervisor, "phase_status",
+                               return_value=("ready", "queue")), \
+             mock.patch.object(self.supervisor, "artifacts_in_flight",
+                               side_effect=lambda: answers.pop(0)), \
+             mock.patch.object(self.supervisor, "atomic_json"), \
+             mock.patch.object(self.supervisor, "log") as log, \
+             mock.patch.object(self.supervisor.time, "sleep", slept.append):
+            state = {}
+            self.supervisor.wait_for_inputs(state)
+        self.assertEqual([self.supervisor.POLL_SECONDS], slept)
+        self.assertEqual("waiting-artifacts", state["status"])
+        self.assertIn("being re-fetched", log.call_args[0][0])
+
+    def test_a_ready_queue_with_nothing_in_flight_does_not_wait(self):
+        with mock.patch.object(self.supervisor, "phase_status",
+                               return_value=("ready", "queue")), \
+             mock.patch.object(self.supervisor, "artifacts_in_flight", return_value=[]), \
+             mock.patch.object(self.supervisor.time, "sleep",
+                               side_effect=AssertionError("must not wait")):
+            self.supervisor.wait_for_inputs({})
+
+
 class PhaseStatusTests(SupervisorTestCase):
     def test_a_matching_stamp_is_ready_while_state_says_running(self):
         state_path = self.sandbox / "download-state.json"
@@ -472,6 +551,82 @@ class PhaseStatusTests(SupervisorTestCase):
         self.assertEqual({}, self.supervisor.load_state()["steps"])
 
 
+class InputFingerprintResilienceTests(SupervisorTestCase):
+    """A checkout too busy to read is a host condition, not a mission failure.
+
+    ``git diff --binary HEAD`` over ``verification`` is the mission's own input
+    query. Under sixteen concurrent downloads it exceeded a single 30-second
+    attempt, and a concurrent git process made it exit 128; both escaped as
+    unhandled exceptions and ended the run before any gate started.
+    """
+
+    def arrange(self, results):
+        """Feed ``subprocess.run`` one outcome per call: bytes, or an exception."""
+        self.slept = []
+        outcomes = list(results)
+
+        def fake_run(command, **kwargs):
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return subprocess.CompletedProcess(command, 0, stdout=outcome, stderr=b"")
+
+        return (
+            mock.patch.object(self.supervisor.subprocess, "run", fake_run),
+            mock.patch.object(self.supervisor.time, "sleep", self.slept.append),
+            mock.patch.object(self.supervisor, "log"),
+        )
+
+    def run_fingerprint(self, results):
+        for patch in self.arrange(results):
+            patch.start()
+            self.addCleanup(patch.stop)
+        return self.supervisor.mission_inputs_fingerprint()
+
+    def test_a_slow_checkout_is_retried_rather_than_fatal(self):
+        timeout = subprocess.TimeoutExpired(["git", "diff"], 180)
+        value = self.run_fingerprint([b"ls-files", timeout, timeout, b"diff"])
+        self.assertRegex(value, r"^[0-9a-f]{64}$")
+        self.assertEqual([self.supervisor.FINGERPRINT_RETRY_SECONDS] * 2, self.slept)
+
+    def test_a_contended_index_is_retried_rather_than_fatal(self):
+        conflict = subprocess.CalledProcessError(128, ["git", "diff"])
+        self.assertRegex(self.run_fingerprint([b"ls-files", conflict, b"diff"]),
+                         r"^[0-9a-f]{64}$")
+
+    def test_an_unreadable_checkout_refuses_instead_of_raising_out(self):
+        timeout = subprocess.TimeoutExpired(["git", "ls-files"], 180)
+        with self.assertRaises(self.supervisor.InputsUnreadable):
+            self.run_fingerprint([timeout] * self.supervisor.FINGERPRINT_ATTEMPTS)
+        self.assertEqual(self.supervisor.FINGERPRINT_ATTEMPTS - 1, len(self.slept))
+
+    def test_the_retry_budget_is_bounded(self):
+        self.assertGreaterEqual(self.supervisor.FINGERPRINT_ATTEMPTS, 2)
+        self.assertLessEqual(self.supervisor.FINGERPRINT_ATTEMPTS, 8)
+        self.assertLessEqual(self.supervisor.FINGERPRINT_TIMEOUT_SECONDS, 600)
+
+    def test_main_waits_instead_of_recording_a_mission_failure(self):
+        self.supervisor.STATE.write_text(json.dumps({
+            "schema": "frankenstein-functional-mission/1", "steps": {},
+            "input_fingerprint": "earlier", "status": "functional-foundation-complete"}))
+        with mock.patch.object(self.supervisor, "mission_inputs_fingerprint",
+                               side_effect=self.supervisor.InputsUnreadable("git diff failed")), \
+             mock.patch.object(self.supervisor, "log"), \
+             mock.patch.object(self.supervisor.fcntl, "flock"), \
+             mock.patch.object(self.supervisor, "adopt_legacy_step", return_value=False), \
+             mock.patch.object(self.supervisor, "run_step",
+                               side_effect=AssertionError("no gate may be attempted")), \
+             warnings.catch_warnings():
+            warnings.simplefilter("ignore", ResourceWarning)
+            code = self.supervisor.main()
+        state = json.loads(self.supervisor.STATE.read_text())
+        self.assertEqual(self.supervisor.EXIT_ADMISSION_REFUSED, code)
+        self.assertEqual("inputs-unreadable", state["status"])
+        self.assertEqual("earlier", state["input_fingerprint"],
+                         "an unread fingerprint must not overwrite the one that ran")
+        self.assertIn("git diff failed", state["error"])
+
+
 class InterruptedStepClassificationTests(SupervisorTestCase):
     """An operator stop is not a step verdict."""
 
@@ -490,12 +645,17 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
         # drive() calls inside one test.
         self.supervisor.stop_signal = None
 
-        def fake_run_step(name, command, state):
+        def fake_run_step(name, command, state, before_start=None):
+            if before_start:
+                before_start()
             index = names.index(name)
             calls.append(name)
             rc = exit_codes[index]
             state["steps"][name] = {
-                "command": command, "status": "passed" if rc == 0 else "failed",
+                # The real run_step classifies by exit code, so 75 and 76 are not
+                # "failed" here either; a fake that flattened them would let the
+                # supervisor's blocked/inconclusive handling go untested.
+                "command": command, "status": self.supervisor.exit_status(rc),
                 "exit_code": rc, "input_fingerprint": state["input_fingerprint"],
             }
             if signal_after == index:
@@ -553,6 +713,44 @@ class InterruptedStepClassificationTests(SupervisorTestCase):
         self.assertEqual([{"name": "step-1", "exit_code": 3}], state["failed_steps"])
         self.assertEqual(["step-0", "step-1", "step-2"], calls,
                          "one functional failure hid independent gate results")
+
+    def test_a_refused_gate_is_outstanding_work_not_a_failed_gate(self):
+        """75 means the gate declined to start, so no verdict exists to record.
+
+        Recording it in ``failed_steps`` published a failure for a model that was
+        never dispatched, and made a busy host indistinguishable from a broken
+        one in the only summary an operator reads.
+        """
+        code, state, calls = self.drive([0, 75, 0])
+        self.assertEqual(self.supervisor.EXIT_ADMISSION_REFUSED, code)
+        self.assertEqual("admission-blocked", state["status"])
+        self.assertEqual([], state["failed_steps"])
+        self.assertEqual([{"name": "step-1", "exit_code": 75}], state["blocked_steps"])
+        self.assertEqual("blocked", state["steps"]["step-1"]["status"])
+        self.assertEqual(["step-0", "step-1", "step-2"], calls,
+                         "a refusal must not stop the gates that follow it")
+        self.assertIn("step-1", state["remaining"])
+
+    def test_a_real_failure_outranks_a_refusal_in_the_same_pass(self):
+        code, state, _ = self.drive([0, 75, 1])
+        self.assertEqual(1, code)
+        self.assertEqual("functional-foundation-incomplete", state["status"])
+        self.assertEqual([{"name": "step-2", "exit_code": 1}], state["failed_steps"])
+        self.assertEqual([{"name": "step-1", "exit_code": 75}], state["blocked_steps"])
+
+    def test_a_refused_gate_is_attempted_again_on_the_next_invocation(self):
+        self.drive([0, 75, 0])
+        code, state, calls = self.drive([0, 0, 0])
+        self.assertEqual(["step-1"], calls)
+        self.assertEqual(0, code)
+        self.assertEqual("functional-foundation-complete", state["status"])
+        self.assertNotIn("blocked_steps", state)
+
+    def test_an_inconclusive_gate_is_still_reported_as_incomplete(self):
+        code, state, _ = self.drive([0, 76, 0])
+        self.assertEqual(1, code)
+        self.assertEqual("functional-foundation-incomplete", state["status"])
+        self.assertEqual([{"name": "step-1", "exit_code": 76}], state["failed_steps"])
 
     def test_multiple_functional_failures_are_aggregated_after_policy_passes(self):
         code, state, calls = self.drive([0, 2, 4])

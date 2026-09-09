@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import functools
 import importlib.util
 import os
 from pathlib import Path
@@ -533,6 +534,277 @@ class BlockedWorkloadTests(unittest.TestCase):
         spec.loader.exec_module(supervisor)
         self.assertEqual(supervisor.MISSION_BLOCKING_REASONS,
                          module.MISSION_BLOCKING_REASONS)
+
+
+class AdmissionIsNotAVerdictTests(unittest.TestCase):
+    """A refused qualification must cost nothing: no rows, no receipt, no FAIL.
+
+    The gate used to raise its refusal from inside ``check_model``, which is
+    inside the callable ``run_cached`` wraps. By then a ``running`` receipt had
+    replaced the previous one, and the refusal was published as ``failed``. One
+    download queue re-verifying weights therefore erased a preset's pass and
+    filled the artifact with nine FAIL rows that were never verdicts.
+    """
+
+    CONFLICT = [{"pid": 4242, "reason": "download-queue", "command": "aria2c", "cwd": "/tmp"}]
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.store = module.Store(self.temp.name)
+
+    def dispatch(self, results, *, busy, argv=(), force=False):
+        """Run main() over fake presets with a real receipt store."""
+        calls = []
+
+        def execute(model):
+            calls.append(model)
+            return dict(results[model], model=model)
+
+        with (
+            patch.object(module, "CHAT_MODELS", sorted(results)),
+            patch.object(module, "VISION_MODELS", []),
+            patch.object(module, "model_key", side_effect=lambda _g, m, *a, **kw:
+                         {"model": m} if kw.get("details") else module.digest({"model": m})),
+            patch.object(module, "run_cached", functools.partial(
+                module.run_cached, store=self.store)),
+            patch.object(module, "checks_for", return_value=()),
+            patch.object(module, "check_model", side_effect=execute),
+            patch.object(module, "blocked_workloads", return_value=busy),
+            patch.object(module, "write_atomic") as artifact,
+            patch.dict("os.environ", {"HERMES_REQUALIFY": "1" if force else "0"}, clear=True),
+        ):
+            code = module.main(list(argv))
+        return code, artifact.call_args[0][0], calls
+
+    def test_a_busy_host_refuses_before_the_model_loop_runs(self):
+        code, summary, calls = self.dispatch({"ridge": {"pass": True}}, busy=self.CONFLICT)
+        self.assertEqual(module.EXIT_ADMISSION_REFUSED, code)
+        self.assertEqual([], calls, "a refused gate must dispatch no model")
+        self.assertEqual([], summary["models"], "a refusal writes no per-model rows")
+        self.assertTrue(summary["admission_refused"])
+        self.assertEqual(self.CONFLICT, summary["blocked_by"])
+        self.assertIs(False, summary["pass"])
+        self.assertFalse(any(self.store.root.glob("*.json")),
+                         "a refusal must publish no receipt at all")
+
+    def test_a_refusal_leaves_an_earlier_pass_reusable(self):
+        code, _, calls = self.dispatch({"ridge": {"pass": True}}, busy=[])
+        self.assertEqual(0, code)
+        self.assertEqual(["ridge"], calls)
+        receipt = self.store.read("router-models", "ridge")
+        # Now the queues start and the operator asks for a real retest anyway.
+        code, _, calls = self.dispatch({"ridge": {"pass": True}}, busy=self.CONFLICT,
+                                       argv=["--requalify"], force=True)
+        self.assertEqual(module.EXIT_ADMISSION_REFUSED, code)
+        self.assertEqual([], calls)
+        self.assertEqual(receipt, self.store.read("router-models", "ridge"))
+        self.assertIsNotNone(self.store.reuse("router-models", "ridge", module.digest({"model": "ridge"})))
+
+    def test_a_queue_that_starts_after_admission_refuses_without_a_verdict(self):
+        # The race the hoisted check cannot close. check_model's own guard is
+        # kept for exactly this, and it now reports a refusal rather than a FAIL.
+        state = {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0,
+                 "vram_used_bytes": {"card0": 0}}
+        with (
+            patch.object(module, "sample", return_value=state),
+            patch.object(module, "blocked_workloads", return_value=self.CONFLICT),
+            patch.object(module, "chat", side_effect=AssertionError("no model may be dispatched")),
+            patch.object(module, "unload", side_effect=AssertionError("nothing was loaded")),
+        ):
+            result = module.check_model("ridge")
+        self.assertEqual("blocked", result["outcome"])
+        self.assertTrue(result["admission_refused"])
+        self.assertIs(False, result["pass"])
+        self.assertEqual({}, result["checks"])
+        self.assertEqual(self.CONFLICT, result["blocked_by"])
+
+    def test_the_vision_path_refuses_on_the_same_terms(self):
+        state = {"mem_available_bytes": 50 << 30, "swap_used_bytes": 0,
+                 "vram_used_bytes": {"card0": 0}}
+        with (
+            patch.object(module, "sample", return_value=state),
+            patch.object(module, "blocked_workloads", return_value=self.CONFLICT),
+            patch.object(module, "chat", side_effect=AssertionError("no model may be dispatched")),
+        ):
+            result = module.check_vision_model("obliterated-vision")
+        self.assertEqual("blocked", result["outcome"])
+        self.assertIs(False, result["pass"])
+
+    def test_a_mid_run_refusal_stops_the_loop_and_keeps_earlier_receipts(self):
+        blocked = {"pass": False, "outcome": "blocked", "admission_refused": True,
+                   "blocked_by": self.CONFLICT, "problems": ["refusing"]}
+        code, summary, calls = self.dispatch(
+            {"a-ridge": {"pass": True}, "b-heretic": blocked, "c-fable": {"pass": True}},
+            busy=[])
+        self.assertEqual(module.EXIT_ADMISSION_REFUSED, code)
+        self.assertEqual(["a-ridge", "b-heretic"], calls, "the loop must stop at the refusal")
+        self.assertEqual(["a-ridge"], [item["model"] for item in summary["models"]])
+        self.assertIs(False, summary["pass"])
+        self.assertIsNotNone(self.store.reuse("router-models", "a-ridge", module.digest({"model": "a-ridge"})))
+        self.assertIsNone(self.store.read("router-models", "b-heretic"))
+
+    def test_a_real_failure_still_revokes_and_still_exits_one(self):
+        code, summary, _ = self.dispatch({"ridge": {"pass": True}}, busy=[])
+        self.assertEqual(0, code)
+        code, summary, calls = self.dispatch({"ridge": {"pass": False, "problems": ["wrong answer"]}},
+                                             busy=[], argv=["--requalify"], force=True)
+        self.assertEqual(1, code)
+        self.assertEqual(["ridge"], calls)
+        self.assertEqual("failed", self.store.read("router-models", "ridge")["status"])
+        self.assertIsNone(self.store.reuse("router-models", "ridge", "ridge"))
+
+
+class InconclusiveIsNotAFailureTests(unittest.TestCase):
+    """A run whose inputs moved is not a model that answered badly."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.store = module.Store(self.temp.name)
+
+    def test_inputs_that_change_during_execution_are_inconclusive(self):
+        keys = iter(["before", "before", "after", "after"])
+        with (
+            patch.object(module, "model_key",
+                         side_effect=lambda *a, **kw: {"k": 1} if kw.get("details") else next(keys)),
+            patch.object(module, "run_cached", functools.partial(module.run_cached, store=self.store)),
+            patch.object(module, "checks_for", return_value=()),
+            patch.object(module, "blocked_workloads", return_value=[]),
+            patch.object(module, "check_model", return_value={"model": "ridge", "pass": True,
+                                                              "problems": []}),
+        ):
+            result = module.qualify_cached("ridge")
+        self.assertEqual("inconclusive", result["outcome"])
+        self.assertIs(False, result["pass"])
+        self.assertIn("qualification inputs changed during execution", result["problems"])
+        self.assertEqual("inconclusive", self.store.read("router-models", "ridge")["status"])
+        self.assertIsNone(self.store.reuse("router-models", "ridge", "before"))
+
+    def test_an_inconclusive_gate_exits_distinctly_from_a_failed_one(self):
+        def dispatch(result):
+            with (
+                patch.object(module, "CHAT_MODELS", ["ridge"]),
+                patch.object(module, "VISION_MODELS", []),
+                patch.object(module, "model_key", side_effect=lambda _g, m, *a, **kw:
+                             {"model": m} if kw.get("details") else module.digest({"model": m})),
+                patch.object(module, "run_cached", functools.partial(
+                    module.run_cached, store=module.Store(tempfile.mkdtemp(dir=self.temp.name)))),
+                patch.object(module, "checks_for", return_value=()),
+                patch.object(module, "blocked_workloads", return_value=[]),
+                patch.object(module, "check_model", return_value=dict(result, model="ridge")),
+                patch.object(module, "write_atomic"),
+                patch.dict("os.environ", {}, clear=True),
+            ):
+                return module.main([])
+
+        self.assertEqual(0, dispatch({"pass": True}))
+        self.assertEqual(1, dispatch({"pass": False, "problems": ["wrong answer"]}))
+        self.assertEqual(module.EXIT_INCONCLUSIVE,
+                         dispatch({"pass": False, "outcome": "inconclusive",
+                                   "problems": ["inputs changed"]}))
+
+    def test_a_late_conflict_makes_the_result_inconclusive_not_failed(self):
+        result = {"problems": [], "checks": {"coherence": {"pass": True}}}
+        with patch.object(module, "blocked_workloads", return_value=[{"pid": 1, "reason": "inference"}]):
+            module.record_late_conflicts(result)
+        self.assertEqual("inconclusive", result["outcome"])
+        self.assertIs(False, result["pass"])
+
+
+class UnreadablePresetIdentityTests(unittest.TestCase):
+    """An in-flight download must refuse the preset, not fail it.
+
+    Every large weight in this workspace has been quarantined and re-downloaded
+    at least once, so ``models/.../x.gguf`` is regularly a ``.partial`` for
+    hours. Stat-ing it raised ``FileNotFoundError`` out of ``qualify_cached``,
+    and out of the chat-versus-vision classification before any preset had even
+    been considered.
+    """
+
+    def test_an_unreadable_preset_refuses_without_dispatching(self):
+        with (
+            patch.object(module, "model_key",
+                         side_effect=FileNotFoundError(2, "No such file or directory")),
+            patch.object(module, "checks_for", return_value=()),
+            patch.object(module, "check_model",
+                         side_effect=AssertionError("no model may be dispatched")),
+            patch.object(module, "run_cached",
+                         side_effect=AssertionError("no receipt may be touched")),
+        ):
+            result = module.qualify_cached("qwen3-coder-next")
+        self.assertEqual("blocked", module.outcome_of(result))
+        self.assertIs(False, result["pass"])
+        self.assertEqual("qualification-inputs-unreadable",
+                         result["blocked_by"][0]["reason"])
+
+    def test_the_gate_refuses_rather_than_raising_out_of_main(self):
+        with (
+            patch.object(module, "CHAT_MODELS", ["ridge"]),
+            patch.object(module, "VISION_MODELS", []),
+            patch.object(module, "model_key", side_effect=OSError("weights are a .partial")),
+            patch.object(module, "checks_for", return_value=()),
+            patch.object(module, "blocked_workloads", return_value=[]),
+            patch.object(module, "check_model",
+                         side_effect=AssertionError("no model may be dispatched")),
+            patch.object(module, "write_atomic") as artifact,
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            code = module.main([])
+        self.assertEqual(module.EXIT_ADMISSION_REFUSED, code)
+        summary = artifact.call_args[0][0]
+        self.assertTrue(summary["admission_refused"])
+        self.assertEqual([], summary["models"], "a refused preset writes no verdict row")
+
+    def test_classification_reads_settings_not_weights(self):
+        """The selection loop asks what a preset *is*, which needs no weights."""
+        source = Path(module.__file__).read_text()
+        self.assertNotIn("preset_identity(model)", source)
+        self.assertIn("preset_values(model)", source)
+
+
+class WorktreeImportTests(unittest.TestCase):
+    """The gate has to resolve its own checkout, not a hardcoded one.
+
+    A linked git worktree is how this repository is edited without disturbing the
+    checkout the mission supervisor owns. A gate that names the primary path
+    literally imports the *other* tree's policy and cache modules from inside the
+    worktree, so a test there proves nothing about the code under edit.
+    """
+
+    def test_root_is_derived_from_this_file(self):
+        self.assertEqual(Path(module.__file__).resolve().parents[2], module.ROOT)
+
+    def test_the_gate_imports_and_fixtures_come_from_its_own_checkout(self):
+        source = Path(module.__file__).read_text()
+        self.assertNotIn('"/home/typhoon/git/frankenstein-llm/verification', source)
+        for dependency in (module.candidate_policy, module.qualification_cache):
+            self.assertEqual(module.ROOT,
+                             Path(dependency.__file__).resolve().parents[2])
+        self.assertEqual(module.ROOT, module.VISION_FIXTURE.resolve().parents[3])
+
+
+def test_router_plan_does_not_dispatch_or_write(tmp_path, monkeypatch, capsys):
+    import json
+    monkeypatch.setattr(module, 'CHAT_MODELS', ['ridge'])
+    monkeypatch.setattr(module, 'VISION_MODELS', [])
+    monkeypatch.setattr(module, 'model_key', lambda *a, **kw: {'model': 'ridge'})
+    store = module.Store(tmp_path)
+    monkeypatch.setattr(module, 'Store', lambda: store)
+    def prohibited(*args, **kwargs):
+        raise AssertionError('plan must not dispatch or write')
+    monkeypatch.setattr(module, 'blocked_workloads', prohibited)
+    monkeypatch.setattr(module, 'write_atomic', prohibited)
+    monkeypatch.setattr(module, 'check_model', prohibited)
+    monkeypatch.setenv('HERMES_QUALIFY_MODELS', '[]')
+    assert module.main(['--plan']) == 0
+    assert json.loads(capsys.readouterr().out)[0]['cache']['reason'] == 'no-receipt'
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_router_refusal_does_not_hide_an_earlier_failure(monkeypatch):
+    monkeypatch.setattr(module, 'write_atomic', lambda *a: None)
+    assert module.refuse({'models': [{'pass': False}]}, [{'reason': 'inference'}]) == 1
 
 
 if __name__ == "__main__":

@@ -63,11 +63,18 @@ MAX_CONFLICT_SAMPLES = 8
 # starting up and about to claim the GPU, and non-null for minutes after the step
 # it names has finished. Reading it as "no step is running" inverts the answer in
 # the dangerous direction.
-RUNNING_MISSION_STATUSES = frozenset({"running", "running-with-failures"})
+RUNNING_MISSION_STATUSES = frozenset({
+    "running", "running-with-failures", "running-with-blocked-admission",
+})
 PENDING_MISSION_STATUSES = frozenset({"starting", "waiting-artifacts", "waiting-safe-host"})
+# Every terminal status is written on the way out, so no supervisor is left to
+# claim a GPU. "admission-blocked" and "inputs-unreadable" are terminal for that
+# reason and not pending: the run refused and exited, and the gates it did not
+# attempt are outstanding work for the next invocation rather than work in hand.
 TERMINAL_MISSION_STATUSES = frozenset({
-    "blocked-policy", "failed", "functional-foundation-complete",
-    "functional-foundation-incomplete", "interrupted",
+    "admission-blocked", "blocked-policy", "failed",
+    "functional-foundation-complete", "functional-foundation-incomplete",
+    "inputs-unreadable", "interrupted", "selected-qualifications-complete",
 })
 
 VERDICT_STEP_RUNNING = "mission-step-running"

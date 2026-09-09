@@ -13,10 +13,30 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/candidate-qualification")
-sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/mission-supervisor")
+# Resolve this gate's own checkout rather than naming one. A linked worktree is
+# how this repository is edited while the mission supervisor owns the primary
+# checkout; a literal path there would import the other tree's policy and cache
+# modules, so a change under test would never be the change that ran.
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "verification/candidate-qualification"))
+sys.path.insert(0, str(ROOT / "verification/mission-supervisor"))
+import candidate_policy  # noqa: E402
+import qualification_cache  # noqa: E402
 from candidate_policy import tool_grant_allowed_for_preset  # noqa: E402
-from qualification_cache import model_key, run_cached, preset_identity  # noqa: E402
+from qualification_cache import (  # noqa: E402
+    EXIT_ADMISSION_REFUSED,
+    EXIT_INCONCLUSIVE,
+    Store,
+    digest,
+    key_components,
+    mark_blocked,
+    mark_inconclusive,
+    model_key,
+    outcome_of,
+    preset_values,
+    run_cached,
+    unreadable_identity,
+)
 from run_functional_mission import (  # noqa: E402
     MISSION_BLOCKING_REASONS,
     conflict_reason,
@@ -27,7 +47,7 @@ BASE = "http://127.0.0.1:8080"
 CHAT_MODELS = ["ridge", "heretic", "obliterated", "fable", "phr00ty",
                "qwen3-coder-next", "gemma4-heretic"]
 VISION_MODELS = ["obliterated-vision", "gemma4-heretic-vision"]
-VISION_FIXTURE = Path("/home/typhoon/git/frankenstein-llm/verification/computer-use-grounding/fixtures/screen-app.png")
+VISION_FIXTURE = ROOT / "verification/computer-use-grounding/fixtures/screen-app.png"
 
 # Not every preset is judged on the same contract. A preset the candidate policy
 # refuses tools to must not be sent a tools payload at all: demanding a tool call
@@ -153,12 +173,32 @@ def blocked_workloads(proc_root: Path = Path("/proc")) -> list[dict[str, object]
 
 
 def record_late_conflicts(result: dict) -> None:
-    """Fail closed if competing work appeared after the pre-load check."""
+    """Fail closed if competing work appeared after the pre-load check.
+
+    This one *did* dispatch the model, so unlike a refusal it is not free: the
+    receipt has already been revoked and the answers that came back were taken
+    beside work that could have decided them. That makes the run inconclusive
+    rather than failed, and inconclusive outranks a failing check recorded in the
+    same run -- contention is a reason to distrust the measurement, not a reason
+    to promote it into a verdict about the model.
+    """
     conflicts = blocked_workloads()
     result["post_load_conflicts"] = conflicts
     if conflicts:
-        result["problems"].append(
-            "confounded qualification: competing workloads observed after load")
+        mark_inconclusive(
+            result, "confounded qualification: competing workloads observed after load")
+
+
+def admission_refusal(result: dict, conflicts: list[dict[str, object]]) -> dict:
+    """Record that this qualification was refused, not that it was failed.
+
+    A refusal is an admission decision about the host, so it says nothing about
+    the preset: no check ran, no weights were loaded, and the previous verdict
+    for this preset is still the last thing anyone measured.
+    """
+    return mark_blocked(
+        result, conflicts,
+        f"refusing confounded qualification; active workloads: {conflicts}")
 
 
 def pressure() -> dict[str, str]:
@@ -318,10 +358,14 @@ def check_model(model: str) -> dict:
     result: dict = {"model": model, "before": before, "checks": {}, "problems": [],
                     "required_checks": list(required),
                     "tools_offered": "tool_call" in required}
+    conflicts = blocked_workloads()
+    if conflicts:
+        # main() already refused a busy host; this closes the race where a queue
+        # starts between that check and the first request. Return before anything
+        # is dispatched, so there is nothing to unload and nothing to account
+        # for -- and so the caller can put the receipt back exactly as it was.
+        return admission_refusal(result, conflicts)
     try:
-        conflicts = blocked_workloads()
-        if conflicts:
-            raise RuntimeError(f"refusing confounded qualification; active workloads: {conflicts}")
         pong = chat(model, "Reply with exactly the single uppercase word PONG.")
         text = (pong["message"].get("content") or "").strip()
         result["checks"]["coherence"] = {"pass": text == "PONG", "content": text}
@@ -423,10 +467,10 @@ def check_model(model: str) -> dict:
 def check_vision_model(model: str) -> dict:
     before = sample("before")
     result: dict = {"model": model, "before": before, "checks": {}, "problems": []}
+    conflicts = blocked_workloads()
+    if conflicts:
+        return admission_refusal(result, conflicts)
     try:
-        conflicts = blocked_workloads()
-        if conflicts:
-            raise RuntimeError(f"refusing confounded qualification; active workloads: {conflicts}")
         encoded = base64.b64encode(VISION_FIXTURE.read_bytes()).decode()
         response = chat(
             model,
@@ -466,34 +510,70 @@ def write_atomic(payload: dict) -> None:
 
 
 def qualify_cached(model, vision=False, force=False):
-    sources = [Path(__file__), Path(__file__).parents[1] / 'candidate-qualification/candidate_policy.py']
+    sources = [Path(__file__), ROOT / 'verification/candidate-qualification/candidate_policy.py']
     if vision:
         sources.append(VISION_FIXTURE)
-    key = model_key('router-models', model, sources, extra=checks_for(model))
+    try:
+        details = model_key('router-models', model, sources, extra=checks_for(model), details=True)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return unreadable_identity('router-models', model, error)
+    key = digest(details)
     def execute():
         result = check_vision_model(model) if vision else check_model(model)
-        if model_key('router-models', model, sources, extra=checks_for(model)) != key:
-            result['pass'] = False
-            result.setdefault('problems', []).append('qualification inputs changed during execution')
+        if outcome_of(result) == 'blocked':
+            # Nothing ran, so there is no window for the inputs to have moved in.
+            return result
+        try:
+            unchanged = model_key('router-models', model, sources, extra=checks_for(model)) == key
+        except (OSError, ValueError, KeyError, TypeError):
+            unchanged = False
+        if not unchanged:
+            # The preset, its weights or the runtime moved while this preset was
+            # being measured. Fail closed, but say what happened: the answers
+            # came from an arrangement that no longer exists, which is not the
+            # same claim as "this model got the answer wrong".
+            mark_inconclusive(result, 'qualification inputs changed during execution')
         return result
-    return run_cached('router-models', model, key, execute, force)
+    return run_cached('router-models', model, key, execute, force,
+                      admit=lambda: blocked_workloads(),
+                      components=key_components(details))
 
 
 def main(argv=()) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', action='append', help='configured router preset; repeat to select several')
     parser.add_argument('--requalify', action='store_true')
+    parser.add_argument('--plan', action='store_true', help='explain receipt reuse without dispatch or writes')
     args = parser.parse_args(argv)
     requested = args.model or json.loads(os.environ.get('HERMES_QUALIFY_MODELS', '[]'))
     selected = set(requested or CHAT_MODELS + VISION_MODELS)
     chat_models, vision_models = list(CHAT_MODELS), list(VISION_MODELS)
     for model in sorted(selected - set(chat_models + vision_models)):
         try:
-            preset = preset_identity(model)['preset']
+            # Only the preset's declared settings decide chat-versus-vision.
+            # Reading its weight files here made an in-flight download abort the
+            # whole gate before any preset had been considered.
+            preset = preset_values(model)
         except (ValueError, OSError) as error:
             parser.error(str(error))
         (vision_models if preset.get('mmproj') else chat_models).append(model)
     force = args.requalify or os.environ.get('HERMES_REQUALIFY') == '1'
+    if args.plan:
+        plans = []
+        for model in sorted(selected):
+            sources = [Path(__file__), ROOT / 'verification/candidate-qualification/candidate_policy.py']
+            if model in vision_models:
+                sources.append(VISION_FIXTURE)
+            try:
+                details = model_key('router-models', model, sources,
+                                    extra=checks_for(model), details=True)
+                explanation = Store().explain('router-models', model, digest(details),
+                                               key_components(details), force)
+            except (OSError, ValueError, KeyError, TypeError):
+                explanation = {'reason': 'unreadable-identity', 'changed_components': None}
+            plans.append({'model': model, 'cache': explanation})
+        print(json.dumps(plans, indent=2))
+        return 0
     summary = {
         "gate": "router-functional",
         "benchmarking_performed": False,
@@ -505,24 +585,52 @@ def main(argv=()) -> int:
         "models": [],
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
-    for model in chat_models:
-        if model not in selected:
-            continue
-        item = qualify_cached(model, force=force)
-        summary["models"].append(item)
-        write_atomic(summary)
-        print(f"{model}: {'PASS' if item['pass'] else 'FAIL'} reused={item['qualification_reused']}", flush=True)
-    for model in vision_models:
-        if model not in selected:
-            continue
-        vision_item = qualify_cached(model, vision=True, force=force)
-        summary["models"].append(vision_item)
-        write_atomic(summary)
-        print(f"{model}: {'PASS' if vision_item['pass'] else 'FAIL'}", flush=True)
+    summary["admission_refused"] = False
+    summary["blocked_by"] = []
+    # Refuse before the loop, not inside it. The refusal used to be raised from
+    # inside the call run_cached wraps, so a busy host spent every selected
+    # preset's receipt and wrote a FAIL row for each one. Nothing here has
+    # touched a receipt yet, so a refusal now costs nothing.
+    blockers = blocked_workloads()
+    if blockers:
+        return refuse(summary, blockers)
+    for vision, models in ((False, chat_models), (True, vision_models)):
+        for model in models:
+            if model not in selected:
+                continue
+            item = qualify_cached(model, vision=vision, force=force)
+            if outcome_of(item) == 'blocked':
+                # A queue started mid-run. Its receipt was rolled back, no row
+                # is recorded for it, and the presets after it are not attempted
+                # beside the same competing work.
+                return refuse(summary, item.get("blocked_by") or blocked_workloads())
+            summary["models"].append(item)
+            write_atomic(summary)
+            print(f"{model}: {'PASS' if item['pass'] else 'FAIL'}"
+                  f" outcome={outcome_of(item)} reused={item['qualification_reused']}", flush=True)
+    outcomes = [outcome_of(item) for item in summary["models"]]
     summary["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    summary["pass"] = all(item["pass"] for item in summary["models"])
+    summary["outcome_counts"] = {name: outcomes.count(name)
+                                 for name in ("passed", "failed", "inconclusive")}
+    summary["pass"] = bool(summary["models"]) and all(outcome == "passed" for outcome in outcomes)
     write_atomic(summary)
+    if "failed" in outcomes:
+        return 1
+    if "inconclusive" in outcomes:
+        return EXIT_INCONCLUSIVE
     return 0 if summary["pass"] else 1
+
+
+def refuse(summary: dict, blockers: list) -> int:
+    """Publish a refusal that cannot be mistaken for a set of model verdicts."""
+    summary.update({"admission_refused": True, "blocked_by": blockers, "pass": False,
+                    "outcome": "blocked", "complete": False,
+                    "finished_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
+    write_atomic(summary)
+    print(f"router-models: REFUSED (no further qualification attempted); active workloads: {blockers}",
+          flush=True)
+    # Do not hide genuine failures from earlier models behind a later refusal.
+    return 1 if any(outcome_of(item) == 'failed' for item in summary['models']) else EXIT_ADMISSION_REFUSED
 
 
 if __name__ == "__main__":

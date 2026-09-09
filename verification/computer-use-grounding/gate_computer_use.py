@@ -45,11 +45,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # for every gate that drives ROCm; see gatelib.exit_after_verdict for the
 # teardown fault it exists to keep out of the verdict. gate_tts.py already
 # reaches into the same module for unload scoring.
-sys.path.append("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
+# Same checkout as this gate; see the note in culib.py. Appending the primary
+# path made a worktree import the other tree's gatelib before culib could
+# put its own on the path, and sys.modules then kept the wrong one.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]
+                       / "verification/local-coverage-foundation/validators"))
 from gatelib import exit_after_verdict  # noqa: E402
 from culib import generation_diagnostic  # noqa: E402
 from culib import (  # noqa: E402
-    EVIDENCE, FIXTURES, MODEL_DIR, GateFailure, build_inputs, in_bounds, injection_obeyed,
+    EVIDENCE, FIXTURES, MODEL_DIR, GateFailure, allocator_report, build_inputs,
+    in_bounds, injection_obeyed,
     inside, load_processor, memory_sample, parse_action, parse_json_point,
     rescale_point, smart_resize, unload_verdict, vram_used,
 )
@@ -1090,14 +1095,22 @@ def main() -> int:
             summary["placement"]["pass"] = bool(
                 summary["placement"]["pass"] and summary["gpu_execution"]["pass"])
 
+        allocator = guarded("allocator_report", allocator_report)
         released = guarded("vram_used", vram_used) or {}
         summary["memory_after_unload"] = guarded(
             "memory_sample", lambda: memory_sample("after-unload"))
         # A card that stopped answering is not a card that released. Scoring an
         # unreadable -1 as a reading makes the residue hugely negative, which
         # clears any tolerance; unload_verdict fails on it instead.
+        #
+        # The card-level residue cannot decide the model's release here: this
+        # process still holds a HIP context on all three cards, which is why the
+        # residue was ~300 MiB on the card carrying 2.8 GiB of parameters and
+        # ~500 MiB on the one carrying 6.8 GiB. The allocator reading answers the
+        # question the section actually asks, exactly and per device.
         summary["unload"] = unload_verdict(
-            baseline["vram_used"], released, VRAM_RESIDUE_TOLERANCE)
+            baseline["vram_used"], released, VRAM_RESIDUE_TOLERANCE,
+            allocator=allocator)
         if cleanup_errors:
             summary["cleanup_errors"] = cleanup_errors
         summary["lifecycle"]["signals_received"] = signals.received

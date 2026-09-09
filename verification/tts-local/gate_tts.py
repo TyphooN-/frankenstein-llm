@@ -25,8 +25,12 @@ import sys
 import time
 import unicodedata
 
-sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import unload_verdict, vram_used  # noqa: E402
+# Resolve the shared validator helpers from this gate's own checkout. Naming
+# the primary path literally made a linked worktree import the *other*
+# tree's gatelib, so a change under test was never the code that ran.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]
+                        / "verification/local-coverage-foundation/validators"))
+from gatelib import allocator_report, unload_verdict, vram_used  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
 EVIDENCE = ROOT / "evidence"
@@ -332,13 +336,18 @@ def main() -> int:
                 pass
         gc.collect()
         time.sleep(8)
+        allocator = allocator_report()
         after = memory_sample("after-unload")
         summary["memory_after_unload"] = after
         # Cards that could not be read are not cards that released: an empty
         # residue set used to make ``all(...)`` vacuously true, so a host whose
         # sysfs nodes stopped answering passed the clean-unload gate outright.
+        # The allocator reading is what decides whether the *model* came back;
+        # this process keeps its HIP context until it exits, and that context is
+        # what the card-level residue was being blamed on the model for.
         summary["unload"] = unload_verdict(
-            baseline["vram_used"], after["vram_used"], VRAM_RESIDUE_TOLERANCE)
+            baseline["vram_used"], after["vram_used"], VRAM_RESIDUE_TOLERANCE,
+            allocator=allocator)
         for problem in summary["unload"]["problems"]:
             note(problems, f"unload: {problem}")
 

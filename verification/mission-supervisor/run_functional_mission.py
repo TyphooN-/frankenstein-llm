@@ -22,9 +22,10 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from qualification_cache import Store, step_key, adopt_legacy_step
+from qualification_cache import (Store, step_key, adopt_legacy_step, key_components,
+                                 INCONCLUSIVE, EXIT_ADMISSION_REFUSED, EXIT_INCONCLUSIVE)
 
-ROOT = Path("/home/typhoon/git/frankenstein-llm")
+ROOT = Path(__file__).resolve().parents[2]
 HERE = ROOT / "verification" / "mission-supervisor"
 STATE = HERE / "mission-state.json"
 LOG = HERE / "mission.log"
@@ -132,6 +133,42 @@ def durable_queue_state(raw: bytes) -> bytes:
     return json.dumps(strip(document), sort_keys=True, separators=(",", ":")).encode()
 
 
+# Reading the checkout is a query about the host, not about a model, so a host
+# that is too busy to answer it is a reason to wait rather than a mission
+# failure. ``git diff --binary HEAD`` walks every tracked file under
+# ``verification``; while a download queue saturates the disk that regularly
+# exceeded the original single 30-second attempt, and a concurrent git process
+# makes it exit 128 over ``index.lock``. Both surfaced as an unhandled
+# TimeoutExpired/CalledProcessError from the module-level handler, which recorded
+# ``status: failed`` and ended the run -- twenty times on 2026-09-08, without a
+# single gate having been attempted.
+FINGERPRINT_ATTEMPTS = 4
+FINGERPRINT_TIMEOUT_SECONDS = 180
+FINGERPRINT_RETRY_SECONDS = 20
+
+
+class InputsUnreadable(RuntimeError):
+    """The mission could not read its own inputs, so it measured nothing."""
+
+
+def read_git_inputs(command: list[str]) -> bytes:
+    """One read-only git query, retried, or a refusal that names the condition."""
+    last: Exception | None = None
+    for attempt in range(1, FINGERPRINT_ATTEMPTS + 1):
+        try:
+            return subprocess.run(command, cwd=ROOT, check=True, capture_output=True,
+                                  timeout=FINGERPRINT_TIMEOUT_SECONDS).stdout
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError,
+                OSError) as error:
+            last = error
+            log(f"input fingerprint attempt {attempt}/{FINGERPRINT_ATTEMPTS}"
+                f" failed name={command[1]} {type(error).__name__}")
+            if attempt < FINGERPRINT_ATTEMPTS:
+                time.sleep(FINGERPRINT_RETRY_SECONDS)
+    raise InputsUnreadable(
+        f"git {command[1]} failed {FINGERPRINT_ATTEMPTS} times: {type(last).__name__}")
+
+
 def mission_inputs_fingerprint() -> str:
     """Fingerprint source and promoted artifacts without re-hashing model weights."""
     digest = hashlib.sha256()
@@ -140,9 +177,7 @@ def mission_inputs_fingerprint() -> str:
         ["git", "ls-files", "-s", "--", *source_paths],
         ["git", "diff", "--binary", "HEAD", "--", *source_paths],
     ):
-        result = subprocess.run(
-            command, cwd=ROOT, check=True, capture_output=True, timeout=30)
-        digest.update(result.stdout)
+        digest.update(read_git_inputs(command))
 
     # Promotion records are durable; file metadata additionally catches restored
     # or replaced bytes whose queue state was not rewritten.
@@ -409,6 +444,44 @@ def phase_status(state_path: Path, stamp_path: Path, expected: str) -> tuple[str
     return "failed", f"{stamp_path.name}: expected {expected}, got {stamp!r}"
 
 
+def artifacts_in_flight() -> list[str]:
+    """Queue destinations that are absent or the wrong size and being re-fetched.
+
+    A completion stamp records that a queue finished once. It does not survive
+    contact with this host: the queue verifies SHA-256 on promotion, quarantines
+    a file that fails to ``<name>.bad-<stamp>`` and downloads it again, and the
+    stamp still says complete throughout. On 2026-09-09 the candidate policy gate
+    ran sixteen minutes before ``Gemma-4-12B-it-heretic-Q6_K.gguf`` was promoted,
+    correctly reported it "missing or wrong size", and blocked all eleven
+    model-backed gates behind a file that was simply still arriving.
+
+    Only a destination with a ``.partial`` sibling counts: that is a transfer
+    staging bytes right now. A file that is merely absent is a real problem and
+    is left to the policy gate to report, so this never becomes a wait for
+    something nobody is fetching.
+    """
+    waiting = []
+    for queue_path in sorted(FOUNDATION.glob("download-queue*.json")):
+        try:
+            document = json.loads(queue_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for artifact in document.get("artifacts", []):
+            for entry in artifact.get("files", []):
+                destination = Path(entry.get("destination", ""))
+                expected = entry.get("size")
+                if not destination.name or not isinstance(expected, int):
+                    continue
+                try:
+                    complete = destination.stat().st_size == expected
+                except OSError:
+                    complete = False
+                if complete or not destination.with_name(destination.name + ".partial").exists():
+                    continue
+                waiting.append(str(destination))
+    return sorted(waiting)
+
+
 def wait_for_inputs(state: dict) -> None:
     last = None
     while True:
@@ -418,8 +491,13 @@ def wait_for_inputs(state: dict) -> None:
             state.update({"status": "failed", "error": failure, "updated_at": now()})
             atomic_json(state)
             raise RuntimeError(failure)
-        if all(status == "ready" for status, _ in statuses):
+        in_flight = artifacts_in_flight()
+        if all(status == "ready" for status, _ in statuses) and not in_flight:
             return
+        if in_flight:
+            statuses = statuses + [("re-fetching",
+                                    f"{len(in_flight)} artifact(s) being re-fetched:"
+                                    f" {in_flight[:4]}")]
         detail = "; ".join(text for _, text in statuses)
         if detail != last:
             log(f"waiting for artifact queues: {detail}")
@@ -506,9 +584,11 @@ def on_signal(signum: int, _frame) -> None:
     raise SystemExit(128 + signum)
 
 
-def run_step(name: str, command: list[str], state: dict) -> int:
+def run_step(name: str, command: list[str], state: dict, before_start=None) -> int:
     global child
     wait_for_quiet(state)
+    if before_start is not None:
+        before_start()
     step = {
         "command": command,
         "input_fingerprint": state["input_fingerprint"],
@@ -526,7 +606,7 @@ def run_step(name: str, command: list[str], state: dict) -> int:
         child = subprocess.Popen(command, cwd=ROOT, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
         rc = child.wait()
     child = None
-    step.update({"finished_at": now(), "exit_code": rc, "status": "passed" if rc == 0 else "failed"})
+    step.update({"finished_at": now(), "exit_code": rc, "status": exit_status(rc)})
     state["updated_at"] = now()
     atomic_json(state)
     log(f"step end name={name} rc={rc}")
@@ -550,8 +630,20 @@ def prepare_child_environment() -> None:
 def qualification_key(name, command):
     try:
         return step_key(name, command)
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError, TypeError):
         return None
+
+
+def qualification_components(name, command):
+    try:
+        return key_components(step_key(name, command, details=True))
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def exit_status(rc):
+    return {0: 'passed', EXIT_ADMISSION_REFUSED: 'blocked',
+            EXIT_INCONCLUSIVE: 'inconclusive'}.get(rc, 'failed')
 
 
 def reuse_step(name, command, state, force=False):
@@ -567,17 +659,43 @@ def reuse_step(name, command, state, force=False):
 
 
 def execute_qualification(name, command, state):
-    key = qualification_key(name, command)
     store = Store(HERE / 'qualification-cache')
-    store.publish(name, name, key)
-    rc = run_step(name, command, state)
-    if key is not None and qualification_key(name, command) != key:
-        rc = 1
-        state['steps'][name].update(status='failed', exit_code=1,
+    previous = store.read(name, name)
+    identity = {}
+
+    def begin():
+        # Admission waits must not revoke a completed qualification. Capture
+        # inputs only once the host is admitted, immediately before dispatch.
+        identity.update(key=qualification_key(name, command),
+                        components=qualification_components(name, command))
+        store.publish(name, name, identity['key'], components=identity['components'])
+
+    rc = run_step(name, command, state, before_start=begin)
+    key = identity.get('key')
+    if rc == EXIT_ADMISSION_REFUSED:
+        store.restore(name, name, previous)
+        state['steps'][name].update(status='blocked', exit_code=rc)
+        atomic_json(state)
+        return rc
+    outcome = exit_status(rc)
+    if stop_signal is not None and rc != 0:
+        # The operator stopped the mission and the signal was forwarded to the
+        # running gate, which then exited non-zero because it was stopped. That
+        # run decided nothing about the model, so the receipt says so. Filing an
+        # operator stop as a model failure is the same error as filing a refusal
+        # as one -- it is fail-closed either way, but only one of them is true.
+        outcome = INCONCLUSIVE
+        state['steps'][name].update(status='interrupted', exit_code=rc)
+        atomic_json(state)
+    elif key is not None and qualification_key(name, command) != key:
+        rc = EXIT_INCONCLUSIVE
+        outcome = INCONCLUSIVE
+        state['steps'][name].update(status='inconclusive', exit_code=rc,
                                     error='qualification inputs changed during execution')
         atomic_json(state)
-    store.publish(name, name, key, {'pass': rc == 0,
-                                  'step': state['steps'].get(name, {})})
+    store.publish(name, name, key, {'pass': rc == 0, 'outcome': outcome,
+                                  'step': state['steps'].get(name, {})},
+                  components=identity.get('components'))
     return rc
 
 
@@ -608,10 +726,13 @@ def main(argv=()) -> int:
         return 0
     selected = set(args.gate or [name for name, _ in STEPS])
     if args.model:
-        from qualification_cache import preset_identity
+        # Validate the *name*, which is what the operator typed. Stat-ing the
+        # preset's weights here rejected a valid selection whenever the file was
+        # mid-download, which is exactly when a targeted retest gets asked for.
+        from qualification_cache import preset_values
         for model in args.model:
             try:
-                preset_identity(model)
+                preset_values(model)
             except (ValueError, OSError) as error:
                 parser.error(str(error))
         selected &= {'router-models', 'repository-agent', 'candidate-policy', 'router-reload-presets'}
@@ -623,7 +744,9 @@ def main(argv=()) -> int:
     os.environ['HERMES_QUALIFY_MODELS'] = json.dumps(args.model or [])
     if args.plan:
         store = Store(HERE / 'qualification-cache')
-        print(json.dumps([{'gate': name, 'action':
+        print(json.dumps([{'gate': name, 'cache': store.explain(
+            name, name, qualification_key(name, command),
+            qualification_components(name, command), args.requalify), 'action':
             'reuse' if store.reuse(name, name, qualification_key(name, command), args.requalify)
             else ('per-model dispatch' if name in ('router-models', 'repository-agent') else 'run')}
             for name, command in STEPS if name in selected], indent=2))
@@ -646,9 +769,19 @@ def main(argv=()) -> int:
     if args.migrate_passes:
         print(json.dumps({'imported': imported, 'model_workloads_started': False}))
         return 0
-    input_fingerprint = mission_inputs_fingerprint()
-    for stale in ("signal", "error", "failed_step", "failed_steps", "exit_code",
-                  "interrupted_step", "step_exit_code", "step_status"):
+    try:
+        input_fingerprint = mission_inputs_fingerprint()
+    except InputsUnreadable as error:
+        # Nothing was dispatched and no receipt was touched. Leave the previous
+        # fingerprint in place so the next run compares against what actually
+        # ran, and report a refusal rather than a mission failure.
+        state.update({"status": "inputs-unreadable", "current_step": None,
+                      "error": str(error), "updated_at": now()})
+        atomic_json(state)
+        log(f"inputs unreadable; no gate was attempted: {error}")
+        return EXIT_ADMISSION_REFUSED
+    for stale in ("signal", "error", "failed_step", "failed_steps", "blocked_steps",
+                  "exit_code", "interrupted_step", "step_exit_code", "step_status"):
         state.pop(stale, None)
     state.update({
         "status": "starting",
@@ -705,13 +838,16 @@ def main(argv=()) -> int:
         return 1
 
     failures = []
+    blocked = []
     for name, command in STEPS[1:]:
         if name not in selected:
             continue
         previous = state["steps"].get(name, {})
         if reuse_step(name, command, state, args.requalify):
             continue
+        receipt = Store(HERE / 'qualification-cache').read(name, name)
         if (not args.requalify and name not in ('router-models', 'repository-agent')
+                and (receipt is None or (receipt.get('key') is None and receipt.get('status') == 'passed'))
                 and previous.get("status") == "passed"
                 and previous.get("input_fingerprint") == input_fingerprint):
             log(f"step already passed; skipping name={name}")
@@ -736,25 +872,39 @@ def main(argv=()) -> int:
                           "updated_at": now()})
             atomic_json(state)
             return 128 + stop_signal
+        if rc == EXIT_ADMISSION_REFUSED:
+            # The gate refused admission after this supervisor's own quiet-host
+            # wait, so it never ran. It is outstanding work, not a failed gate:
+            # listing it in failed_steps publishes a verdict nothing measured,
+            # and the next pass has to attempt it again rather than repair it.
+            blocked.append({"name": name, "exit_code": rc})
+            state.update({"status": "running-with-failures" if failures
+                          else "running-with-blocked-admission",
+                          "blocked_steps": blocked, "updated_at": now()})
+            atomic_json(state)
+            continue
         if rc != 0:
             failures.append({"name": name, "exit_code": rc})
             state.update({"status": "running-with-failures", "failed_steps": failures,
                           "updated_at": now()})
             atomic_json(state)
-    if failures:
+    if failures or blocked:
         state.update({
-            "status": "functional-foundation-incomplete",
+            "status": "functional-foundation-incomplete" if failures else "admission-blocked",
             "current_step": None,
             "failed_steps": failures,
-            "exit_code": 1,
-            "remaining": [failure["name"] for failure in failures] + [
+            "blocked_steps": blocked,
+            "exit_code": 1 if failures else EXIT_ADMISSION_REFUSED,
+            "remaining": [item["name"] for item in failures + blocked] + [
                 "build bounded end-to-end computer control only after grounding passes",
             ],
             "updated_at": now(),
         })
         atomic_json(state)
-        log(f"functional foundation incomplete; failed steps={failures}")
-        return 1
+        log(f"functional foundation incomplete; failed steps={failures}"
+            f"; blocked steps={blocked}" if failures
+            else f"admission blocked; nothing failed; blocked steps={blocked}")
+        return 1 if failures else EXIT_ADMISSION_REFUSED
     state.update({
         "status": "selected-qualifications-complete" if args.gate or args.model else "functional-foundation-complete",
         "current_step": None,

@@ -65,6 +65,102 @@ class VramResidueTests(unittest.TestCase):
         self.assertFalse(verdict["pass"])
 
 
+class InProcessUnloadTests(unittest.TestCase):
+    """Card-level VRAM cannot decide the model's release for an in-process gate.
+
+    The sidecar gates stop a unit, so the process holding the weights exits and
+    the card reading is a reading about the model. The TTS, grounding and vision
+    gates load the model inside their own process, which keeps its HIP context,
+    compiled kernels and BLAS workspaces until it exits. That residue was scored
+    as "VRAM still held after unload", and the three gates had each answered it
+    with a different constant -- 256, 512 and 768 MiB.
+
+    The allocator reading answers the question the section actually asks, and it
+    answers it exactly: a live tensor is a failed unload at any size.
+    """
+
+    CLEAN = {"cuda:0": {"allocated_bytes": 0, "reserved_bytes": 0}}
+
+    def test_context_residue_is_recorded_as_context_not_as_a_leak(self):
+        # The grounding gate's own numbers: every parameter came back, and what
+        # is left is the same few hundred megabytes on the card that held 2.8 GiB
+        # as on the one that held 6.8 GiB.
+        verdict = gatelib.unload_verdict(
+            {"card0": 27_836_416, "card1": 404_557_824, "card2": 2_195_812_352},
+            {"card0": 525_914_112, "card1": 704_323_584, "card2": 2_493_698_048},
+            TOLERANCE,
+            allocator={f"cuda:{index}": {"allocated_bytes": 0, "reserved_bytes": 0}
+                       for index in range(3)})
+        self.assertTrue(verdict["pass"], verdict["problems"])
+        self.assertEqual({"card0": 498_077_696, "card1": 299_765_760,
+                          "card2": 297_885_696}, verdict["runtime_context_bytes"])
+        self.assertLess(verdict["runtime_context_bytes"]["card2"],
+                        verdict["runtime_context_bytes"]["card0"],
+                        "context size does not track how much the card carried")
+        self.assertIn("runtime device context", verdict["note"])
+        self.assertEqual(498_077_696, verdict["vram_residue_bytes"]["card0"],
+                         "the host reading is still recorded in full")
+
+    def test_a_live_tensor_fails_even_under_the_card_tolerance(self):
+        verdict = gatelib.unload_verdict(
+            {"card0": 0}, {"card0": 1024}, TOLERANCE,
+            allocator={"cuda:0": {"allocated_bytes": 4096, "reserved_bytes": 2 << 20}})
+        self.assertFalse(verdict["pass"])
+        self.assertIn("model memory still allocated after unload",
+                      " ".join(verdict["problems"]))
+
+    def test_reserved_but_unallocated_memory_is_still_a_failed_unload(self):
+        verdict = gatelib.unload_verdict(
+            {"card0": 0}, {"card0": 0}, TOLERANCE,
+            allocator={"cuda:0": {"allocated_bytes": 0, "reserved_bytes": 8 << 20}})
+        self.assertFalse(verdict["pass"])
+
+    def test_an_unreadable_card_still_fails_with_a_clean_allocator(self):
+        # The allocator says this process released everything; that is not a
+        # claim about a card whose sysfs node stopped answering.
+        verdict = gatelib.unload_verdict({"card0": -1}, {"card0": 0}, TOLERANCE,
+                                         allocator=self.CLEAN)
+        self.assertFalse(verdict["pass"])
+        self.assertEqual(["card0"], verdict["unreadable_cards"])
+
+    def test_no_measurable_card_still_fails_with_a_clean_allocator(self):
+        verdict = gatelib.unload_verdict({}, {}, TOLERANCE, allocator=self.CLEAN)
+        self.assertFalse(verdict["pass"])
+
+    def test_an_unreadable_allocator_leaves_the_card_check_deciding(self):
+        for report in (None, {}, "unavailable", {"cuda:0": {"allocated_bytes": 0}},
+                       {"cuda:0": {"allocated_bytes": -1, "reserved_bytes": 0}},
+                       {"cuda:0": None}):
+            with self.subTest(report=report):
+                self.assertIsNone(gatelib.allocator_outstanding(report))
+                verdict = gatelib.unload_verdict({"card0": 0}, {"card0": 2 * GIB},
+                                                 TOLERANCE, allocator=report)
+                self.assertFalse(verdict["pass"])
+                self.assertNotIn("allocator_bytes", verdict)
+
+    def test_the_sidecar_callers_are_unchanged_by_the_new_argument(self):
+        clean = gatelib.unload_verdict({"card0": GIB}, {"card0": GIB}, TOLERANCE)
+        held = gatelib.unload_verdict({"card0": 0}, {"card0": 2 * GIB}, TOLERANCE)
+        self.assertTrue(clean["pass"])
+        self.assertFalse(held["pass"])
+        for verdict in (clean, held):
+            self.assertNotIn("allocator_bytes", verdict)
+            self.assertNotIn("runtime_context_bytes", verdict)
+
+    def test_the_allocator_report_never_raises_when_torch_is_absent(self):
+        with mock.patch.dict(sys.modules, {"torch": None}):
+            self.assertIsNone(gatelib.allocator_report())
+
+    def test_the_in_process_gates_pass_the_allocator_reading(self):
+        """The fix is worth nothing if the gates keep scoring the proxy."""
+        root = Path(__file__).resolve().parents[3]
+        for gate in ("tts-local/gate_tts.py",
+                     "computer-use-grounding/gate_computer_use.py"):
+            with self.subTest(gate=gate):
+                source = (root / "verification" / gate).read_text()
+                self.assertRegex(source, r"unload_verdict\([^)]*allocator=")
+
+
 class EnsureUnloadedTests(unittest.TestCase):
     """Cleanup must stop the sidecar on every path out of a gate."""
 

@@ -20,8 +20,13 @@ import re
 import sys
 import time
 
-sys.path.insert(0, "/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/validators")
-from gatelib import CARDS, GateFailure, check, unload_verdict, vram_used  # noqa: E402,F401
+# Resolve the shared validator helpers from this gate's own checkout. Naming
+# the primary path literally made a linked worktree import the *other*
+# tree's gatelib, so a change under test was never the code that ran.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]
+                        / "verification/local-coverage-foundation/validators"))
+from gatelib import (  # noqa: E402,F401
+    CARDS, GateFailure, allocator_report, check, unload_verdict, vram_used)
 
 ROOT = Path("/home/typhoon/git/frankenstein-llm/verification/computer-use-grounding")
 FIXTURES = ROOT / "fixtures"

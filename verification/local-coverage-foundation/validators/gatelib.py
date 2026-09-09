@@ -74,9 +74,69 @@ def vram_residue(baseline: dict[str, int], released: dict[str, int]) -> tuple[di
     return residue, sorted(unreadable)
 
 
+def allocator_report() -> dict[str, dict[str, int]] | None:
+    """Bytes this process's tensor allocator still holds, per device, or None.
+
+    Read-only accounting: it submits no work and allocates nothing. ``None``
+    means the question could not be answered -- no torch, no initialised
+    runtime, an accounting call that raised -- which is not the same answer as
+    zero and never relaxes a verdict.
+    """
+    try:
+        import torch
+    except Exception:                                           # noqa: BLE001
+        return None
+    try:
+        if not torch.cuda.is_available() or not torch.cuda.is_initialized():
+            return None
+        return {f"cuda:{index}": {
+                    "allocated_bytes": int(torch.cuda.memory_allocated(index)),
+                    "reserved_bytes": int(torch.cuda.memory_reserved(index))}
+                for index in range(torch.cuda.device_count())}
+    except Exception:                                           # noqa: BLE001
+        return None
+
+
+def allocator_outstanding(report) -> dict[str, dict[str, int]] | None:
+    """Devices whose allocator still holds bytes, or None if it cannot be read."""
+    if not isinstance(report, dict) or not report:
+        return None
+    outstanding = {}
+    for device, entry in report.items():
+        if not isinstance(entry, dict):
+            return None
+        try:
+            held = {name: int(entry[name])
+                    for name in ("allocated_bytes", "reserved_bytes")}
+        except (KeyError, TypeError, ValueError):
+            return None
+        if any(value < 0 for value in held.values()):
+            return None
+        if any(held.values()):
+            outstanding[device] = held
+    return outstanding
+
+
 def unload_verdict(baseline: dict[str, int], released: dict[str, int],
-                   tolerance: int = 256 * 1024 * 1024) -> dict:
-    """Score a clean-unload check so that missing evidence never reads as a pass."""
+                   tolerance: int = 256 * 1024 * 1024, allocator=None) -> dict:
+    """Score a clean-unload check so that missing evidence never reads as a pass.
+
+    Card-level VRAM is a reading about the *host*. For a gate that stops a
+    sidecar it is also a reading about the model, because the process holding
+    the weights exits. For a gate that loads a model in-process it is not: the
+    HIP context, its compiled kernels and its BLAS workspaces are created on
+    first device use and live until the process does, so a few hundred megabytes
+    per card survive a correct unload and were being reported as "VRAM still
+    held after unload". The three in-process gates had each answered that with a
+    different tolerance -- 256, 512 and 768 MiB -- which is what tuning a
+    constant around the wrong measurement looks like.
+
+    ``allocator`` is the direct measurement, from :func:`allocator_report`: the
+    bytes this process's tensor allocator still has outstanding. When it can be
+    read it decides the model-release claim exactly, with no tolerance at all,
+    and any residue beyond it is recorded as the runtime context rather than
+    scored as a leak. When it cannot be read, nothing changes.
+    """
     residue, unreadable = vram_residue(baseline, released)
     problems = []
     if unreadable:
@@ -84,15 +144,29 @@ def unload_verdict(baseline: dict[str, int], released: dict[str, int],
     if not residue:
         problems.append("no card produced a usable before/after VRAM pair")
     over = {card: value for card, value in residue.items() if value > tolerance}
-    if over:
-        problems.append(f"VRAM still held after unload: {over}")
-    return {
+    verdict = {
         "vram_residue_bytes": residue,
         "unreadable_cards": unreadable,
         "tolerance_bytes": tolerance,
-        "problems": problems,
-        "pass": not problems,
     }
+    outstanding = allocator_outstanding(allocator)
+    if outstanding is None:
+        if over:
+            problems.append(f"VRAM still held after unload: {over}")
+    else:
+        verdict["allocator_bytes"] = allocator
+        if outstanding:
+            # Stricter than the card-level check it replaces: a live tensor is a
+            # failed unload at any size, including one under the tolerance.
+            problems.append(f"model memory still allocated after unload: {outstanding}")
+        elif over:
+            verdict["runtime_context_bytes"] = over
+            verdict["note"] = (
+                "the tensor allocator released every byte it held; the residue "
+                "above is the still-live runtime device context, not the model")
+    verdict["problems"] = problems
+    verdict["pass"] = not problems
+    return verdict
 
 
 def post_json(url: str, payload: dict, timeout: int = 600) -> dict:

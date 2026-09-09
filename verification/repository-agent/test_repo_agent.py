@@ -26,6 +26,68 @@ import unittest.mock
 
 import gate_repo_agent as gate
 
+
+def test_repository_cli_cache_admission_and_inconclusive(tmp_path, monkeypatch):
+    import functools
+    import sys
+    store = gate.Store(tmp_path / 'receipts')
+    details = {'model': 'heretic'}
+    key = gate.digest(details)
+    monkeypatch.setattr(gate, 'resolve_model', lambda value: value)
+    monkeypatch.setattr(gate, 'require_sandbox', lambda: None)
+    monkeypatch.setattr(gate, 'model_key', lambda *a, **kw: details if kw.get('details') else key)
+    monkeypatch.setattr(gate, 'run_cached', functools.partial(gate.run_cached, store=store))
+    monkeypatch.setenv('HERMES_QUALIFY_MODELS', '[]')
+    monkeypatch.setenv('HERMES_REQUALIFY', '0')
+    monkeypatch.setattr(sys, 'argv', ['gate', '--model', 'heretic'])
+    calls = []
+
+    def fake_qualify(root, model, call, postcheck=None):
+        # Stand in for the real qualify(): the postcheck belongs to it, and it
+        # runs before anything is published. A stub that ignored it would let
+        # this test pass while the artifact on disk kept claiming a pass.
+        calls.append('run')
+        result = {'pass': True}
+        if postcheck is not None:
+            postcheck(result)
+        return result
+
+    monkeypatch.setattr(gate, 'qualify', fake_qualify)
+    monkeypatch.setattr(gate, 'blocked_workloads', lambda: [])
+    assert gate.main() == 0
+    assert calls == ['run']
+    old = store.read('repository-agent', 'heretic')
+    monkeypatch.setenv('HERMES_REQUALIFY', '1')
+    monkeypatch.setattr(gate, 'blocked_workloads', lambda: [{'reason': 'download-queue'}])
+    assert gate.main() == 75
+    assert calls == ['run']
+    assert store.read('repository-agent', 'heretic') == old
+    checks = iter([[], [], [{'reason': 'inference'}]])
+    monkeypatch.setattr(gate, 'blocked_workloads', lambda: next(checks))
+    assert gate.main() == 76
+    assert store.read('repository-agent', 'heretic')['status'] == 'inconclusive'
+    assert store.reuse('repository-agent', 'heretic', key) is None
+
+def test_repository_cli_refuses_an_unreadable_preset_identity(tmp_path, monkeypatch, capsys):
+    """A preset mid-download refuses; it does not report the model as failed."""
+    import sys
+    monkeypatch.setattr(gate, 'resolve_model', lambda value: value)
+    monkeypatch.setattr(gate, 'require_sandbox',
+                        lambda: (_ for _ in ()).throw(AssertionError('nothing may run')))
+    monkeypatch.setattr(gate, 'model_key',
+                        lambda *a, **kw: (_ for _ in ()).throw(
+                            FileNotFoundError(2, 'No such file or directory')))
+    monkeypatch.setattr(gate, 'qualify',
+                        lambda *a, **kw: (_ for _ in ()).throw(AssertionError('no dispatch')))
+    monkeypatch.setenv('HERMES_QUALIFY_MODELS', '[]')
+    monkeypatch.setattr(sys, 'argv', ['gate', '--model', 'qwen3-coder-next'])
+    assert gate.main() == gate.EXIT_ADMISSION_REFUSED
+    result = json.loads(capsys.readouterr().out)
+    assert result['pass'] is False
+    assert result['outcome'] == 'blocked'
+    assert result['blocked_by'][0]['reason'] == 'qualification-inputs-unreadable'
+
+
 ORACLE_SOURCE = (
     "import unittest\nfrom calculator import add\n"
     "class T(unittest.TestCase):\n"
@@ -510,6 +572,41 @@ class EvidenceLifecycleTests(unittest.TestCase):
         self.assertEqual("complete", current["status"])
         self.assertFalse(current["interrupted"])
         self.assertNotEqual("old", current["run_id"])
+
+    def test_a_postcheck_downgrade_reaches_the_artifact_not_just_the_caller(self):
+        """The defect this pins: a pass published before its postchecks ran.
+
+        ``qualify`` used to publish the verdict and return it, and the caller
+        then applied the late-conflict and changed-input checks to the returned
+        dict. The receipt got the corrected result; the artifact on disk -- the
+        thing the ledger and every operator read -- kept saying ``pass: true``
+        for a run that had already been invalidated.
+        """
+        self.stale_pass()
+        agent_reply = {"choices": [{"message": {"role": "assistant", "content": "done"}}]}
+        with unittest.mock.patch.object(gate, "run_agent",
+                                        return_value={"pass": True, "problems": []}):
+            result = gate.qualify(
+                self.root, "heretic", lambda _messages: agent_reply,
+                postcheck=lambda value: gate.mark_inconclusive(
+                    value, "competing workloads observed during qualification"))
+        current = json.loads(self.path.read_text())
+        self.assertFalse(result["pass"])
+        self.assertFalse(current["pass"], "the artifact must not outlive its own downgrade")
+        self.assertEqual("inconclusive", current["status"])
+        self.assertEqual("inconclusive", current["outcome"])
+        self.assertIn("competing workloads observed during qualification",
+                      current["problems"])
+
+    def test_a_clean_run_is_still_published_as_a_pass(self):
+        with unittest.mock.patch.object(gate, "run_agent",
+                                        return_value={"pass": True, "problems": []}):
+            gate.qualify(self.root, "heretic", lambda _messages: {},
+                         postcheck=lambda value: None)
+        current = json.loads(self.path.read_text())
+        self.assertTrue(current["pass"])
+        self.assertEqual("complete", current["status"])
+        self.assertEqual("passed", current["outcome"])
 
     def test_the_verdict_and_its_directory_entry_are_both_fsynced(self):
         # A rename is atomic but not durable. Syncing the file and not the

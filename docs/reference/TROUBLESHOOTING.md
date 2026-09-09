@@ -21,6 +21,9 @@ Related: [operations](OPERATIONS.md) · [configuration](CONFIGURATION.md) ·
 - [Every boot repeats the whole mission](#every-boot-repeats-the-whole-mission)
 - [A gate's receipt is invalidated every boot](#a-gates-receipt-is-invalidated-every-boot)
 - [A refused router qualification revokes a pass](#a-refused-router-qualification-revokes-a-pass)
+- [The mission dies reading its own inputs](#the-mission-dies-reading-its-own-inputs)
+- [The policy gate blocks every gate over a file that is still arriving](#the-policy-gate-blocks-every-gate-over-a-file-that-is-still-arriving)
+- [A gate reports VRAM still held after unload](#a-gate-reports-vram-still-held-after-unload)
 - [One preset fails only its tool-call check](#one-preset-fails-only-its-tool-call-check)
 - [Gate problems](#gate-problems)
 - [A failed process outranks a passing artifact](#a-failed-process-outranks-a-passing-artifact)
@@ -229,6 +232,8 @@ The supervisor logs why it is waiting to
 | `blocked-policy` | The candidate policy gate failed; nothing model-backed ran | Read `candidate-qualification/evidence/candidate-policy.json` → `problems` |
 | `interrupted` | An operator stop or a signal | Re-run; passed steps are skipped, the interrupted step repeats |
 | `failed` with `host did not become quiet` | The bounded wait expired | The message lists the blockers actually observed |
+| `inputs-unreadable` | `git ls-files`/`git diff` over `verification` did not answer within the retry budget | Let the disk quiet down; the run exits 75 having attempted nothing |
+| `admission-blocked` | Every incomplete gate refused admission; none failed | Re-run when the queues are idle. `blocked_steps` names them; `failed_steps` is empty |
 
 Three classified reasons actually hold the mission
 (`MISSION_BLOCKING_REASONS`): a build whose `cwd` is inside a kernel tree
@@ -325,29 +330,30 @@ file has a new mtime and ctime, so every receipt and the whole-mission
 rules, because from the cache's point of view the input really did change.
 
 **Read the promotion lines before blaming the cache.** If a file is quarantined
-and then re-promoted with the *same* SHA-256 it had before, the bytes on disk
-were fine and the failing read was the host:
+and then re-promoted with the *same* SHA-256 it had before, the replacement
+matches the previously expected artifact. That alone does not establish whether
+the intervening corruption was on disk, in memory, or in a read path:
 
 ```bash
 grep -E 'quarantined|promoted' verification/local-coverage-foundation/downloads.log | tail -20
 ```
 
-That is the signature of the memory corruption described in
+Investigate this alongside the kernel and storage evidence described in
 [a gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting),
-not of a bad mirror. Fix the host first. Raising no tolerance, disabling no
+without attributing a hardware or mirror cause from hashes alone. Fix the host
+integrity issue first. Raising no tolerance, disabling no
 verification and rebuilding no cache will stop this loop while reads keep coming
 back wrong: the queue re-downloads, the fingerprint moves, and the mission
 restarts from the top for as long as it continues.
 
 ## A refused router qualification revokes a pass
 
-**Known defect, not yet repaired.** `gate_router_models` raises
-`refusing confounded qualification` from inside `check_model` and
-`check_vision_model` — that is, from inside the function `run_cached` wraps. By
-then `run_cached` has already published a `running` receipt, which revokes reuse
-eligibility, and it goes on to publish the refusal as a `failed` one. The
-previous pass survives only as `last_pass`, which is historical and never
-reusable.
+**Repaired in the mission admission/receipt update.** Previously a host refusal
+inside the cached callable overwrote a valid pass with a failure. Admission is
+now checked before revocation, while the inner guard still covers a workload
+appearing between outer admission and dispatch. A pre-dispatch refusal restores
+the exact old receipt; a late conflict after dispatch is inconclusive and does
+not restore it. Real failures and unload evidence are retained.
 
 So a preset that genuinely passed loses its receipt because a download queue
 happened to be running, and the artifact records nine model `FAIL` rows that are
@@ -357,13 +363,121 @@ not verdicts about any model. Confirm from the artifact, which keeps the reason:
 python3 -c "import json;d=json.load(open('verification/router-functional/evidence/router-functional.json'));print(d['models'][0]['problems'])"
 ```
 
-The repair is to refuse before the receipt is touched, not inside the workload:
-hoist the `blocked_workloads()` check out of `check_model`/`check_vision_model`
-into `main()`, ahead of the model loop, and exit with a distinct status that
-writes no per-model rows and publishes no receipt. Refusal is not a verdict and
-must not consume one. Until that lands, treat a `router-models` artifact whose
-`problems` name `download-queue` as "not run", and re-run the gate when the
-queues are idle rather than reading it as a regression.
+The router stops dispatching on refusal and returns 75 unless an earlier model
+actually failed. No model FAIL row is fabricated for the refused preset. The
+repository-agent gate and serialized runner follow the same contract. The
+supervisor waits for admission before revoking a receipt and distinguishes 75
+(blocked) from 76 (inconclusive). A failed forced retest still invalidates reuse.
+
+## The mission dies reading its own inputs
+
+Symptom: `mission.log` ends in
+
+```
+fatal TimeoutExpired: Command '['git', 'diff', '--binary', 'HEAD', '--', 'verification', 'llama-models.ini', 'scripts']' timed out after 30 seconds
+```
+
+or the same command with `returned non-zero exit status 128`, and no gate ran at
+all. On 2026-09-08 this ended twenty invocations between 13:23 and 23:35.
+
+`mission_inputs_fingerprint()` asks git what the checkout looks like.
+`git diff --binary HEAD` walks every tracked file under `verification/`, which
+takes minutes while a download queue is saturating the disk; `128` is git
+refusing over a contended `index.lock` or an unreadable object. Both are
+statements about the host at that moment, not about the mission, and both used to
+escape as unhandled exceptions into the module-level handler, which recorded
+`status: failed` and exited.
+
+Each query is now retried (`FINGERPRINT_ATTEMPTS`, `FINGERPRINT_TIMEOUT_SECONDS`)
+and a persistent failure records `inputs-unreadable` and exits 75 with the
+previous `input_fingerprint` left in place, so the next run still compares
+against what actually ran.
+
+```bash
+grep -c 'input fingerprint attempt' verification/mission-supervisor/mission.log
+grep -n 'inputs unreadable' verification/mission-supervisor/mission.log | tail
+```
+
+Persistent `128` is not a timing problem. Check the checkout itself, and read it
+against [a gate fails while the kernel is faulting](#a-gate-fails-while-the-kernel-is-faulting).
+
+## The policy gate blocks every gate over a file that is still arriving
+
+Symptom: `candidate-policy` fails with a single problem naming one weight file,
+and all eleven model-backed gates are recorded `blocked-policy`:
+
+```
+"problems": ["uncensored-multimodal-gemma4-heretic-q6k: Gemma-4-12B-it-heretic-Q6_K.gguf missing or wrong size"]
+```
+
+Check whether the file arrived shortly afterwards before treating it as a
+missing artifact:
+
+```bash
+ls -la --time-style=+%F\ %T models/gemma4-heretic/
+grep -E 'quarantined|promoted' verification/local-coverage-foundation/downloads.log | tail
+```
+
+On 2026-09-09 the gate ran at 00:01:15 and the file was promoted at 00:17 --
+sixteen minutes of the mission's whole run refused over a transfer in progress.
+A completion stamp records that a queue finished once; it does not survive the
+quarantine-and-re-download loop, because the queue verifies SHA-256 on
+promotion, moves a mismatching file aside as `<name>.bad-<stamp>` and fetches it
+again while the stamp still reads complete.
+
+`wait_for_inputs` now also holds while any queue destination is absent or the
+wrong size **and** has a `.partial` sibling, which is the signature of a transfer
+staging bytes right now. A file that is simply absent, with nothing fetching it,
+is still reported by the policy gate rather than waited for -- otherwise a real
+missing artifact would become a hang.
+
+```bash
+python3 -c "import sys;sys.path.insert(0,'verification/mission-supervisor');import run_functional_mission as m;print(m.artifacts_in_flight())"
+```
+
+The same loop makes a preset's identity unreadable, because `preset_identity`
+stats the weights the preset names. The router and repository-agent gates now
+refuse that preset (`qualification-inputs-unreadable`, exit 75) instead of
+dying on `FileNotFoundError` and exiting 1, which every runner reads as a model
+failure. Chat-versus-vision classification reads the preset's settings only, so
+one in-flight download no longer aborts the gate before any preset is considered.
+
+## A gate reports VRAM still held after unload
+
+Symptom: a gate passes every functional section and fails only `unload`:
+
+```
+"problems": ["VRAM still held after unload: {'card0': 845180928}"]
+```
+
+Check what the residue is proportional to before treating it as a leak. In the
+2026-09-08 grounding run the model held 6.80 GiB on card0, 6.99 GiB on card1 and
+2.80 GiB on card2, and the residue was 498 MiB, 300 MiB and 298 MiB. Residue that
+does not scale with what the card carried is not un-freed weights.
+
+The sidecar gates stop a systemd unit, so the process holding the weights exits
+and a card-level before/after reading really is a reading about the model. The
+TTS, grounding and vision gates load the model inside their own process, which
+keeps its HIP context, compiled kernels and BLAS workspaces on every device it
+touched until the process exits. That floor was being scored as retained model
+memory, and the three gates had each absorbed it into a different constant --
+256, 512 and 768 MiB.
+
+`unload_verdict` now takes `allocator_report()`, the bytes this process's tensor
+allocator still has outstanding. When it can be read it decides the release
+exactly and with no tolerance: any live tensor fails the section at any size,
+including one under the card tolerance, and residue beyond it is recorded as
+`runtime_context_bytes` with the full host reading kept beside it. When it cannot
+be read -- no torch, an uninitialised runtime, a malformed report -- the card
+check decides as before. Unreadable cards still fail either way.
+
+```bash
+python3 -c "import json;d=json.load(open('verification/tts-local/evidence/gate-tts.json'));print(json.dumps(d['unload'],indent=1))"
+```
+
+`allocator_bytes` present with an empty `runtime_context_bytes` is a clean
+unload. `model memory still allocated after unload` is a real leak. Neither key
+present means the allocator could not be read and the card tolerance decided.
 
 ## One preset fails only its tool-call check
 
@@ -380,18 +494,18 @@ recorded in the artifact:
 python3 -c "import json;d=json.load(open('verification/router-functional/evidence/router-functional.json'));m=[x for x in d['models'] if x['model']=='obliterated'][0];print(m['checks']['tool_call']['template'])"
 ```
 
-`chat_template_length` 8952 with `supports_tool_calls: true` is the ridge/heretic
-tools template, so the payload did reach the model. A model that emits one
-character until the length cap is a sampling collapse, not a discarded tools
-block.
+`chat_template_length` 8952 with `supports_tool_calls: true` records template
+metadata, not proof of the exact rendered payload. The repeated character is
+degenerate generation; inspect rendering, effective sampling, runtime and weight
+integrity before assigning a cause.
 
 Compare presets before suspecting the weights. `ridge`, `heretic` and `fable` all
-run `spec-type = draft-mtp` with `spec-draft-n-max = 2` and pass, so speculative
-decoding is not the difference. What is unique to `obliterated` is
+run `spec-type = draft-mtp` with `spec-draft-n-max = 2` and pass, but that does not
+exclude a model-specific speculative-decoding defect. One candidate difference is
 `repeat-penalty = 1.15` with `temp = 0.2`: a tool-call prompt repeats its JSON
 scaffolding, a repetition penalty pushes exactly those tokens down, and a
-low temperature makes whatever the sampler lands on sticky. The failure mode is
-repetition produced by the setting meant to prevent it.
+low temperature may reinforce a degenerate continuation. This mechanism is
+unproven here and must not be reported as the established cause.
 
 **This is a hypothesis, not a finding.** Testing it means one bounded run of that
 preset with the penalty at the default, and that is a GPU workload: do it when
