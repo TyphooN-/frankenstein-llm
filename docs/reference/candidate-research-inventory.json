@@ -1,8 +1,15 @@
 {
   "additional_research_queue": {
     "integrity": "User-submitted identifiers only; not researched, downloaded, or qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 3,
+    "unique_repository_count": 7,
     "entries": [
+      {
+        "url": "https://huggingface.co/peasantsmith/Qwen3.8-Flash-Next-PS-IQ2_XXS-GGUF",
+        "repository": "peasantsmith/Qwen3.8-Flash-Next-PS-IQ2_XXS-GGUF",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false
+      },
       {
         "url": "https://huggingface.co/lvladikov/Krea2-Turbo-Distill-4step-LoRA",
         "repository": "lvladikov/Krea2-Turbo-Distill-4step-LoRA",
@@ -20,6 +27,27 @@
       {
         "url": "https://huggingface.co/nerkyor/Qwen3.8-27B-EfficientThink-Uncensored-K3-Opus5-Grok4.6-GPT5.6Sol-SFT-SimPO-DFlash2-GGUF",
         "repository": "nerkyor/Qwen3.8-27B-EfficientThink-Uncensored-K3-Opus5-Grok4.6-GPT5.6Sol-SFT-SimPO-DFlash2-GGUF",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/agentionai/Signal-3.8-27B-GGUF",
+        "repository": "agentionai/Signal-3.8-27B-GGUF",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/WarmBloodAban/Minimax-h3_Singularity",
+        "repository": "WarmBloodAban/Minimax-h3_Singularity",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI",
+        "repository": "Alissonerdx/Minimax-H3-ComfyUI",
         "state": "queued",
         "investigated": false,
         "qualified": false

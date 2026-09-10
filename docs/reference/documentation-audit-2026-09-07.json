@@ -23,14 +23,21 @@
     "Every 127.0.0.1:<port> in documentation matches a port in a tracked unit, env file or script.",
     "The CONFIGURATION.md alias table is compared field by field against llama-models.ini by an added test."
   ],
-  "inventory_count": 65,
+  "inventory_count": 66,
   "disposition_counts": {
     "updated": 11,
     "historical": 22,
     "aligned": 26,
-    "added": 6
+    "added": 7
   },
   "entries": [
+    {
+      "path": "docs/decisions/0008-local-frankenstein-artwork-and-animation.md",
+      "disposition": "added",
+      "finding": "Accepted creative brief omitted from the continuation inventory; execution remains qualification-gated.",
+      "source_evidence": "ADR 0008 Context and prerequisite, Execution decision, Acceptance and evidence, and Current disposition; no generated deliverable is claimed.",
+      "change": "Inventoried the creative brief without changing its prerequisite or claiming completed media."
+    },
     {
       "path": "README.md",
       "disposition": "updated",

@@ -168,13 +168,18 @@ def render(data, details=False):
                 lines.append('  Denominator: ' + info['plan_basis'])
             for model in info['models']:
                 failed = model['failed_checks']
-                if details or failed or model['outcome'] not in ('passed', 'unknown'):
+                if details or failed or model.get('not_claimed_checks') or model['outcome'] not in ('passed', 'unknown'):
                     lines.append(f"    {model['model']}: {model['outcome']}"
                                  + (' (reused)' if model['reused'] else '')
                                  + f"; checks {model['checks_passed']}/{model['checks_recorded']} passed"
                                  + (f"; FAILED: {', '.join(failed)}" if failed else '')
                                  + (f"; missing: {', '.join(model['missing_checks'])}" if model['missing_checks'] else '')
+                                 + (f"; NOT CLAIMED: {', '.join(model['not_claimed_checks'])}" if model.get('not_claimed_checks') else '')
                                  + (f"; other problems: {model['problem_count']}" if model['problem_count'] else ''))
+                    if model.get('missing_workflows'):
+                        lines.append('      Workflows not completed: ' + ', '.join(model['missing_workflows']))
+                    for hint in model.get('problem_hints', []):
+                        lines.append('      Cause: ' + hint)
         elif details:
             lines.append('  Detail unavailable: ' + info.get('reason', 'not recorded'))
     observation = data.get('router_observation', {})
@@ -185,10 +190,14 @@ def render(data, details=False):
               'Use --details for every recorded model and --offline to skip the read-only router probe.']
     if data['error']:
         lines += ['', 'Recorded cause: ' + data['error']]
-    for label, key in (('Failed', 'failed_steps'), ('Blocked (nothing ran)', 'blocked_steps')):
-        if data[key]:
+    inconclusive = [row for row in data['steps'] if row['status'] == 'inconclusive']
+    inconclusive_names = {row['name'] for row in inconclusive}
+    failures = [row for row in data['failed_steps'] if row['name'] not in inconclusive_names]
+    for label, rows in (('Failed', failures), ('Inconclusive (not a model failure)', inconclusive),
+                        ('Blocked (nothing ran)', data['blocked_steps'])):
+        if rows:
             lines.append(f"{label}: " + ', '.join(
-                f"{row['name']}(exit {row['exit_code']})" for row in data[key]))
+                f"{row['name']}(exit {row['exit_code']})" for row in rows))
     for row in data['steps']:
         if row['error']:
             lines.append(f"  {row['name']}: {row['error']}")

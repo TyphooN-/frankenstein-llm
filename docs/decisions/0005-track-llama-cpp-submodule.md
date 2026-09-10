@@ -1,4 +1,4 @@
-# ADR 0005: Track llama.cpp as a pinned in-repository submodule
+# ADR 0005: Track llama.cpp master with reproducible revision records
 
 - Status: Accepted
 - Date: 2026-09-04
@@ -17,7 +17,14 @@ Track `https://github.com/ggml-org/llama.cpp.git` as a Git submodule at:
 
 `upstream/llama.cpp`
 
-The outer repository gitlink and `upstream/llama-cpp.lock.json` both pin tag `v0.4.0` at commit `5266f24da75dc449bd56cbed7addb9c8e4a6a73e`. A mismatch between the lock and the submodule worktree fails the build before CMake runs. The gitlink is checked separately by `verification/upstream-pin/test_llama_cpp_pin.py`, because the build script reads the worktree and cannot see a stale index.
+The update policy is current upstream `master`, not release tags. Resolve master
+at the start of each update and retain its exact SHA in the outer gitlink and
+`upstream/llama-cpp.lock.json`. Exact revision records preserve reproducibility;
+they are not a policy to wait for tagged releases. The existing v0.4.0 revision
+is the last recorded build until a master update is compiled and verified.
+A mismatch between the lock and the submodule worktree fails the build before
+CMake runs. The gitlink is checked separately by
+`verification/upstream-pin/test_llama_cpp_pin.py`.
 
 Build in the submodule's ignored `build/` directory with:
 
@@ -33,12 +40,20 @@ The router remains loopback-only and limited to one resident model. A version up
 
 ## Updating
 
-1. Review the upstream release and resolve its tag to an exact commit.
-2. In the submodule, fetch tags and check out that commit detached.
-3. Update `upstream/llama-cpp.lock.json` to the same tag and commit.
+1. Fetch upstream `master`, resolve it to an exact commit, and inspect the delta
+   from the running binary, including ROCm, model-loading, and flag changes.
+2. Compile that exact master revision, not the latest release tag. Keep the
+   working runtime intact until the candidate build succeeds; never update
+   sources or binaries underneath an active qualification or benchmark.
+3. Record branch `master` and the exact compiled commit in
+   `upstream/llama-cpp.lock.json`; remove the obsolete release-tag selector when
+   the new build is integrated.
 4. Stage the submodule and confirm `git ls-files -s upstream/llama.cpp` reports that same commit. Staging picks up whatever the worktree is on, so a fetch left checked out on `master` pins `master` here while every other record still reads the release.
 5. Run `scripts/build-llama-cpp.sh` only when no other optimized build is active.
-6. Run functional qualification without token-rate or latency measurements.
+6. Verify binary identity, CLI/preset compatibility, and functional behavior.
+   Controlled Radeon/ROCm benchmarking is now separately authorized. Re-baseline
+   MTP-off/on measurements after each runtime, quant, or topology change; do not
+   carry an old optimum into the new build without measurement.
 7. Commit the outer gitlink, lock, service paths, documentation, and verification together.
 
 A checkout is restored with:

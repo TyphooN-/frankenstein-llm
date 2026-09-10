@@ -75,6 +75,14 @@ def checks(item):
         for key, value in list(workflows.items())[:MAX_ROWS]:
             if isinstance(value, dict) and type(value.get('nontrivial')) is bool:
                 found['workflow:' + label(key) + ':nontrivial'] = value['nontrivial']
+                for check in ('changed', 'instruction_blue_over_red'):
+                    if type(value.get(check)) is bool:
+                        found['workflow:' + label(key) + ':' + check] = value[check]
+    events = item.get('events', [])
+    if isinstance(events, list):
+        for index, event in enumerate(events[:MAX_ROWS]):
+            if isinstance(event, dict) and type(event.get('ok')) is bool:
+                found[f"tool:{index}:{label(event.get('tool'))}"] = event['ok']
     cases = item.get('cases', [])
     if isinstance(cases, list):
         for index, value in enumerate(cases[:MAX_ROWS]):
@@ -85,9 +93,34 @@ def checks(item):
 
 def model_row(item, fallback):
     outcomes = checks(item)
-    required = item.get('required_checks')
+    required = item.get('required_checks', [])
+    not_claimed = []
+    if (item.get('gate') == 'wemm-functional'
+            and outcomes.get('image') is False
+            and isinstance(item.get('image_status'), str)
+            and item['image_status'].startswith('not claimed:')
+            and isinstance(required, list) and 'image' not in required):
+        outcomes.pop('image')
+        not_claimed.append('image')
     missing = ([label(k) for k in required if isinstance(k, str) and k not in outcomes]
                if isinstance(required, list) and len(required) <= MAX_ROWS else [])
+    planned_workflows = item.get('planned_workflows')
+    if planned_workflows is None and item.get('gate') == 'generative-media-functional':
+        planned_workflows = ['image-generation', 'music-generation', 'image-editing']
+    workflows = item.get('workflows', {})
+    missing_workflows = ([label(k) for k in planned_workflows[:MAX_ROWS]
+                          if isinstance(k, str) and k not in workflows]
+                         if isinstance(planned_workflows, list) and isinstance(workflows, dict) else [])
+    hints = []
+    problems = item.get('problems', [])
+    if isinstance(problems, list):
+        for problem in problems[:MAX_ROWS]:
+            if not isinstance(problem, str):
+                continue
+            if 'HIPBLAS_STATUS_INVALID_VALUE' in problem[:4096]:
+                hints.append('hipBLASLt rejected a matrix operation')
+            if 'qualification inputs changed during execution' in problem[:4096]:
+                hints.append('qualification dependency changed during execution')
     passed = item.get('pass')
     outcome = item.get('outcome') or item.get('status')
     if outcome not in ('passed', 'failed', 'inconclusive', 'blocked', 'interrupted'):
@@ -97,7 +130,9 @@ def model_row(item, fallback):
             'checks_passed': sum(outcomes.values()),
             'checks_failed': sum(not v for v in outcomes.values()),
             'checks_recorded': len(outcomes), 'failed_checks': [k for k, v in outcomes.items() if not v],
-            'missing_checks': missing, 'problem_count': len(item.get('problems', []))
+            'missing_checks': missing, 'not_claimed_checks': not_claimed,
+            'missing_workflows': missing_workflows, 'problem_hints': list(dict.fromkeys(hints)),
+            'problem_count': len(item.get('problems', []))
             if isinstance(item.get('problems'), list) else 0}
 
 

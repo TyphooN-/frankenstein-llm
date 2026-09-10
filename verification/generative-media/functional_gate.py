@@ -289,6 +289,8 @@ def main() -> int:
         "benchmark_performed": False,
         "started_at": now(),
         "workflows": {},
+        "planned_workflows": ["image-generation", "music-generation", "image-editing"],
+        "current_workflow": "image-generation",
         "problems": [],
     }
     EVIDENCE.mkdir(parents=True, exist_ok=True)
@@ -305,6 +307,8 @@ def main() -> int:
         atomic_write(report)
         free_models()
 
+        report["current_workflow"] = "music-generation"
+        atomic_write(report)
         record = submit(music_workflow())
         files = output_files(record)
         if not files:
@@ -316,6 +320,8 @@ def main() -> int:
         atomic_write(report)
         free_models()
 
+        report["current_workflow"] = "image-editing"
+        atomic_write(report)
         source = make_edit_source()
         uploaded = upload_image(source)
         record = submit(edit_workflow(uploaded))
@@ -328,7 +334,9 @@ def main() -> int:
             report["problems"].append("Qwen Image Edit output did not prove the requested red-to-blue edit")
         free_models()
     except Exception as error:  # noqa: BLE001 - durable evidence on every failure
+        report["failed_workflow"] = report["current_workflow"]
         report["problems"].append(f"{type(error).__name__}: {error}"[:2000])
+    report["current_workflow"] = None
     report["finished_at"] = now()
     report["pass"] = not report["problems"] and set(report["workflows"]) == {"image-generation", "music-generation", "image-editing"}
     atomic_write(report)

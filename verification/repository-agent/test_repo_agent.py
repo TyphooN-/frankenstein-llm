@@ -41,6 +41,7 @@ def test_repository_cli_cache_admission_and_inconclusive(tmp_path, monkeypatch):
     monkeypatch.setenv('HERMES_REQUALIFY', '0')
     monkeypatch.setattr(sys, 'argv', ['gate', '--model', 'heretic'])
     calls = []
+    observed_results = []
 
     def fake_qualify(root, model, call, postcheck=None):
         # Stand in for the real qualify(): the postcheck belongs to it, and it
@@ -50,6 +51,7 @@ def test_repository_cli_cache_admission_and_inconclusive(tmp_path, monkeypatch):
         result = {'pass': True}
         if postcheck is not None:
             postcheck(result)
+        observed_results.append(result)
         return result
 
     monkeypatch.setattr(gate, 'qualify', fake_qualify)
@@ -67,6 +69,13 @@ def test_repository_cli_cache_admission_and_inconclusive(tmp_path, monkeypatch):
     assert gate.main() == 76
     assert store.read('repository-agent', 'heretic')['status'] == 'inconclusive'
     assert store.reuse('repository-agent', 'heretic', key) is None
+    monkeypatch.setattr(gate, 'blocked_workloads', lambda: [])
+    identities = iter([{'model': 'heretic', 'runtime': 'before'},
+                       {'model': 'heretic', 'runtime': 'after'}])
+    monkeypatch.setattr(gate, 'model_key', lambda *a, **kw: next(identities))
+    assert gate.main() == 76
+    assert observed_results[-1]['qualification_input_changes'] == ['runtime']
+    assert observed_results[-1]['pass'] is False
 
 def test_repository_cli_refuses_an_unreadable_preset_identity(tmp_path, monkeypatch, capsys):
     """A preset mid-download refuses; it does not report the model as failed."""

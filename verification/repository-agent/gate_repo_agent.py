@@ -467,8 +467,14 @@ def main() -> int:
         if blockers:
             mark_inconclusive(result, 'competing workloads observed during qualification')
         try:
-            unchanged = model_key('repository-agent', model, sources) == key
-        except (OSError, ValueError, KeyError, TypeError):
+            after = model_key('repository-agent', model, sources, details=True)
+            before_components, after_components = key_components(details), key_components(after)
+            result['qualification_input_changes'] = sorted(
+                name for name in before_components.keys() | after_components.keys()
+                if before_components.get(name) != after_components.get(name))
+            unchanged = digest(after) == key
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            result['qualification_input_error_type'] = type(error).__name__
             unchanged = False
         if not unchanged:
             mark_inconclusive(result, 'qualification inputs changed during execution')

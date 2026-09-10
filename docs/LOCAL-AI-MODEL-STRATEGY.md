@@ -186,6 +186,47 @@ Publisher refusal and benchmark claims are not admission proof. Every retained c
 
 The router exposes only one resident model. Switching models incurs a first-prompt load delay and evicts the previous model.
 
+### Radeon/ROCm MTP tuning: authorized, not yet measured
+
+This repository targets Radeon hardware and ROCm only. Results from CUDA,
+RTX 5090/Blackwell, or other vendors are investigation leads, not local tuning
+evidence. The [qwen38-mtp investigation](https://github.com/sudoingX/qwen38-mtp)
+motivates testing confidence gating and draft depth together; it does not
+establish a transferable `spec-draft-p-min` or `spec-draft-n-max` optimum.
+The current draft length of 2 is a working baseline, not an accepted sweet spot.
+
+The user authorizes controlled per-model benchmarking to determine that sweet
+spot. Complete the active qualification repair before taking exclusive GPU
+ownership for this sweep; do not overlap qualification, downloads, builds, or
+interactive inference. Keep working router defaults until replacement settings
+have measured benefit and functional proof.
+
+- Inventory exact MTP-bearing GGUFs and text/vision presets, runtime binary
+  revision, accepted flags, and effective defaults before constructing trials.
+- Use MTP-off and ungated MTP (`p-min=0`) controls. Sweep supported draft depths
+  beginning at 1, 2, 3, and 4, and confidence thresholds including 0, 0.3, 0.5,
+  0.6, 0.7, and 0.8. Refine around observed winners; expand draft depth when a
+  boundary winner and measured headroom justify it. This is an initial grid,
+  not a claim that the optimum lies inside it.
+- Compare each exact artifact/quant on its actual Radeon placement: two 6900
+  XTs and the V620, including any bounded RAM offload. Do not label a card
+  bandwidth-starved or compute-fast from its marketing class; measure the
+  effective configuration. Keep placement fixed within a sweep, and treat
+  separately tested placements as distinct configurations.
+- Hold prompts, context lengths, output budgets, sampling, templates,
+  parallelism, and cache state constant within paired trials. Include realistic
+  coding/tool and prose workloads; evaluate vision presets separately. Use
+  warmups, repeated trials, interleaved trial order, and sustained runs to
+  expose thermal drift, V620 throttling, and measurement variability.
+- Optimize useful completion latency and throughput subject to correctness,
+  context stability, memory/desktop headroom, and clean unload. Record prefill,
+  TTFT, decode, end-to-end duration, accepted/drafted tokens, per-device VRAM,
+  RAM/offload, clocks/temperature, and contention. Acceptance rate is diagnostic:
+  a gate that raises acceptance but lowers useful throughput is not a win.
+- Publish exact commands and raw results with per-model recommendations and
+  uncertainty. No universal confidence gate, no automatic adoption of 0.60,
+  and no inference from non-MTP llama-bench results to MTP serving performance.
+
 ## Image generation
 
 ### Correct division of labor

@@ -13,6 +13,19 @@ detail = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(detail)
 
 
+def test_explicitly_unclaimed_wemm_image_is_not_a_failed_check():
+    data = {'gate': 'wemm-functional', 'pass': True, 'checks': {'text': True, 'image': False},
+            'image_status': 'not claimed: processor unavailable'}
+    row = detail.model_row(data, 'wemm-embeddings')
+    assert row['checks_passed'] == 1 and row['checks_failed'] == 0
+    assert row['not_claimed_checks'] == ['image']
+    data['required_checks'] = ['text', 'image']
+    assert detail.model_row(data, 'wemm-embeddings')['failed_checks'] == ['image']
+    data.pop('required_checks')
+    data['image_status'] = 'failed during inference'
+    assert detail.model_row(data, 'wemm-embeddings')['failed_checks'] == ['image']
+
+
 def artifact(tmp_path, **changes):
     path = tmp_path / 'verification/router-functional/evidence/router-functional.json'
     path.parent.mkdir(parents=True)

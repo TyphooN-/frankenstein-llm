@@ -8,6 +8,22 @@ and the provisional ranking in
 [MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md). Those files retain
 useful header and pagination notes; they are not the current verdicts.
 
+## Submitted candidate intake — 2026-09-10
+
+Three submitted URLs, three distinct identifiers, added to
+`additional_research_queue` in [candidate-research-inventory.json](candidate-research-inventory.json):
+
+- <https://huggingface.co/agentionai/Signal-3.8-27B-GGUF>
+- <https://huggingface.co/WarmBloodAban/Minimax-h3_Singularity>
+- <https://huggingface.co/Alissonerdx/Minimax-H3-ComfyUI>
+
+All three are **queued for investigation**, not researched, downloaded, or
+qualified. Preserve the exact identifiers and investigate lineage, artifact
+format, AMD backend support, license, and practical local fit independently;
+similar MiniMax names do not establish the same weights or runtime. Existing
+qualification repairs take priority. This intake does not change runtime or
+download admission.
+
 ## Submitted candidate intake — 2026-09-08
 
 The following intake records investigation requests, not download admission or

@@ -12,6 +12,66 @@ assert spec.loader is not None
 spec.loader.exec_module(functional_gate)
 
 
+def test_comfy_bootstrap_selects_backend_in_server_process():
+    from types import SimpleNamespace
+    import runpy
+    configure = runpy.run_path(str(MODULE_PATH.with_name('comfy_runtime.py')))['configure']
+    calls = []
+    def original(a, b):
+        calls.append((a, b))
+        return 17
+    torch = SimpleNamespace(version=SimpleNamespace(hip='7.2'),
+        backends=SimpleNamespace(cuda=SimpleNamespace(preferred_blas_library=calls.append)))
+    eager = SimpleNamespace(_int8_matmul_accumulate=original)
+    configure(torch, eager)
+    x = SimpleNamespace(device=SimpleNamespace(type='cpu'))
+    assert eager._int8_matmul_accumulate(x, x) == 17
+    assert calls == ['cublas', (x, x)]
+
+
+def test_int8_tiling_preserves_integer_accumulation():
+    import runpy
+    import pytest
+    torch = pytest.importorskip('torch')
+    accumulate = runpy.run_path(str(MODULE_PATH.with_name('comfy_runtime.py')))['int8_accumulate']
+    torch.manual_seed(17)
+    for m, k, n in ((3, 2049, 7), (257, 17, 1025), (0, 16, 7), (3, 0, 7)):
+        a = torch.randint(-128, 128, (m, k), dtype=torch.int8)
+        b = torch.randint(-128, 128, (k, n), dtype=torch.int8)
+        torch.testing.assert_close(accumulate(torch, a, b).long(), a.long() @ b.long(), rtol=0, atol=0)
+    a = torch.full((1, 2049), -128, dtype=torch.int8)
+    b = torch.full((2049, 1), -128, dtype=torch.int8)
+    torch.testing.assert_close(accumulate(torch, a, b).long(), a.long() @ b.long(), rtol=0, atol=0)
+    with pytest.raises(ValueError, match='INT8'):
+        accumulate(torch, a.float(), b)
+    with pytest.raises(ValueError, match='compatible'):
+        accumulate(torch, a, b.T)
+
+
+def test_comfy_runner_does_not_double_remap_devices():
+    source = MODULE_PATH.with_name('run_functional_serialized.sh').read_text()
+    assert 'unset DISPLAY HIP_VISIBLE_DEVICES CUDA_VISIBLE_DEVICES' in source
+    assert 'export ROCR_VISIBLE_DEVICES=GPU-a21e268c0b0a73d7' in source
+    assert '--cuda-device 1' not in source
+    assert '"$DIR/comfy_runtime.py"' in source
+
+
+def test_failure_records_workflow_without_claiming_completion(monkeypatch, tmp_path):
+    import copy
+    reports = []
+    monkeypatch.setattr(functional_gate, 'EVIDENCE', tmp_path)
+    monkeypatch.setattr(functional_gate, 'OUTPUTS', tmp_path / 'outputs')
+    monkeypatch.setattr(functional_gate, 'atomic_write', lambda value: reports.append(copy.deepcopy(value)))
+    def failure(_):
+        raise RuntimeError('backend unavailable')
+    monkeypatch.setattr(functional_gate, 'submit', failure)
+    assert functional_gate.main() == 1
+    assert reports[-1]['failed_workflow'] == 'image-generation'
+    assert reports[-1]['current_workflow'] is None
+    assert reports[-1]['workflows'] == {}
+    assert len(reports[-1]['planned_workflows']) == 3
+
+
 class WorkflowTests(unittest.TestCase):
     def assert_no_performance_fields(self, workflow: dict) -> None:
         serialized = repr(workflow).lower()

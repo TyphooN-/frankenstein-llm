@@ -78,30 +78,18 @@ if systemctl --user is-active --quiet llama-router.service; then
   systemctl --user stop llama-router.service
 fi
 
-# ComfyUI is a single-device workflow runtime. Expose only the two headless GPUs
-# and select remapped device 1, the physical 32 GiB V620; GPU2 stays excluded.
-export HIP_VISIBLE_DEVICES=0,1
-export ROCR_VISIBLE_DEVICES=0,1
-export CUDA_VISIBLE_DEVICES=0,1
-# Route matmuls through hipBLAS rather than hipBLASLt. These cards are gfx1030
-# (recorded by ComfyUI itself at startup) and torch 2.13's own hipBLASLt support
-# list is gfx9 only -- its "Attempting to use hipBLASLt on an unsupported
-# architecture" override did not fire here. On 2026-09-07 the image-edit
-# workflow died in node 14 (KSampler) with HIPBLAS_STATUS_INVALID_VALUE out of
-# hipblasLtMatmulAlgoGetHeuristic, which is hipBLASLt reporting that it has no
-# algorithm for that problem shape, while image generation and music generation
-# completed in the same process. This selects a backend that covers the shape;
-# it is not a tolerance change and the workflows are still scored on their
-# actual output.
-export TORCH_BLAS_PREFER_HIPBLASLT=0
-unset DISPLAY
-"$ROOT/venvs/comfy/bin/python" "$ROOT/tools/ComfyUI/main.py" \
+# Use one stable device identity. --cuda-device rewrites HIP visibility and
+# double-remaps ordinals; do not combine it with ROCR filtering.
+unset DISPLAY HIP_VISIBLE_DEVICES CUDA_VISIBLE_DEVICES
+export ROCR_VISIBLE_DEVICES=GPU-a21e268c0b0a73d7
+"$ROOT/venvs/comfy/bin/python" "$DIR/comfy_runtime.py" \
+  "$ROOT/tools/ComfyUI/main.py" \
   --listen 127.0.0.1 --port 8188 --disable-auto-launch \
   --extra-model-paths-config "$DIR/extra_model_paths.yaml" \
   --input-directory "$EVIDENCE/inputs" \
   --output-directory "$EVIDENCE/outputs" \
   --temp-directory "$EVIDENCE/temp" \
-  --cuda-device 1 --reserve-vram 1 >"$LOG" 2>&1 &
+  --fp32-vae --reserve-vram 1 >"$LOG" 2>&1 &
 pid=$!
 
 ready=0
