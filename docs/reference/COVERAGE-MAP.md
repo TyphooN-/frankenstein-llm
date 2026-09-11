@@ -42,6 +42,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/reference/COVERAGE-MAP.md`](../../docs/reference/COVERAGE-MAP.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/DEVELOPER-GUIDE.md`](../../docs/reference/DEVELOPER-GUIDE.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md`](../../docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md) | [Reference](ARCHITECTURE.md) |
+| [`docs/reference/HOST-SYSTEM-AND-PCIE.md`](../../docs/reference/HOST-SYSTEM-AND-PCIE.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/MODEL-UPGRADE-EVALUATION.md`](../../docs/reference/MODEL-UPGRADE-EVALUATION.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/MODEL-UPGRADE-SHORTLIST.md`](../../docs/reference/MODEL-UPGRADE-SHORTLIST.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`docs/reference/OPERATIONS.md`](../../docs/reference/OPERATIONS.md) | [Reference](DEVELOPER-GUIDE.md) |

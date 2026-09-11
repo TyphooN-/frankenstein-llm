@@ -23,12 +23,12 @@
     "Every 127.0.0.1:<port> in documentation matches a port in a tracked unit, env file or script.",
     "The CONFIGURATION.md alias table is compared field by field against llama-models.ini by an added test."
   ],
-  "inventory_count": 66,
+  "inventory_count": 67,
   "disposition_counts": {
+    "added": 8,
     "updated": 11,
     "historical": 22,
-    "aligned": 26,
-    "added": 7
+    "aligned": 26
   },
   "entries": [
     {
@@ -492,6 +492,13 @@
       "finding": "Added during qualification naming, telemetry and profile backup continuation.",
       "source_evidence": "config/hardware/amdgpu/2026-09-09T0106-0400/SHA256SUMS; byte-for-byte source comparisons",
       "change": "Documented and verified against the referenced implementation or captured source; not part of the original audit."
+    },
+    {
+      "path": "docs/reference/HOST-SYSTEM-AND-PCIE.md",
+      "disposition": "added",
+      "finding": "New host-system and PCIe reference (platform, links, RAM/GPU inventory, 4th-GPU upgrade plan); tracked but missing from the continuation inventory, which left the coverage-map and audit tests red.",
+      "source_evidence": "Commit 7e1597c (benchmark host platform/PCIe docs) and d0355e8 (32 GB fourth-GPU target); file present in git ls-files but absent from the audit entries and COVERAGE-MAP.",
+      "change": "Added the entry, incremented inventory_count, and recomputed disposition_counts so the inventory and coverage map match the tracked file set."
     }
   ]
 }
