@@ -1,7 +1,7 @@
 {
   "additional_research_queue": {
     "integrity": "User-submitted identifiers only; not researched, downloaded, or qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 7,
+    "unique_repository_count": 11,
     "entries": [
       {
         "url": "https://huggingface.co/peasantsmith/Qwen3.8-Flash-Next-PS-IQ2_XXS-GGUF",
@@ -50,6 +50,34 @@
         "repository": "Alissonerdx/Minimax-H3-ComfyUI",
         "state": "queued",
         "investigated": false,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/thesysdev/OUI-1",
+        "repository": "thesysdev/OUI-1",
+        "state": "queued",
+        "investigated": true,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash",
+        "repository": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "state": "queued",
+        "investigated": true,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/m-a-p/YuE2-3B",
+        "repository": "m-a-p/YuE2-3B",
+        "state": "queued",
+        "investigated": true,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/tencent/AuK",
+        "repository": "tencent/AuK",
+        "state": "queued",
+        "investigated": true,
         "qualified": false
       }
     ]
