@@ -2,6 +2,8 @@
 
 One file per weight file that was actually benchmarked with the native `llama-bench` binary. Throughput is deliberately **not** part of `local-ai-qualification.service`, which records `benchmark_performed: false`; these runs are a separate lane that an operator authorizes with `--confirm-kernel --execute` after confirming the intended kernel. See [Scripted model operation](../MODEL-RUNS.md).
 
+Every number in this directory was measured on the host described in [Host system and PCIe](../reference/HOST-SYSTEM-AND-PCIE.md), including its BCLK overclock (104.09 MHz), which raises CPU/DRAM/PCIe/DMI clocking ~4% over stock. When comparing these rates against a stock-BCLK host or across a BIOS update, the BCLK is part of the measurement and must be carried with the result.
+
 Rows are ordered by alias, not by speed. A model absent from this table was not benchmarked; nothing here is estimated. The functional column is the router gate's own verdict, carried here so a fast preset that failed a gate cannot be read as a recommendation.
 
 | Artifact | Alias | Quant | Split | pp | tg | Serving MTP | Functional gate |

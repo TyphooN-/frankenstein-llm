@@ -32,11 +32,17 @@ ROCm1 (card1, 0000:07:00.0, GPU-a21e268c0b0a73d7): ... role=headless
 ROCm2 (card2, 0000:0a:00.0, GPU-4d1c68aee3a84b64): ... role=display (card2-DP-4,card2-DP-5)
 ```
 
-| Device | Card | PCI | VRAM | Role |
-|---|---|---|---|---|
-| ROCm0 | card0 | 0000:03:00.0 | 15.98 GiB | RX 6900 XT, headless |
-| ROCm1 | card1 | 0000:07:00.0 | 29.98 GiB | Radeon Pro V620, headless |
-| ROCm2 | card2 | 0000:0a:00.0 | 15.98 GiB | RX 6900 XT, **drives the desktop** |
+| Device | Card | PCI | VRAM | Role | PCIe link |
+|---|---|---|---|---|---|
+| ROCm0 | card0 | 0000:03:00.0 | 15.98 GiB | RX 6900 XT, headless | PCIe 3.0 x8 |
+| ROCm1 | card1 | 0000:07:00.0 | 29.98 GiB | Radeon Pro V620, headless | PCIe 2.0 x8 |
+| ROCm2 | card2 | 0000:0a:00.0 | 15.98 GiB | RX 6900 XT, **drives the desktop** | PCIe 3.0 x8 |
+
+The PCIe link column reflects the C610 chipset's lane split across three x16
+slots — each GPU gets x8, which is the normal three-GPU layout on this board and
+not a degraded link. The V620's root port is PCIe 2.0; the 6900 XTs are PCIe
+3.0. The host's BCLK overclock (104.09 MHz), BIOS mod, and the pending RAM and
+GPU upgrade plan are recorded in [Host system and PCIe](HOST-SYSTEM-AND-PCIE.md).
 
 The UUIDs are the same strings `rocminfo` prints as each agent's `Uuid`, which
 is how a reader checks this table against ROCm's own tooling rather than against
