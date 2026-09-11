@@ -90,7 +90,8 @@ def emit(row):
     target = os.environ.get('QUALIFICATION_PERFORMANCE_PATH')
     if target is None and Path(sys.argv[0]).suffix == '.py':
         if _default_target is None:
-            parent = Path(__file__).resolve().parents[1] / 'verification/qualification-supervisor'
+            parent = Path(__file__).resolve().parents[1] / 'proofs/verification/qualification-supervisor/evidence'
+
             _default_target = parent / f'direct-{time.time_ns()}-{os.getpid()}.performance.jsonl'
         target = str(_default_target)
     if not target or _written >= LIMIT:

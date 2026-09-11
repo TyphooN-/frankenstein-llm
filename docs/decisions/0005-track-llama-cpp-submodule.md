@@ -20,8 +20,8 @@ Track `https://github.com/ggml-org/llama.cpp.git` as a Git submodule at:
 The update policy is current upstream `master`, not release tags. Resolve master
 at the start of each update and retain its exact SHA in the outer gitlink and
 `upstream/llama-cpp.lock.json`. Exact revision records preserve reproducibility;
-they are not a policy to wait for tagged releases. The existing v0.4.0 revision
-is the last recorded build until a master update is compiled and verified.
+they are not a policy to wait for tagged releases. The September 10 master build
+is recorded below separately from full runtime qualification.
 A mismatch between the lock and the submodule worktree fails the build before
 CMake runs. The gitlink is checked separately by
 `verification/upstream-pin/test_llama_cpp_pin.py`.
@@ -59,6 +59,74 @@ The router remains loopback-only and limited to one resident model. A version up
 A checkout is restored with:
 
     git submodule update --init --recursive upstream/llama.cpp
+
+## Further performance work
+
+Status: Planned; no unmeasured speedup or optimal configuration is claimed.
+The requested compiler direction is **full LTO**, not fat LTO objects. Fat
+objects package native code alongside intermediate representation and are not
+the performance objective. Preserve correctness and qualified capabilities;
+do not trade them for a headline token rate.
+
+### Recorded build baseline (2026-09-10)
+
+- Source: `df03399b885831b2a1603b3abb0d8c156808e363`, build 10902.
+- ROCm/HIP `gfx1030`, Release `-O3`, native CPU tuning, HIP graphs,
+  Flash Attention and CPU weight repacking.
+- `GGML_LTO=ON` produced GCC `-flto=auto` compile/link commands for GGML
+  CPU/core targets. This establishes full GCC LTO in that scope, not
+  whole-program LTO across the server, model code, shared libraries and HIP
+  device kernels.
+- Build exit 0; all three Radeon devices enumerated; a live embedding request
+  returned 4096 finite values. Repository tests passed with generated scratch
+  fixtures excluded: 1040 tests and 917 subtests. These checks do not replace
+  the complete text/tool/vision/unload qualification gates.
+- Local logs, binary checksum, rollback binaries and smoke evidence are in
+  ignored `proofs/llama-master-update/`. Compilation overlapped user-authorized
+  system stress; no controlled performance conclusion follows from it.
+
+### Investigation backlog
+
+- [ ] Extend and verify full host LTO coverage over model, common and server
+  targets. Inspect actual compile/link commands and object provenance; a CMake
+  switch alone is not proof. Compare shared-library and broader-link scope
+  without sacrificing backend compatibility. Investigate HIP device LTO
+  separately against the installed ROCm toolchain rather than assuming host
+  LTO enables it or mixing incompatible GCC/LLVM intermediate representations.
+- [ ] Evaluate profile-guided optimization with representative prefill, decode,
+  tool, long-context and CPU-offload workloads. Keep profile training separate
+  from held-out evaluation; bind profiles to exact source and compiler versions.
+- [ ] Compare applicable ROCm kernel selection, graph execution and allocation
+  paths. Test forced MMQ versus automatic dispatch only where supported;
+  exclude CUDA-only and CDNA-only assumptions from Radeon gfx1030 decisions.
+- [ ] Sweep batch/ubatch sizes, CPU thread counts, context/cache settings and
+  supported GPU split modes/placements per artifact. Include desktop reserve,
+  sustained V620 thermals and the two 6900 XTs; capacity ratios alone are not
+  performance-optimal placement evidence. Treat cache precision as a quality
+  variable, not a free speed optimization.
+- [ ] Jointly sweep embedded-head MTP draft depth and confidence, including
+  MTP-off and ungated controls, for each exact model/quant/placement. Start from
+  existing presets but do not accept depth 2 as an optimum. Refine or expand
+  around measured winners after every runtime or topology change. The
+  [qwen38-mtp reference](https://github.com/sudoingX/qwen38-mtp) supplies
+  hypotheses and methodology, not transferable NVIDIA performance results.
+
+### Acceptance and promotion
+
+Run repeated, interleaved comparisons on a quiet host with matched prompts,
+sampling, context, cache state and exact artifacts. Separate cold loading,
+prefill, time to first token, decode and end-to-end latency; record variability,
+RAM/VRAM, thermal behavior and correctness. Optimize useful completed work, not
+MTP acceptance rate alone. Stress-run functional evidence must be labeled
+confounded for comparative timing.
+
+Retain the baseline and rollback until applicable functional gates pass and
+reproducible measurements justify promotion. Avoid blanket fast-math, unsafe
+floating-point assumptions or unsupported ISA flags. Store raw measurements,
+effective build/runtime arguments, toolchain/source/binary identities and a
+decision report under `proofs/`; record selected settings in maintained config
+only after evidence supports them. This backlog does not itself launch tuning
+or modify serving defaults.
 
 ## Rollback
 

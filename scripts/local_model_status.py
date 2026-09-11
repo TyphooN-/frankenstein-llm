@@ -47,7 +47,7 @@ class StatusError(RuntimeError):
     pass
 
 
-QUALIFICATION_STATE = ROOT / "verification/qualification-supervisor/qualification-state.json"
+QUALIFICATION_STATE = ROOT / "verification/qualification-supervisor/evidence/qualification-state.json"
 QUALIFICATION_SUPERVISOR = ROOT / "verification/qualification-supervisor/run_qualification.py"
 MAX_STATE_BYTES = 4 * 1024 * 1024
 MAX_CONFLICT_SAMPLES = 8

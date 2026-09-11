@@ -198,6 +198,9 @@ def test_submitted_intake_lists_each_url_exactly_once():
 def test_coverage_map_contains_all_outer_tracked_files():
     tracked = set(subprocess.check_output(
         ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")) - {"", "upstream/llama.cpp"}
+    tracked = {path for path in tracked if not (
+        path.startswith('proofs/') and path.endswith('/.gitkeep')
+        or (ROOT / path).is_symlink() and (ROOT / path).resolve().is_relative_to(ROOT / 'proofs'))}
     coverage = (ROOT / "docs/reference/COVERAGE-MAP.md").read_text()
     mapped = set(re.findall(r"\| \[`([^`]+)`\]", coverage))
     assert tracked == mapped, {"missing": sorted(tracked - mapped), "obsolete": sorted(mapped - tracked)}
@@ -239,7 +242,9 @@ def test_gate_output_directories_are_not_tracked():
         ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")) - {""}
     generated = sorted(
         path for path in tracked
-        if re.search(r"(^|/)(evidence|verification/tts-local/artifacts)/", path))
+        if (re.search(r"(^|/)(evidence|verification/tts-local/artifacts)/", path)
+            or path.startswith('proofs/'))
+        and not (path.startswith('proofs/') and path.endswith('/.gitkeep')))
     assert generated == [], generated
 
     # The ignore rule has to be narrow enough to leave the gate's *inputs* alone:

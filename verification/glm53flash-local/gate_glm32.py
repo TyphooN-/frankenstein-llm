@@ -29,8 +29,8 @@ GLM_SRC = Path(os.environ.get(
 ))
 BINARY = Path(os.environ.get("GLM_BINARY", GLM_SRC / "build-rocm/bin/llama-server"))
 MODEL = Path("/home/typhoon/git/frankenstein-llm/models/glm53flash-regular-iq3xxs/GLM-5.3-Flash-IQ3_XXS-00001-of-00015.gguf")
-LOG = ROOT / "glm32-server.log"
-EVIDENCE = ROOT / "gate-glm32.json"
+LOG = ROOT / "evidence" / "glm32-server.log"
+EVIDENCE = ROOT / "evidence" / "gate-glm32.json"
 BASE = "http://127.0.0.1:8093"
 MIN_AVAILABLE = 8 * 1024**3
 MAX_SWAP_DELTA = 4 * 1024**3

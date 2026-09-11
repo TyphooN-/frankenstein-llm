@@ -11,7 +11,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 BINARY = ROOT / 'upstream/llama.cpp/build/bin/llama-server'
-BOOL_FLAGS = {'jinja': ('--jinja', '--no-jinja'), 'mmap': ('--mmap', '--no-mmap'),
+BOOL_FLAGS = {'jinja': ('--jinja', '--no-jinja'),
               'embedding': ('--embedding', None), 'reranking': ('--reranking', None)}
 VALUE_FLAGS = {'model', 'mmproj', 'mmproj-device', 'ctx-size', 'gpu-layers', 'flash-attn',
                'cache-type-k', 'cache-type-v', 'parallel', 'device', 'tensor-split',
@@ -21,7 +21,7 @@ VALUE_FLAGS = {'model', 'mmproj', 'mmproj-device', 'ctx-size', 'gpu-layers', 'fl
                # override it from config/chat-templates/. Serving a preset here
                # with a different template than the router uses would make this
                # tool reproduce a different model, so the key has to be carried.
-               'chat-template-file'}
+               'chat-template-file', 'load-mode'}
 
 
 def command(alias, values, serving):

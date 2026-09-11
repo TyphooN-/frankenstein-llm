@@ -298,4 +298,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/local-coverage-foundation/validators/test_torch_release.py`](../../verification/local-coverage-foundation/validators/test_torch_release.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/generative-media/comfy_runtime.py`](../../verification/generative-media/comfy_runtime.py) | [Reference](TROUBLESHOOTING.md) |
 
-Inventory entries: 292. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+| [`scripts/proof_layout.py`](../../scripts/proof_layout.py) | [Reference](OPERATIONS.md#local-proof-storage) |
+| [`verification/proof-storage/test_proof_layout.py`](../../verification/proof-storage/test_proof_layout.py) | [Reference](OPERATIONS.md#local-proof-storage) |
+
+Inventory entries: 294, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

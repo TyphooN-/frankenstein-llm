@@ -80,7 +80,8 @@ class LockTests(unittest.TestCase):
         self.assertEqual("llama.cpp", LOCK["name"])
         self.assertEqual("https://github.com/ggml-org/llama.cpp.git", LOCK["repository"])
         self.assertEqual("upstream/llama.cpp", SUBMODULE)
-        self.assertEqual("v0.4.0", LOCK["tag"])
+        self.assertEqual("master", LOCK["branch"])
+        self.assertNotIn("tag", LOCK)
         self.assertRegex(LOCK["commit"], r"^[0-9a-f]{40}$")
 
     def test_lock_records_the_build_the_stack_actually_needs(self):
@@ -162,6 +163,8 @@ class BuildScriptTests(unittest.TestCase):
 
     def test_build_configures_the_locked_backend_and_targets(self):
         self.assertIn("-DGGML_HIP=ON", self.source)
+        for flag in ("GGML_NATIVE", "GGML_LTO", "GGML_HIP_GRAPHS", "GGML_CUDA_FA", "GGML_CPU_REPACK"):
+            self.assertIn(f"-D{flag}=ON", self.source)
         self.assertIn('-DGPU_TARGETS="$GPU_TARGETS"', self.source)
         self.assertIn("-DCMAKE_BUILD_TYPE=Release", self.source)
         self.assertIn("-G Ninja", self.source)

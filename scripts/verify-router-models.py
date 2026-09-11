@@ -6,7 +6,7 @@ import sys
 import urllib.request
 
 BASE = "http://127.0.0.1:8080"
-OUT = pathlib.Path("/home/typhoon/git/frankenstein-llm/verification")
+OUT = pathlib.Path(__file__).resolve().parents[1] / "proofs/verification/manual/evidence"
 OUT.mkdir(parents=True, exist_ok=True)
 models = sys.argv[1:] or ["ridge", "obliterated", "heretic"]
 # The alias is what the request carries; the artifact is what answered it.

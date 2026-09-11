@@ -130,7 +130,8 @@ def test_shared_and_specific_settings_merge():
     assert values['tensor-split'] != presets['heretic']['tensor-split']
     assert len(values['tensor-split'].split(',')) == 3
     cmd = m.command('qwen3-coder-next', values, {'host': '127.0.0.1', 'port': 8080})
-    assert '--no-mmap' in cmd and '--jinja' in cmd
+    assert cmd[cmd.index('--load-mode') + 1] == 'none'
+    assert '--jinja' in cmd
     assert cmd[cmd.index('--alias') + 1] == 'qwen3-coder-next'
 
 

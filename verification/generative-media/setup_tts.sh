@@ -2,7 +2,8 @@
 # Local Qwen3-TTS runtime. Reuses the system ROCm torch; never upgrades it.
 set -uo pipefail
 VENV=/home/typhoon/git/frankenstein-llm/venvs/tts
-LOG=/tmp/hermes-verify-coverage-continuation-20260901/logs/tts-setup.log
+LOG=/home/typhoon/git/frankenstein-llm/proofs/logs/tts-setup.log
+mkdir -p "$(dirname "$LOG")"
 exec > >(tee -a "$LOG") 2>&1
 echo "=== tts setup start $(date -Is) ==="
 [ -x "$VENV/bin/python" ] || python3 -m venv --system-site-packages "$VENV" || exit 11

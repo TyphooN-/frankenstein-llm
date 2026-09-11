@@ -6,7 +6,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-OUT = Path("/home/typhoon/git/frankenstein-llm/verification/obliteratus-hf-inventory-2026-08-31-live.json")
+OUT = Path(__file__).resolve().parents[1] / "proofs/verification/manual/evidence/obliteratus-hf-inventory-2026-08-31-live.json"
 KNOWN = {
     "OBLITERATUS/DeepSeek-R1-Distill-Llama-8B-OBLITERATED",
     "OBLITERATUS/Gemma-4-12B-OBLITERATED",

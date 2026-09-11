@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from qualification_detail import detail, router_residency
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_STATE = ROOT / 'verification/qualification-supervisor/qualification-state.json'
+DEFAULT_STATE = ROOT / 'verification/qualification-supervisor/evidence/qualification-state.json'
 BOOT_ID = Path('/proc/sys/kernel/random/boot_id')
 RUNNER_LOGS = {
     'tts-asr-roundtrip': 'tts-local/evidence/tts-runner.log',

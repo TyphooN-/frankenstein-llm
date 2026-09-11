@@ -5,7 +5,8 @@ set -uo pipefail
 ROOT=/home/typhoon/git/frankenstein-llm
 TOOLS=$ROOT/tools
 VENV=$ROOT/venvs/comfy
-LOG=/tmp/hermes-verify-coverage-continuation-20260901/logs/comfy-setup.log
+LOG=$ROOT/proofs/logs/comfy-setup.log
+mkdir -p "$(dirname "$LOG")"
 exec > >(tee -a "$LOG") 2>&1
 echo "=== setup start $(date -Is) ==="
 

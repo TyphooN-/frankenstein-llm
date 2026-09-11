@@ -1,6 +1,11 @@
 # Weights, shards, and media checkpoints stay on local disk only.
 /models/
 
+# Generated proofs are local; placeholders and compatibility links are tracked.
+/proofs/**
+!/proofs/**/
+!/proofs/**/.gitkeep
+
 # Local virtualenvs and nested upstream checkouts.
 /venvs/
 /tools/ComfyUI/

@@ -11,12 +11,12 @@ readarray -t META < <(python3 -c '
 import json,sys
 p=json.load(open(sys.argv[1]))
 print(p["repository"])
-print(p["tag"])
+print(p["branch"])
 print(p["commit"])
 print(";".join(p["build"]["gpu_targets"]))
 ' "$LOCK")
 REPOSITORY="${META[0]}"
-TAG="${META[1]}"
+BRANCH="${META[1]}"
 EXPECTED="${META[2]}"
 GPU_TARGETS="${META[3]}"
 
@@ -25,7 +25,7 @@ GPU_TARGETS="${META[3]}"
     exit 2
 }
 [[ "$(git -C "$SRC" rev-parse HEAD)" == "$EXPECTED" ]] || {
-    echo "llama.cpp HEAD does not match $TAG ($EXPECTED)" >&2
+    echo "llama.cpp HEAD does not match locked $BRANCH ($EXPECTED)" >&2
     exit 2
 }
 [[ -z "$(git -C "$SRC" status --porcelain --untracked-files=no)" ]] || {
@@ -48,6 +48,11 @@ GPU_TARGETS="${META[3]}"
 HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
 cmake -S "$SRC" -B "$BUILD" -G Ninja \
     -DGGML_HIP=ON \
+    -DGGML_NATIVE=ON \
+    -DGGML_LTO=ON \
+    -DGGML_HIP_GRAPHS=ON \
+    -DGGML_CUDA_FA=ON \
+    -DGGML_CPU_REPACK=ON \
     -DGPU_TARGETS="$GPU_TARGETS" \
     -DCMAKE_BUILD_TYPE=Release
 
@@ -59,4 +64,4 @@ for binary in llama-server llama-cli llama-quantize llama-gguf; do
 done
 
 "$BUILD/bin/llama-server" --version
-printf 'llama.cpp %s built at %s\n' "$TAG" "$BUILD"
+printf 'llama.cpp %s (%s) built at %s\n' "$BRANCH" "$EXPECTED" "$BUILD"

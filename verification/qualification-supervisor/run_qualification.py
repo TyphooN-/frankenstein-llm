@@ -27,8 +27,8 @@ from qualification_cache import (Store, step_key, adopt_legacy_step, key_compone
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = ROOT / "verification" / "qualification-supervisor"
-STATE = HERE / "qualification-state.json"
-LOG = HERE / "qualification.log"
+STATE = HERE / "evidence" / "qualification-state.json"
+LOG = HERE / "evidence" / "qualification.log"
 LOCK = HERE / "qualification.lock"
 FOUNDATION = ROOT / "verification" / "local-coverage-foundation"
 TTS_PYTHON = ROOT / "venvs" / "tts" / "bin" / "python"
@@ -600,8 +600,10 @@ def run_step(name: str, command: list[str], state: dict, before_start=None) -> i
     state["steps"][name] = step
     state.update({"status": "running", "current_step": name, "updated_at": now()})
     atomic_json(state)
-    step_log = HERE / f"{name}.log"
-    performance_path = HERE / f"{name}-{time.time_ns()}-{os.getpid()}.performance.jsonl"
+    output = HERE / "evidence"
+    output.mkdir(parents=True, exist_ok=True)
+    step_log = output / f"{name}.log"
+    performance_path = output / f"{name}-{time.time_ns()}-{os.getpid()}.performance.jsonl"
     step["performance_log"] = str(performance_path)
     step["performance_kind"] = "passive-observations-not-a-benchmark"
     atomic_json(state)
@@ -757,6 +759,7 @@ def main(argv=()) -> int:
             for name, command in STEPS if name in selected], indent=2))
         return 0
     HERE.mkdir(parents=True, exist_ok=True)
+    (HERE / "evidence").mkdir(parents=True, exist_ok=True)
     prepare_child_environment()
     lock_handle = LOCK.open("a+")
     try:

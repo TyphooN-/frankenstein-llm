@@ -19,6 +19,7 @@ ProtectHome=read-only
 # bytecode and ComfyUI runtime files.
 ReadWritePaths=/home/typhoon/git/frankenstein-llm/verification /home/typhoon/git/frankenstein-llm/models /home/typhoon/git/frankenstein-llm/venvs /home/typhoon/git/frankenstein-llm/tools /tmp /var/tmp /run/user/%U
 Environment=TMPDIR=/home/typhoon/git/frankenstein-llm/verification/tmp
+ReadWritePaths=/home/typhoon/git/frankenstein-llm/proofs
 Environment=TMP=/home/typhoon/git/frankenstein-llm/verification/tmp
 Environment=TEMP=/home/typhoon/git/frankenstein-llm/verification/tmp
 # MIOpen keeps a user performance database and a compiled-kernel cache under

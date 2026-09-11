@@ -1,5 +1,33 @@
 # Operations runbook
 
+## Local proof storage
+
+Generated verification reports, logs, screenshots, audio, benchmark output and
+qualification receipts belong under `proofs/`, not in Git or ephemeral `/tmp`
+handoffs. Only `.gitkeep` placeholders are tracked inside that tree. Store new
+manual verification work in `proofs/manual/<task>/`.
+
+The canonical layout preserves repository-relative names, for example
+`proofs/verification/generative-media/evidence/` and `proofs/logs/`.
+Tracked compatibility directory links retain existing `verification/*/evidence`
+and `logs` entry points. Writers through those links write into `proofs/`; readers
+and saved output references therefore continue to work. Do not replace these
+links with ordinary directories. New gate artifact directories must be added to
+`scripts/proof_layout.py` and get a placeholder and compatibility link.
+
+On an existing checkout, stop all artifact-writing services and manual runs,
+then run `python3 scripts/proof_layout.py --migrate`. Migration refuses collisions
+and preserves report bytes and timestamps; it never upgrades a qualification
+verdict. Update the installed qualification service with the narrow `proofs/`
+write allowlist before restarting it. A fresh checkout includes the empty layout;
+`python3 scripts/proof_layout.py` can repair missing empty directories.
+
+Tracked fixtures, source, curated documentation and model manifests are inputs,
+not generated proofs. Model weights, build caches, temporary tensor workspaces,
+download coordination state and live locks retain their existing storage.
+Ignored proofs are durable local files, not a remote backup; archive this tree
+separately if off-host retention is required.
+
 > Operator-interface update: [Model runs](../MODEL-RUNS.md) is the current reference
 > for standalone serving, qualification and native benchmark scripts. The former
 > standalone Ridge environment overrides are replaced by shared presets/configs.

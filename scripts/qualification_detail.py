@@ -158,7 +158,9 @@ def router_defaults(root):
 
 
 def detail(root, name, step, boot=None):
-    boundary = root / 'verification'
+    boundary = root / 'proofs/verification'
+    if not boundary.exists():
+        boundary = root / 'verification'  # Unmigrated snapshots and test fixtures.
     paths = [boundary / ARTIFACTS[name]] if name in ARTIFACTS else []
     if name == 'repository-agent':
         paths = list(islice((boundary / 'repository-agent/evidence').glob('gate-repo-agent-*.json'), MAX_ROWS + 1))

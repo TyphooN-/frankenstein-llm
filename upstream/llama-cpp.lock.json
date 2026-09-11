@@ -3,8 +3,8 @@
   "name": "llama.cpp",
   "repository": "https://github.com/ggml-org/llama.cpp.git",
   "submodule_path": "upstream/llama.cpp",
-  "tag": "v0.4.0",
-  "commit": "5266f24da75dc449bd56cbed7addb9c8e4a6a73e",
+  "branch": "master",
+  "commit": "df03399b885831b2a1603b3abb0d8c156808e363",
   "build": {
     "backend": "ROCm/HIP",
     "gpu_targets": ["gfx1030"],
