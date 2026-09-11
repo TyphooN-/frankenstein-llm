@@ -428,13 +428,26 @@ def decoder_layers_by_device(device_map: dict) -> dict[int, list[int]]:
 
 
 def ocr_score(response: str, truth: dict) -> dict:
-    """Substring recall over the document's known lines and table cells."""
+    """Case/whitespace-insensitive recall with complete, exact table rows.
+
+    Plain text and pipe-delimited tables are accepted. Cells must appear on
+    the same line in order, with their multiplicity preserved. Visually similar
+    characters are not interchangeable in an exact-transcription gate.
+    """
     flat = normalize_text(response)
+    row_counts = {}
+    for line in (response or "").splitlines():
+        key = normalize_text(line.replace("|", " "))
+        row_counts[key] = row_counts.get(key, 0) + 1
     lines = [{"expected": line, "found": normalize_text(line) in flat}
              for line in truth["lines"]]
     cells = []
     for row in truth["table_rows"]:
-        cells.append({"row": row, "found": all(normalize_text(c) in flat for c in row)})
+        key = normalize_text(" ".join(row))
+        found = row_counts.get(key, 0) > 0
+        if found:
+            row_counts[key] -= 1
+        cells.append({"row": row, "found": found})
     headers = [{"header": h, "found": normalize_text(h) in flat}
                for h in truth["table_header"]]
     return {
@@ -728,7 +741,8 @@ def run_ocr(runner, truth, image, summary) -> None:
     summary["ocr"] = {
         "raw": raw.strip()[:1200], **score,
         "pass": score["lines_found"] == score["lines_total"]
-                and score["rows_found"] == score["rows_total"],
+                and score["rows_found"] == score["rows_total"]
+                and score["headers_found"] == score["headers_total"],
     }
 
 

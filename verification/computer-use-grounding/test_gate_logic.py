@@ -17,6 +17,7 @@ import signal
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from culib import (  # noqa: E402
@@ -27,8 +28,8 @@ from gate_computer_use import (  # noqa: E402
     DEVICE_MAP, EXIT_ALREADY_RUNNING, EXIT_FAIL, EXIT_INTERRUPTED, EXIT_PASS,
     GATE_SECTIONS, GateInterrupted, HANDLED_SIGNALS, SignalState, acquire_single_instance_lock,
     candidate_points, decoder_layers_by_device, finalize_verdict, gate_exit_code,
-    mark_interrupted, normalize_text, ocr_score, pick_convention, score_target,
-    signal_exit_status, write_json_atomic,
+    mark_interrupted, normalize_text, ocr_score, pick_convention,
+    score_target, signal_exit_status, write_json_atomic,
 )
 from gpu_telemetry import read_records, summarize_records, summarize_samples  # noqa: E402
 from inspect_runtime import classify_last_run  # noqa: E402
@@ -352,6 +353,51 @@ class TestOcrScoring(unittest.TestCase):
     def test_normalize_text(self):
         self.assertEqual(normalize_text("  A  b\n C "), "a b c")
         self.assertEqual(normalize_text(None), "")
+
+    def test_homograph_errors_are_not_exact_transcriptions(self):
+        for transcript in ("nvmeOn1 0 0 0", "R0Cm1 0 0 0", "ROCmI 0 0 0"):
+            with self.subTest(transcript=transcript):
+                self.assertEqual(ocr_score(transcript, self.document)["rows_found"], 0)
+
+    def test_table_requires_complete_cells_on_one_line(self):
+        for transcript in ("nvme0n1", "nvme0n1 0", "nvme0n1 0 0",
+                           "nvme0n1 10 20 30", "nvme0n1\n0 0 0",
+                           "nvme0n1 0 0 0 9", "xnvme0n1 0 0 0"):
+            with self.subTest(transcript=transcript):
+                self.assertEqual(ocr_score(transcript, self.document)["rows_found"], 0)
+
+    def test_pipe_table_preserves_case_and_whitespace_tolerance(self):
+        transcript = "| NVME0N1 | 0 | 0 | 0 |\n| rocm1 | 0 | 0 | 0 |"
+        self.assertEqual(ocr_score(transcript, self.document)["rows_found"], 2)
+
+    def test_cell_order_and_duplicate_rows(self):
+        truth = {"lines": [], "table_header": [],
+                 "table_rows": [["disk", "1", "2"], ["disk", "1", "2"]]}
+        self.assertEqual(ocr_score("disk 2 1", truth)["rows_found"], 0)
+        self.assertEqual(ocr_score("disk 1 2", truth)["rows_found"], 1)
+        self.assertEqual(ocr_score("disk 1 2\ndisk 1 2", truth)["rows_found"], 2)
+
+    def test_missing_header_fails_live_gate(self):
+        from gate_computer_use import run_ocr
+
+        transcript = "\n".join(self.document["lines"] +
+                               [" ".join(row) for row in self.document["table_rows"]])
+        runner = mock.Mock()
+        runner.ask.return_value = (transcript, None)
+        summary = {}
+        run_ocr(runner, self.document, None, summary)
+        self.assertFalse(summary["ocr"]["pass"])
+        runner.ask.return_value = (transcript + "\n" +
+                                   " ".join(self.document["table_header"]), None)
+        run_ocr(runner, self.document, None, summary)
+        self.assertTrue(summary["ocr"]["pass"])
+
+    def test_genuine_miss_still_scores_zero(self):
+        # Unrelated text must not satisfy the exact document or table rows.
+        transcript = "INCIDENT REPORT 9999\nnvme0n9 5 7 2"
+        score = ocr_score(transcript, self.document)
+        self.assertEqual(score["lines_found"], 0)
+        self.assertEqual(score["rows_found"], 0)
 
 
 class TestSandbox(unittest.TestCase):
