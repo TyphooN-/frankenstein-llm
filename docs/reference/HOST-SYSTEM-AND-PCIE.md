@@ -72,12 +72,12 @@ and re-baseline any benchmark that is CPU/DRAM/PCIe-sensitive.
    helps KV-cache offload, concurrent model residency, and the RAM-offload path
    for bigger models (see ADR 0003).
 
-2. **GPU: add a 4th Navi 21 / Pro card.** Add a Radeon W6800 (24 GB) or a second
-   V620 (16 GB) as the fourth GPU. Verify the board's fourth x16 slot's root port
-   width after install — the C610 chipset's lane split may give the new card x4
-   or x8, and the M.2 NVMe port can downgrade if the last slot is populated (see
-   the BIOS mod's PCIe limitations). Re-check `lspci -vv` and `dmesg` after
-   install and update the table above.
+2. **GPU: add a 4th Navi 21 / Pro card (32 GB).** Add a Radeon W6800 Pro (32 GB)
+   or a second V620 (32 GB) as the fourth GPU. Verify the board's fourth x16
+   slot's root port width after install — the C610 chipset's lane split may give
+   the new card x4 or x8, and the M.2 NVMe port can downgrade if the last slot
+   is populated (see the BIOS mod's PCIe limitations). Re-check `lspci -vv` and
+   `dmesg` after install and update the table above.
 
 Do not change the per-GPU VRAM accounting in ADR 0003 until the new card is
 installed and its VRAM is measured with `nvidia-smi`-equivalent (`rocm-smi` /
