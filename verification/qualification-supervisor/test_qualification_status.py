@@ -68,6 +68,52 @@ def test_redirected_runner_log_is_observed(tmp_path):
     assert row['log_path'] == str(log)
 
 
+@pytest.mark.parametrize('layout', ['legacy', 'evidence', 'canonical', 'compatibility'])
+def test_details_follow_state_storage_layout(tmp_path, layout):
+    root = tmp_path / 'repo'
+    verification = root / ('proofs/verification' if layout in ('canonical', 'compatibility') else 'verification')
+    supervisor = verification / 'qualification-supervisor'
+    state_dir = supervisor if layout == 'legacy' else supervisor / 'evidence'
+    state_dir.mkdir(parents=True)
+    artifact = verification / 'local-coverage-foundation/evidence/gate-asr.json'
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text(json.dumps({'model': 'test-asr', 'pass': True,
+                                    'checks': {'transcription': True}}))
+    path = state_dir / 'qualification-state.json'
+    path.write_text(json.dumps({'input_fingerprint': 'f', 'steps': {
+        'asr': {'status': 'passed', 'input_fingerprint': 'f'}}}))
+    (state_dir / 'asr.log').write_text('finished')
+    if layout == 'compatibility':
+        link = root / 'verification/qualification-supervisor/evidence'
+        link.parent.mkdir(parents=True)
+        link.symlink_to(state_dir, target_is_directory=True)
+        path = link / path.name
+    before = path.read_bytes()
+    report = MODULE.snapshot(path)
+    row = report['steps'][0]
+    assert row['detail']['available'] is True
+    assert row['detail']['checks_passed'] == 1
+    assert row['detail']['models'][0]['model'] == 'test-asr'
+    assert row['log_age_seconds'] is not None
+    assert report['passed'] == 1
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize('prefix', ['verification', 'proofs/verification'])
+def test_redirected_runner_log_with_nested_state(tmp_path, prefix):
+    verification = tmp_path / prefix
+    state_dir = verification / 'qualification-supervisor/evidence'
+    state_dir.mkdir(parents=True)
+    log = verification / 'tts-local/evidence/tts-runner.log'
+    log.parent.mkdir(parents=True)
+    log.write_text('progress')
+    path = state_dir / 'state.json'
+    path.write_text(json.dumps({'steps': {'tts-asr-roundtrip': {'status': 'running'}}}))
+    row = MODULE.snapshot(path, now=log.stat().st_mtime + 10)['steps'][0]
+    assert row['log_age_seconds'] == 10
+    assert Path(row['log_path']).resolve() == log.resolve()
+
+
 def state_with(tmp_path, **overrides):
     path = tmp_path / 'state.json'
     document = {'status': 'running', 'current_step': 'grounding', 'boot_id': 'boot-a',

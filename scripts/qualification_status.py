@@ -65,6 +65,14 @@ def timestamp(value):
 def snapshot(path, now=None, boot=None, live=False):
     now = time.time() if now is None else now
     boot = current_boot() if boot is None else boot
+    # State may use the legacy flat path, an evidence directory, or a
+    # compatibility link into proofs/. Derive layout before looking up siblings.
+    state_dir = path.resolve().parent
+    supervisor_dir = state_dir.parent if state_dir.name == 'evidence' else state_dir
+    verification_dir = supervisor_dir.parent
+    repository_root = verification_dir.parent
+    if repository_root.name == 'proofs':
+        repository_root = repository_root.parent
     with path.open('rb') as handle:
         raw = handle.read(4 * 1024 * 1024 + 1)
     if len(raw) > 4 * 1024 * 1024:
@@ -95,9 +103,9 @@ def snapshot(path, now=None, boot=None, live=False):
             status = 'stale-pass' if status == 'passed' else 'stale-' + status
         start, finish = timestamp(step.get('started_at')), timestamp(step.get('finished_at'))
         elapsed = None if start is None else max(0, (finish if finish is not None else now) - start)
-        log = path.parent / f'{name}.log'
+        log = state_dir / f'{name}.log'
         if name in RUNNER_LOGS:
-            log = path.parent.parent / RUNNER_LOGS[name]
+            log = verification_dir / RUNNER_LOGS[name]
         # State is data, never a command or an arbitrary log-path authority.
         safe_name = Path(name).name == name and name not in ('.', '..')
         log_age = None
@@ -116,7 +124,7 @@ def snapshot(path, now=None, boot=None, live=False):
                          error=text(step.get('error')),
                          blocked_by=text(step.get('blocked_by'))))
     for row in rows:
-        row['detail'] = detail(path.parent.parent.parent, row['name'], state['steps'][row['name']], boot)
+        row['detail'] = detail(repository_root, row['name'], state['steps'][row['name']], boot)
         if row['status'].startswith('stale-') and row['detail'].get('available'):
             row['detail']['evidence_scope'] = 'previous-inputs'
             for model in row['detail']['models']:
@@ -205,7 +213,7 @@ def render(data, details=False):
         lines.append('Remaining: ' + '; '.join(data['remaining']))
     lines += ['', 'Failures require repair/retest; finishing this pass is not qualification success.',
               'Host/process detail: bash scripts/local-model-status.sh --host-sharing',
-              'Gate logs: verification/qualification-supervisor/<gate>.log; redirected runner paths in --json']
+              'Gate logs: verification/qualification-supervisor/evidence/<gate>.log; exact paths (including redirected runners) in --json']
     return '\n'.join(lines)
 
 
