@@ -1,7 +1,7 @@
 {
   "additional_research_queue": {
     "integrity": "User-submitted identifiers only; not researched, downloaded, or qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 11,
+    "unique_repository_count": 15,
     "entries": [
       {
         "url": "https://huggingface.co/peasantsmith/Qwen3.8-Flash-Next-PS-IQ2_XXS-GGUF",
@@ -76,6 +76,34 @@
       {
         "url": "https://huggingface.co/tencent/AuK",
         "repository": "tencent/AuK",
+        "state": "queued",
+        "investigated": true,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/nex-agi/Nex-N2.5-mini",
+        "repository": "nex-agi/Nex-N2.5-mini",
+        "state": "queued",
+        "investigated": true,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/Jackrong/Qwopus3.8-27B-Flash-GGUF",
+        "repository": "Jackrong/Qwopus3.8-27B-Flash-GGUF",
+        "state": "queued",
+        "investigated": true,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/nex-agi/Nex-N2.5-Pro",
+        "repository": "nex-agi/Nex-N2.5-Pro",
+        "state": "queued",
+        "investigated": true,
+        "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+        "repository": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
         "state": "queued",
         "investigated": true,
         "qualified": false
