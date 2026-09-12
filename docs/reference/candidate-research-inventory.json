@@ -34,9 +34,33 @@
       {
         "url": "https://huggingface.co/agentionai/Signal-3.8-27B-GGUF",
         "repository": "agentionai/Signal-3.8-27B-GGUF",
-        "state": "queued",
-        "investigated": false,
-        "qualified": false
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "name": "Signal-3.8-27B",
+        "base_model": "Qwen/Qwen3.8-27B",
+        "architecture": "qwen35 (dense 27B, MTP draft head, vision via mmproj)",
+        "param_count": "27B",
+        "quant_tiers": {
+          "Q8_0": "27.05 GiB",
+          "AP-Q6_K": "20.89 GiB",
+          "AP-Q5_K_M": "18.19 GiB",
+          "AP-Q4_K_XL": "16.35 GiB",
+          "AP-Q4_K_M": "15.83 GiB",
+          "AP-IQ4_XS": "13.27 GiB",
+          "AP-Q3_K_XL": "14.05 GiB",
+          "AP-IQ3_S": "12.38 GiB",
+          "AP-IQ3_XXS": "11.39 GiB"
+        },
+        "best_fit_for_16gb": "AP-Q4_K_XL (16.35 GiB) or AP-IQ4_XS (13.27 GiB)",
+        "best_fit_for_32gb": "Q8_0 (27.05 GiB) reference quality",
+        "speed_claim": "57% fewer answer tokens, 52% fewer thinking tokens vs base Qwen3.8-27B; finishes in <half wall time on same HW; +10-22% decode speed with draft-mtp speculative decoding",
+        "comparison_to_current": {
+          "current_heretic": "RVN-Q6_K-multilingual-mtp.gguf (27B dense Q6_K, MTP)",
+          "current_fable": "Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP-Q6_K.gguf (27B Q6_K, 23 GB, MTP)",
+          "signal_vs_fable": "Signal AP-Q6_K (20.89 GiB) is ~2 GiB smaller than fable (23 GB); same 27B dense architecture; Signal's token efficiency (57% fewer tokens) means substantially faster wall-time per completion at same or lower quant; both support draft-mtp"
+        },
+        "notes": "Drop-in GGUF for llama.cpp Qwen3.8-27B setups. Self-distilled for directness, not truncation. GSM8K exact-match matches or beats base. Vision preserved (mmproj-BF16.gguf, 0.87 GiB). 9 quant tiers IQ3_XXS to Q8_0. Agention Precision per-tensor imatrix quants. License: freely released, sponsor-supported."
       },
       {
         "url": "https://huggingface.co/WarmBloodAban/Minimax-h3_Singularity",
@@ -107,6 +131,14 @@
         "state": "queued",
         "investigated": true,
         "qualified": false
+      },
+      {
+        "url": "https://huggingface.co/nex-agi/Nex-N2.5-Max",
+        "repository": "nex-agi/Nex-N2.5-Max",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false,
+        "notes": "Nex-N2.5 family largest variant. Research pending: param count, MoE active params, GGUF sizes, router compatibility."
       }
     ]
   },
