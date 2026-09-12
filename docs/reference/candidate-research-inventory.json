@@ -60,7 +60,12 @@
           "current_fable": "Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP-Q6_K.gguf (27B Q6_K, 23 GB, MTP)",
           "signal_vs_fable": "Signal AP-Q6_K (20.89 GiB) is ~2 GiB smaller than fable (23 GB); same 27B dense architecture; Signal's token efficiency (57% fewer tokens) means substantially faster wall-time per completion at same or lower quant; both support draft-mtp"
         },
-        "notes": "Drop-in GGUF for llama.cpp Qwen3.8-27B setups. Self-distilled for directness, not truncation. GSM8K exact-match matches or beats base. Vision preserved (mmproj-BF16.gguf, 0.87 GiB). 9 quant tiers IQ3_XXS to Q8_0. Agention Precision per-tensor imatrix quants. License: freely released, sponsor-supported."
+        "notes": "Drop-in GGUF for llama.cpp Qwen3.8-27B setups. Self-distilled for directness, not truncation. GSM8K exact-match matches or beats base. Vision preserved (mmproj-BF16.gguf, 0.87 GiB). 9 quant tiers IQ3_XXS to Q8_0. Agention Precision per-tensor imatrix quants. License: freely released, sponsor-supported.",
+        "status": "integrated",
+        "integrated_as": "signal",
+        "integrated_file": "models/signal-3.8-27b/AP-Q6_K/Signal-3.8-27B-AP-Q6_K.gguf",
+        "integrated_quant": "AP-Q6_K (20.89 GiB)",
+        "integrated_date": "2026-09-11"
       },
       {
         "url": "https://huggingface.co/WarmBloodAban/Minimax-h3_Singularity",
@@ -109,14 +114,24 @@
         "repository": "nex-agi/Nex-N2.5-mini",
         "state": "queued",
         "investigated": true,
-        "qualified": false
+        "qualified": false,
+        "status": "integrated",
+        "integrated_as": "nex",
+        "integrated_file": "models/nex-n2.5-mini/Nex-N2.5-mini.i1-Q6_K.gguf",
+        "integrated_quant": "i1-Q6_K (27 GiB)",
+        "integrated_date": "2026-09-11"
       },
       {
         "url": "https://huggingface.co/Jackrong/Qwopus3.8-27B-Flash-GGUF",
         "repository": "Jackrong/Qwopus3.8-27B-Flash-GGUF",
         "state": "queued",
         "investigated": true,
-        "qualified": false
+        "qualified": false,
+        "status": "integrated",
+        "integrated_as": "qwopus",
+        "integrated_file": "models/qwopus3.8-27b-flash/Qwopus3.8-27B-Flash-MTP-Q5_K_M.gguf",
+        "integrated_quant": "Q5_K_M (19.5 GiB)",
+        "integrated_date": "2026-09-11"
       },
       {
         "url": "https://huggingface.co/nex-agi/Nex-N2.5-Pro",

@@ -46,5 +46,17 @@
   "gemma4-heretic-vision": {
     "source": "Gemma-4-12B-it-Heretic Q6_K with its BF16 projector",
     "purpose": "Reader-only image analysis; no executable tools"
+  },
+  "signal": {
+    "source": "AgentionAI Signal-3.8-27B AP-Q6_K (Qwen3.8-27B fine-tune, token-efficient)",
+    "purpose": "Fast chat and coding; 57% fewer answer tokens than base, <half wall time"
+  },
+  "qwopus": {
+    "source": "Jackrong Qwopus3.8-27B-Flash Q5_K_M (Qwen3.8-27B fine-tune, MTP head)",
+    "purpose": "Agentic coding and tool use; self-speculative decoding, 262K context"
+  },
+  "nex": {
+    "source": "Nex-Agi Nex-N2.5-mini i1-Q6_K (35B MoE, 8 active, 262K context)",
+    "purpose": "Agentic, computer-use, and tool-calling; 3B active params for fast inference"
   }
 }

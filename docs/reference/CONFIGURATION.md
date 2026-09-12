@@ -94,6 +94,9 @@ with that path.
 | `obliterated` | `models/Qwen3.8-27B-OBLITERATED-Q6_K.gguf` | MTP pair, `temp=0.2`, `repeat-penalty=1.15` | tool-using |
 | `obliterated-vision` | same GGUF | adds `mmproj=…-mmproj-bf16.gguf`, `mmproj-device=ROCm0`, `ctx-size=32768`, `tensor-split=5,0,4` | tool-using |
 | `fable` | `models/Qwen3.6-27B-Fable-Fus-711-…-Q6_K.gguf` | MTP pair, `ctx-size=65536` | tool-using |
+| `signal` | `models/signal-3.8-27b/AP-Q6_K/Signal-3.8-27B-AP-Q6_K.gguf` | MTP pair, `tensor-split=28,0,23`, `ctx-size=65536`, `temp=0.7`, `top-p=0.95`, `top-k=20`, `min-p=0` | tool-using |
+| `qwopus` | `models/qwopus3.8-27b-flash/Qwopus3.8-27B-Flash-MTP-Q5_K_M.gguf` | MTP pair, `tensor-split=1,0,1`, `ctx-size=65536`, `temp=0.7`, `top-p=0.95`, `top-k=20`, `min-p=0` | tool-using |
+| `nex` | `models/nex-n2.5-mini/Nex-N2.5-mini.i1-Q6_K.gguf` | `tensor-split=1,1,1`, `ctx-size=65536`, `temp=0.7`, `top-p=0.95`, `top-k=20`, `min-p=0` | tool-using |
 | `phr00ty` | `models/Phr00tyMix-v4-32B-imat-Q6_K.gguf` | `ctx-size=65536`, `temp=1.5`, `min-p=0.1`; **no MTP** | tool-using |
 | `qwen3-embedding-8b` | `models/embedding/Qwen3-Embedding-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=4096`, `embedding=1`, `pooling=last`, `embd-normalize=2`, `flash-attn=off`, `cache-type-v=f16`, `tensor-split=1,0,0` | read-only |
 | `qwen3-reranker-8b` | `models/reranker/Qwen3-Reranker-8B-Q6_K.gguf` | `ctx=4096`, `batch/ubatch=1024`, `reranking=1`, `pooling=rank`, `flash-attn=off`, `cache-type-v=f16`, `tensor-split=1,0,0` | read-only |

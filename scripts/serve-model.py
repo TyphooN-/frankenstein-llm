@@ -16,7 +16,8 @@ BOOL_FLAGS = {'jinja': ('--jinja', '--no-jinja'),
 VALUE_FLAGS = {'model', 'mmproj', 'mmproj-device', 'ctx-size', 'gpu-layers', 'flash-attn',
                'cache-type-k', 'cache-type-v', 'parallel', 'device', 'tensor-split',
                'reasoning', 'spec-type', 'spec-draft-n-max', 'temp', 'repeat-penalty',
-               'min-p', 'batch-size', 'ubatch-size', 'pooling', 'embd-normalize',
+               'min-p', 'top-p', 'top-k', 'batch-size', 'ubatch-size', 'pooling',
+               'embd-normalize',
                # Presets whose weights ship a chat template with no tools branch
                # override it from config/chat-templates/. Serving a preset here
                # with a different template than the router uses would make this
