@@ -165,6 +165,7 @@ fn is_value_flag(key: &str) -> bool {
             | "pooling"
             | "embd-normalize"
             | "chat-template-file"
+            | "chat-template-kwargs"
             | "load-mode"
     )
 }
@@ -443,6 +444,24 @@ mod tests {
         };
         let err = command(Path::new("/bin/llama-server"), "a", &preset, &serving).unwrap_err();
         assert!(err.to_string().contains("model path is required"), "{err}");
+    }
+
+    #[test]
+    fn command_preserves_chat_template_kwargs() {
+        for kwargs in [
+            r#"{"reasoning_effort":"none"}"#,
+            r#"{"reasoning_effort": "none", "note": "a;b = c"}"#,
+        ] {
+            let mut preset = Preset::new();
+            preset.set("model", "/tmp/weights.gguf");
+            preset.set("chat-template-kwargs", kwargs);
+            let serving = Serving {
+                host: "127.0.0.1",
+                port: 8080,
+            };
+            let cmd = command(Path::new("/bin/llama-server"), "nex", &preset, &serving).unwrap();
+            assert_eq!(&cmd[cmd.len() - 2..], &["--chat-template-kwargs", kwargs]);
+        }
     }
 
     #[test]

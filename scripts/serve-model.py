@@ -22,7 +22,7 @@ VALUE_FLAGS = {'model', 'mmproj', 'mmproj-device', 'ctx-size', 'gpu-layers', 'fl
                # override it from config/chat-templates/. Serving a preset here
                # with a different template than the router uses would make this
                # tool reproduce a different model, so the key has to be carried.
-               'chat-template-file', 'load-mode'}
+               'chat-template-file', 'chat-template-kwargs', 'load-mode'}
 
 
 def command(alias, values, serving):

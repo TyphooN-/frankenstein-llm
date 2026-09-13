@@ -145,6 +145,13 @@ def test_non_loopback_is_rejected():
         m.command('x', {'model': '/tmp/m.gguf'}, {'host': '0.0.0.0', 'port': 8080})
 
 
+@pytest.mark.parametrize('kwargs', ['{"reasoning_effort":"none"}', '{"reasoning_effort": "none", "note": "a;b = c"}'])
+def test_chat_template_kwargs_remain_one_literal_argument(kwargs):
+    cmd = m.command('nex', {'model': '/tmp/m.gguf', 'chat-template-kwargs': kwargs},
+                    {'host': '127.0.0.1', 'port': 8080})
+    assert cmd[-2:] == ['--chat-template-kwargs', kwargs]
+
+
 def test_arguments_remain_literal():
     cmd = m.command('x', {'model': '/tmp/a;touch bad.gguf'}, {'host': '127.0.0.1', 'port': 8080})
     assert cmd[cmd.index('--model') + 1] == '/tmp/a;touch bad.gguf'
