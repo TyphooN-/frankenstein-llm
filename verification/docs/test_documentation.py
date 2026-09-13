@@ -195,6 +195,63 @@ def test_submitted_intake_lists_each_url_exactly_once():
     assert problems == [], problems
 
 
+def test_research_queue_resolves_each_submission_to_one_record():
+    """A resubmitted identifier resolves to its existing record, never a second row.
+
+    The queue's declared ``unique_repository_count`` had already drifted from its
+    rows (15 declared against 16) when the 2026-09-12 batch arrived, and that
+    batch resubmitted three identifiers that were already recorded. Both are the
+    silent inflation the intake check above guards against, one level up: each
+    identifier is recorded in exactly one place in the inventory, every intake
+    batch URL resolves to exactly one record read at the revision the batch
+    pinned, and nothing in the queue claims qualification.
+    """
+    inventory = json.loads((ROOT / "docs/reference/candidate-research-inventory.json").read_text())
+    queue = inventory["additional_research_queue"]
+    sections = {
+        "additional_research_queue": {row["repository"]: row for row in queue["entries"]},
+        "repositories": {row["repository"]: row for row in inventory["repositories"]},
+    }
+    identifiers = [name.lower() for section in sections.values() for name in section]
+    identifiers += [row["repository"].lower() for row in inventory["submitted_intake"]["entries"]]
+    assert len(identifiers) == len(set(identifiers)), "an identifier is recorded twice"
+    assert queue["unique_repository_count"] == len(queue["entries"]) == len(
+        sections["additional_research_queue"])
+    closeout = (ROOT / "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md").read_text()
+    problems = []
+    for row in queue["entries"]:
+        if row["url"] != f"https://huggingface.co/{row['repository']}":
+            problems.append((row["repository"], "url does not match repository"))
+        if row["qualified"]:
+            problems.append((row["repository"], "the queue may not claim qualification"))
+    for batch in queue["intake_batches"]:
+        rows = batch["entries"]
+        dispositions = [row["disposition"] for row in rows]
+        assert set(dispositions) <= {"new", "already-queued", "already-assessed"}, dispositions
+        assert len({row["url"] for row in rows}) == len(rows) == batch["submitted_url_count"]
+        assert len({row["repository"].lower() for row in rows}) == batch["unique_repository_count"]
+        assert batch["newly_queued_count"] == dispositions.count("new")
+        assert batch["already_queued_count"] == dispositions.count("already-queued")
+        assert batch["already_assessed_count"] == dispositions.count("already-assessed")
+        assert batch["qualified_count"] == 0
+        for row in rows:
+            section = ("repositories" if row["disposition"] == "already-assessed"
+                       else "additional_research_queue")
+            record = sections[section].get(row["repository"])
+            if row["record"] != section or record is None:
+                problems.append((row["repository"], "does not resolve to its record"))
+            elif record.get("revision") != row["pinned_revision"]:
+                problems.append((row["repository"], "record is not at the pinned revision"))
+            elif section == "additional_research_queue" and not (
+                    record["investigated"] and record["state"] == "investigated"):
+                problems.append((row["repository"], "researched in the batch but not investigated"))
+            if row["url"] != f"https://huggingface.co/{row['repository']}":
+                problems.append((row["repository"], "url does not match repository"))
+            if row["repository"] not in closeout:
+                problems.append((row["repository"], "absent from the closeout"))
+    assert problems == [], problems
+
+
 def test_coverage_map_contains_all_outer_tracked_files():
     tracked = set(subprocess.check_output(
         ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")) - {"", "upstream/llama.cpp"}

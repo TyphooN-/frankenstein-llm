@@ -2,9 +2,9 @@
 
 Production source: `/home/typhoon/git/frankenstein-llm/upstream/llama.cpp`
 
-Production revision: v0.4.0 at `5266f24da75dc449bd56cbed7addb9c8e4a6a73e`.
+Production revision: `master` at `790cf51aabd61763486050dec7451d9147cb7c61`, the commit in `upstream/llama-cpp.lock.json`.
 
-The former external PR #27773 worktree no longer exists. v0.4.0 has no `glm5next` architecture identifier, so GLM qualification is blocked until a still-required experimental revision is reviewed and recreated as an isolated worktree below `upstream/llama.cpp/.worktrees/`. It must not modify the production submodule gitlink or build directory.
+The former external PR #27773 worktree no longer exists. That revision has no `glm5next` architecture identifier, so GLM qualification is blocked until a still-required experimental revision is reviewed and recreated as an isolated worktree below `upstream/llama.cpp/.worktrees/`. It must not modify the production submodule gitlink or build directory.
 
 Model: `/home/typhoon/git/frankenstein-llm/models/glm53flash-regular-iq3xxs/GLM-5.3-Flash-IQ3_XXS-00001-of-00015.gguf`
 
@@ -16,7 +16,7 @@ Expected artifact set: 15 shards, exactly 120,994,791,264 bytes, each verified a
 2. All 15 final shard filenames exist; no `.partial` remains.
 3. Re-run exact size and SHA-256 checks over every manifest row.
 4. A reviewed experimental worktree exists below the tracked submodule, its HEAD equals the required revision, and it is clean.
-5. Production submodule HEAD remains v0.4.0 and production router health remains OK.
+5. Production submodule HEAD remains the locked commit and production router health remains OK.
 6. No unrelated optimized build, Cargo/rustc, CMake/Ninja, package build, or GPU-heavy generation is active.
 7. Record baseline `MemAvailable` and per-GPU VRAM.
 
@@ -46,7 +46,7 @@ Build only when machine-level optimized-build exclusivity is satisfied. Capture 
 1. Run the experimental `llama-server --version` and `llama-server --help`.
 2. Confirm `ldd` resolves ROCm/HIP libraries from the expected installation.
 3. Confirm the binary exposes required context, cache type, device, GPU-layer/offload, flash-attention, host, port, Jinja, and model flags.
-4. Do not infer supported flags from the production v0.4.0 binary.
+4. Do not infer supported flags from the production binary.
 
 ## 32K standalone load
 

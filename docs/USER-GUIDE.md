@@ -231,7 +231,7 @@ git submodule update --init --recursive upstream/llama.cpp
 scripts/build-llama-cpp.sh
 ```
 
-The submodule is pinned to llama.cpp v0.4.0 at commit `5266f24`, and the build
+The submodule is pinned to llama.cpp `master` at commit `790cf51a`, and the build
 script refuses to run if the worktree is on any other revision, is dirty, or if
 the lock names an unexpected repository or GPU target. It builds HIP/ROCm for
 `gfx1030` with Ninja in Release, uses every logical CPU via `nproc`, and prints

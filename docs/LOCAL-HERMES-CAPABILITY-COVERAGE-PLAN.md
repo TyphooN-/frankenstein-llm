@@ -110,7 +110,7 @@ Work already on disk outranks new downloads.
 ### Phase A — GLM-5.3-Flash idle-host retry (blocked)
 
 1. Done: IQ3_XXS shards were publisher-hash verified historically; isolated
-   experimental runtime is required because production v0.4.0 has no `glm5next`.
+   experimental runtime is required because production `790cf51a` has no `glm5next`.
 2. Prior auto-fit overlapping a kernel compile remains inconclusive.
 3. Retry 32K only on an idle host, isolated worktree, off the production port.
 4. No production alias before full admission.

@@ -8,6 +8,54 @@ and the provisional ranking in
 [MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md). Those files retain
 useful header and pagination notes; they are not the current verdicts.
 
+## Submitted candidate intake — 2026-09-12
+
+Thirteen submitted URLs, thirteen distinct identifiers, counted and compared
+case-insensitively by script against every section of
+[candidate-research-inventory.json](candidate-research-inventory.json): **ten
+new** `additional_research_queue` entries, **one already queued**, and **two
+already assessed**. The batch record, with each exact URL and the revision it
+was read at, is `additional_research_queue.intake_batches`. `m-a-p/YuE2-3B` is
+an earlier queue entry used below as a comparison, not a URL of this batch.
+
+**Investigated is not qualified.** Each row was read from Hugging Face API
+metadata and its model card at the pinned revision on 2026-09-12. No weights
+were downloaded, no remote code ran, and no router preset, runtime, or download
+queue changed. Publisher benchmarks and behaviour claims are recorded as claims.
+
+Capacity uses the [hardware boundary](#hardware-and-runtime-boundary) below and
+keeps three questions apart:
+
+- **GPU pool:** fits the 56.45 GiB reserved screening pool across the two
+  16 GiB RX 6900 XTs and the ~30 GiB V620. Only a tensor-splitting runtime
+  (llama.cpp) can use that pool; context, KV cache, and work buffers are extra.
+- **Single card:** ComfyUI, Diffusers, and custom PyTorch media stacks do not
+  shard across cards, so the artifact set must fit one card (29.98 GiB V620 or
+  15.98 GiB RX 6900 XT). Activations are unmeasured.
+- **RAM offload:** larger than the GPU pool but within pool plus 94.17 GiB of
+  visible RAM (150.62 GiB). Slow offload is acceptable here; weights minus the
+  pool is an optimistic host-RAM lower bound, and swap is not capacity. Larger
+  than 150.62 GiB **exceeds this host**.
+
+| Repository | Intake | Bytes and capacity | Route on this host | Disposition and next gate |
+|---|---|---|---|---|
+| `meshllm/Kimi-K3-UD-Q4_K_XL-layers` | new, `79c7dbdd` | 1,409.03 GiB of per-layer GGUF; **exceeds host** about 9.4× | mesh-llm multi-machine layer package, not a GGUF that llama-server loads | **Reject** here. The pinned llama.cpp registering `kimi-k3` covers the source GGUF, not this package. |
+| `textclf/Qwen3.8-Flash-Next-TQ-4bit` | new, `78365252` | 87.62 GiB of TQ safetensors (84.76 GiB under `quantization_data/`); RAM-offload class by bytes | vLLM TQ plugin with custom CUDA kernels in an NVIDIA Docker image | **Reject this format** (CUDA-only). The base stays covered by the Flash-Next GGUF records already in the inventory. |
+| `tencent/AuK-Flash` | new, `575b92f0` | 6.30 GiB checkpoint and VAE plus the `Qwen/Qwen2.5-Omni-3B` encoder (11.17 GiB repository); **single card** (V620) by bytes | Tencent-Hunyuan/AuK code, not reviewed; ROCm PyTorch unproven | **Isolated speech evaluation.** Adds editing, enhancement, and separation beyond the local Qwen3-TTS lane. Review the code, then a V620 run judged by the ADR 0002 ASR round-trip. Base `tencent/AuK` is already queued. |
+| `m-a-p/SheetSage2` | new, `eab522a8` | 0.21 GiB adapter plus 2.36 GiB `m-a-p/MERT-v2-FullSong`; **single card** or CPU | transformers `trust_remote_code` with FFmpeg; the card installs a CUDA torch wheel | **Isolated music-analysis evaluation**; no local lane transcribes music. Pin and review the remote code by digest, accept CC BY-NC 4.0, then a transcription check. |
+| `peculiar-ragdoll/Cyber-Tiel-Coder-35B-A3B-GGUF-MTP` | new, `d835c87a` | 11.81–36.17 GiB per tier plus a 0.84 GiB projector; **GPU pool** at every tier | llama.cpp `qwen35moe` (registered) with `--spec-type draft-mtp`, as the router presets already use | **Coding-lane candidate.** Abliterated, and the card insists on OS-level sandboxing. Choose a tier (card: UD-Q4_K_XL, 21.19 GiB), download in a separately authorized lane, then serialized qualification. |
+| `yandex/AliceAI-T5-35B-A0.6B` | new, `a0d71f58` | 64.38 GiB BF16; **RAM offload** | transformers `trust_remote_code` encoder-decoder MoE; no llama.cpp architecture | **Watch.** A pretrained base for fine-tuning, not an instruction or agent driver. Apache-2.0 per its LICENSE file. |
+| `dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8` | new, `d61c59ea` | 475.25 GiB of FP8/FP4 safetensors; **exceeds host** | SGLang preview branch on CUDA | **Reject** here on size and runtime. Its base is already queued at the same size. |
+| `Comfy-Org/YuE2` | new, `8e6fcf0f` | 7.26 GiB BF16 or 3.69 GiB INT8 checkpoint plus 1.29 GiB SheetSage2 encoder; **single card** | ComfyUI native loading; the installed ComfyUI 0.34.0 (`3216c62`) contains no YuE2 or SheetSage2 code | **Hold behind ACE-Step 1.5.** Different bytes from `m-a-p/YuE2-3B`, so a conversion rather than a mirror. Review a pinned ComfyUI update, then compare against the music lane. CC BY-NC 4.0. |
+| `DavidAU/Qwen3.8-27B-TWIN-TURBO-Fable-Cold-Fusion-709-L-Uncensored-NM-DAU-NEO-MTP-GGUF` | new, `88399315` | 9.32–28.16 GiB per quant; **GPU pool**, and MTP-Q8_0 (27.05 GiB) is below one V620 | llama.cpp `qwen35` with draft-mtp, like the current 27B presets | **Best-fit comparison** against the current 27B presets, not a new capability. Changed at 2026-09-13T03:11Z, so re-pin before any download. |
+| `DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF` | already queued; researched now, `0b4bc07a` | 10.87–28.16 GiB per quant; **GPU pool** | llama.cpp `qwen35` with draft-mtp | The same comparison as the 709 sibling. The existing entry was updated in place, not duplicated. |
+| `MiniMaxAI/MiniMax-H3` | already assessed | Revision still `42ed227e` | — | **Hold stands** ([below](#minimax-h3-semantic-bridge)). The card also links a license application form for the US, EU, UK, and South Korea; rights obtained that way would be the separately granted rights that decision names. |
+| `Lightricks/LTX-2.5` | already assessed | Revision still `5e6e7101`; still gated, card HTTP 401 | Installed ComfyUI has LTX-AV and Gemma 4 text-encoder code; that is not proof for these checkpoints | **Hold access stands** ([below](#ltx-25)). |
+| `laion/CLIP-ViT-L-14-laion2B-s32B-b82K` | new, `16270321` | 1.59 GiB per weight copy (four redundant formats); any card or CPU | open_clip (not installed) or transformers `CLIPModel` | **Small isolated evaluation** once a consumer is named: image retrieval beside WeMM's runtime-blocked image path, or image-generation scoring. The card limits it to research and asks for fixed-taxonomy in-domain testing first. |
+
+Media rows are separate stacks with their own runtimes, licenses, and gates, not
+failed text models. None of the thirteen is admitted, downloaded, or qualified.
+
 ## Submitted candidate intake — 2026-09-10
 
 Three submitted URLs, three distinct identifiers, added to
@@ -423,7 +471,7 @@ not execution of this EXL3 artifact.
 
 Adapter revision `8c2d9b0edb84`: 11,023,032-byte safetensors plus workflow,
 not a standalone model. Base `MiniMaxAI/MiniMax-H3` revision `42ed227ee7df`
-is 280 files, 498,474,749,480 bytes / 464.29 GiB. FL2VA transformer plus text
+is 280 files, 498,474,749,480 bytes / 464.24 GiB. FL2VA transformer plus text
 encoder plus VAEs is already about 134 GiB of safetensors before Ref2VA
 duplicates. Community license **Applicable Territory excludes the United
 States, EU, UK, and Republic of Korea**. Decision: **hold**. Do not download

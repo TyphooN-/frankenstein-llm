@@ -14,7 +14,7 @@ Expose local GGUF models in Hermes CLI, TUI, and Desktop through the normal mode
 - GPU split: default layer split with `--device ROCm0,ROCm1,ROCm2 --tensor-split 1,2,1`.
 - RAM: 94 GiB.
 - Home storage: 2.8 TiB free at the last check.
-- llama.cpp: tracked submodule `upstream/llama.cpp`, pinned to v0.4.0 (`5266f24`), with the HIP/ROCm binary at `upstream/llama.cpp/build/bin/llama-server`.
+- llama.cpp: tracked submodule `upstream/llama.cpp`, pinned to `master` commit `790cf51a`, with the HIP/ROCm binary at `upstream/llama.cpp/build/bin/llama-server` (currently a symlink to an externally built bundle; see [ADR 0005](decisions/0005-track-llama-cpp-submodule.md)).
 - llama.cpp supports router mode (`--models-preset`) and native `draft-mtp`.
 - Context policy: 131,072 tokens, one slot, Q4_0 K/V cache, Flash Attention.
 - Endpoint: loopback only, `http://127.0.0.1:8080/v1`.

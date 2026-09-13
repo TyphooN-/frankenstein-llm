@@ -21,8 +21,8 @@ ROOT = Path("/home/typhoon/git/frankenstein-llm/verification/glm53flash-local")
 # under /home/typhoon/src that no longer exists, so its revision can no longer be
 # established from anything on disk. GLM work is recreated as an isolated
 # worktree below the tracked submodule instead -- see BUILD-AND-FUNCTIONAL-RUNBOOK.md.
-# Production v0.4.0 has no glm5next architecture, so this stays overridable and
-# is never the production build directory.
+# The production pin (790cf51a) has no glm5next architecture, so this stays
+# overridable and is never the production build directory.
 GLM_SRC = Path(os.environ.get(
     "GLM_SRC",
     "/home/typhoon/git/frankenstein-llm/upstream/llama.cpp/.worktrees/glm53flash-local",

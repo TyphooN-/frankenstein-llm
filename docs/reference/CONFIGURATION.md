@@ -186,7 +186,7 @@ model than the router does, under the same alias.
 |---|---|---|
 | `repository` | `https://github.com/ggml-org/llama.cpp.git` | build script, `.gitmodules`, pin suite |
 | `submodule_path` | `upstream/llama.cpp` | `.gitmodules`, pin suite |
-| `tag` | `v0.4.0` | pin suite |
+| `branch` | `master`; the lock has no release `tag` field | pin suite |
 | `commit` | 40-hex | build script (worktree `HEAD`), pin suite (staged gitlink) |
 | `build.backend` | `ROCm/HIP` | pin suite |
 | `build.gpu_targets` | `["gfx1030"]` | build script, pin suite |

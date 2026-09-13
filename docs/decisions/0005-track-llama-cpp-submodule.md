@@ -21,7 +21,8 @@ The update policy is current upstream `master`, not release tags. Resolve master
 at the start of each update and retain its exact SHA in the outer gitlink and
 `upstream/llama-cpp.lock.json`. Exact revision records preserve reproducibility;
 they are not a policy to wait for tagged releases. The September 10 master build
-is recorded below separately from full runtime qualification.
+and the 2026-09-13 installed runtime are recorded below separately from full
+runtime qualification.
 A mismatch between the lock and the submodule worktree fails the build before
 CMake runs. The gitlink is checked separately by
 `verification/upstream-pin/test_llama_cpp_pin.py`.
@@ -59,6 +60,37 @@ The router remains loopback-only and limited to one resident model. A version up
 A checkout is restored with:
 
     git submodule update --init --recursive upstream/llama.cpp
+
+## Installed runtime (2026-09-13)
+
+- Source: `790cf51aabd61763486050dec7451d9147cb7c61` (`master`, 2026-09-12),
+  19 commits after the previous pin `8ea29024`. The outer gitlink, the submodule
+  worktree and `upstream/llama-cpp.lock.json` all record it. Its tree
+  (`97726d37`) is identical to the clean source the binaries were compiled from.
+- Build: compiled by the qualification supervisor outside this tree, from a clean
+  shallow clone under `~/.hermes/checkpoints/llama-master-790cf51a/`, with this
+  ADR's configuration: ROCm/HIP `gfx1030`, Release, Ninja, native CPU tuning,
+  `GGML_LTO`, HIP graphs, Flash Attention and CPU repack, 44 jobs (`nproc` on
+  this host). Build exit 0. The binary reports
+  `0.4.0-dev (build 219, commit 790cf51aa)`; the build number counts commits in
+  that shallow clone and is not comparable with earlier build numbers.
+- Installation: `upstream/llama.cpp/build/bin` is a symlink to that build's
+  `bin/`, and the previous binaries remain in
+  `upstream/llama.cpp/build/bin.rollback-8ea290247/`. The router runs from the
+  symlinked bundle. This departs from building in the submodule's own `build/`
+  directory, and `scripts/build-llama-cpp.sh` must not run while the symlink is
+  in place: CMake writes `build/bin` through the link into the running bundle.
+- Evidence: every router preset key is accepted by this binary's `--help` (pin
+  suite). Four heretic functional smoke checks passed on a loaded host (short,
+  source-prefill, native-tool, tool-result). That is not full qualification, and
+  the wider qualification run was stopped by the operator before a reboot.
+- Open failure: in a router session before the current one, direct `heretic`
+  requests returned HTTP 500 (`model name=heretic failed to load`) because the
+  spawned instance rejected `--device ROCm0,ROCm1,ROCm2` with
+  `invalid device: ROCm2`. Earlier in the same log a heretic instance aborted
+  mid-generation with `HSA_STATUS_ERROR_MEMORY_APERTURE_VIOLATION`. Kernel
+  general-protection faults on preceding boots mean neither event is attributed
+  to hardware or to this runtime.
 
 ## Further performance work
 
@@ -131,6 +163,11 @@ or modify serving defaults.
 ## Rollback
 
 Check out the prior outer repository commit and run `git submodule update --init --recursive`. Rebuild the pinned prior gitlink, then reinstall the tracked user-service units. Do not retain an untracked second production checkout as a rollback mechanism.
+
+The 2026-09-13 installation also kept the `8ea29024` binaries on disk in
+`upstream/llama.cpp/build/bin.rollback-8ea290247/`; see
+[Operations: Rollback](../reference/OPERATIONS.md#rollback) for what switching
+back to them does and does not restore.
 
 ## Consequences
 

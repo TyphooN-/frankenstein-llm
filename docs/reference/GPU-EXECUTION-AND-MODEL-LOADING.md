@@ -7,7 +7,7 @@ feels slower or emptier than three GPUs suggest it should:
    how was that split chosen, and why does adding a card not add speed?
 2. The model picker shows a model. Is it loaded?
 
-Everything below is grounded in the pinned runtime (`upstream/llama.cpp`, v0.4.0)
+Everything below is grounded in the runtime pinned when it was written (`upstream/llama.cpp`, v0.4.0)
 and this repository's own configuration. Nothing here is a measurement: no
 tokens/sec figure appears, and none may be produced without the separate
 authorization described in [model runs](../MODEL-RUNS.md).
@@ -366,9 +366,11 @@ Nothing in this stack is single-client. Two editors, a shell script and an agent
 loop can all point at `127.0.0.1:8080` at once. What they get depends entirely on
 whether they name the *same preset*.
 
-All line references are into the pinned submodule, llama.cpp `v0.4.0`
-(`upstream/llama-cpp.lock.json`, commit `5266f24da`), which
-`verification/upstream-pin/test_llama_cpp_pin.py` holds the staged gitlink to.
+All line references are into llama.cpp `v0.4.0` (commit `5266f24da`), the
+submodule pin when they were taken. The pin has since moved to `790cf51a`
+(`upstream/llama-cpp.lock.json`, whose staged gitlink
+`verification/upstream-pin/test_llama_cpp_pin.py` checks), so line numbers may
+have shifted.
 
 **One preset, many callers: one load.** Three separate guards, all under the
 router's single mutex, make concurrent requests for one alias produce exactly one

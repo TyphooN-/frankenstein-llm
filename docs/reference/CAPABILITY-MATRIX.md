@@ -132,7 +132,7 @@ service does not exist". They need different work.
 | WeMM image/video retrieval | **runtime** | `AutoProcessor` needs torchvision, which is not in the ROCm candidate runtime. Text-only is claimed; image/video is not. |
 | WeMM multimodal index | **build step** | The 2048-D index file has not been built. The separation policy exists; the store does not. |
 | PDF and scanned-document ingest | **dependency** | PDF needs an optional parser; scanned documents need the OCR sidecar, which is not qualified. Both are reported as explicit skip reasons, never silent omissions. |
-| GLM-5.3-Flash | **upstream support** | Pinned v0.4.0 has no `glm5next` architecture. Requires a reviewed experimental worktree below the submodule, and a clean idle-host 32K retry. No production alias is permitted first. |
+| GLM-5.3-Flash | **upstream support** | The pinned runtime (`790cf51a`) has no `glm5next` architecture. Requires a reviewed experimental worktree below the submodule, and a clean idle-host 32K retry. No production alias is permitted first. |
 | Security-agent pilot | **by design** | The Strix scaffold builds and validates specifications and executes nothing. There is no functional run to have, and adding one is a separate authorized decision. |
 | Prompt-corpus evaluation | **data + evaluator** | Catalog and admission exist; no rows have been admitted and no model score is claimed. |
 | Model characterization | **harness** | See below. |

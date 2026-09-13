@@ -1,7 +1,130 @@
 {
   "additional_research_queue": {
-    "integrity": "User-submitted identifiers only; not researched, downloaded, or qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 15,
+    "integrity": "User-submitted identifiers. An entry marked investigated carries its recorded research; entries researched in an intake batch cite the revision they were read at, with no weight download or remote code execution. Integrated entries name the router alias that loads them. No entry is qualified. Separate from the historical assessed-inventory and submission-batch counts.",
+    "unique_repository_count": 26,
+    "intake_batches": [
+      {
+        "batch": "2026-09-12",
+        "recorded_at": "2026-09-12T23:34:47-0400",
+        "integrity": "Hugging Face API metadata and model cards read unauthenticated at each pinned revision on 2026-09-12. No weight download, no remote code execution, no router, preset, runtime or download-queue change. Publisher benchmark and behaviour claims are recorded as claims. Investigated is not qualified.",
+        "capacity_basis": {
+          "source": "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md, Hardware and runtime boundary",
+          "gpu_nominal_mib": {
+            "rx_6900_xt_headless": 16368,
+            "v620": 30704,
+            "rx_6900_xt_display": 16368
+          },
+          "gpu_screening_pool_gib": 56.45,
+          "visible_ram_gib": 94.17,
+          "classes": {
+            "fits-gpu-pool": "artifact fits the 56.45 GiB reserved screening pool, which only a tensor-splitting runtime (llama.cpp) can use; context, KV cache and work buffers are extra",
+            "fits-single-gpu": "media and custom PyTorch runtimes do not shard across cards, so the artifact set must fit one card: 29.98 GiB V620 or 15.98 GiB RX 6900 XT; activations unmeasured",
+            "ram-offload": "larger than the GPU pool but within pool plus visible RAM (150.62 GiB); slow offload is accepted by the operator, weights minus pool is an optimistic host-RAM lower bound, and swap is not capacity",
+            "exceeds-host": "larger than 150.62 GiB; no RAM-offload route on this host"
+          }
+        },
+        "submitted_url_count": 13,
+        "unique_repository_count": 13,
+        "newly_queued_count": 10,
+        "already_queued_count": 1,
+        "already_assessed_count": 2,
+        "qualified_count": 0,
+        "comparison_not_submitted": "m-a-p/YuE2-3B is an earlier queue entry used as the comparison for Comfy-Org/YuE2; it is not a URL of this batch.",
+        "entries": [
+          {
+            "url": "https://huggingface.co/meshllm/Kimi-K3-UD-Q4_K_XL-layers",
+            "repository": "meshllm/Kimi-K3-UD-Q4_K_XL-layers",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "79c7dbdd23a468e970195075b07a01a6bab605be"
+          },
+          {
+            "url": "https://huggingface.co/textclf/Qwen3.8-Flash-Next-TQ-4bit",
+            "repository": "textclf/Qwen3.8-Flash-Next-TQ-4bit",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "7836525214a789b6be7a21e28dc0e89572c0b80e"
+          },
+          {
+            "url": "https://huggingface.co/tencent/AuK-Flash",
+            "repository": "tencent/AuK-Flash",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "575b92f0895f75180bf2cbd35f2e176c5732b8ed"
+          },
+          {
+            "url": "https://huggingface.co/m-a-p/SheetSage2",
+            "repository": "m-a-p/SheetSage2",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "eab522a8168e8b8b8c4856bf8609cd86198f01fe"
+          },
+          {
+            "url": "https://huggingface.co/peculiar-ragdoll/Cyber-Tiel-Coder-35B-A3B-GGUF-MTP",
+            "repository": "peculiar-ragdoll/Cyber-Tiel-Coder-35B-A3B-GGUF-MTP",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "d835c87ac12ef0d02867e6e03cb6d425ddeb373b"
+          },
+          {
+            "url": "https://huggingface.co/yandex/AliceAI-T5-35B-A0.6B",
+            "repository": "yandex/AliceAI-T5-35B-A0.6B",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "a0d71f58c40d6affe461797b30b35ff47f52a5f2"
+          },
+          {
+            "url": "https://huggingface.co/dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
+            "repository": "dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "d61c59ea5e514e25d305b5850e8a432f7a9969f2"
+          },
+          {
+            "url": "https://huggingface.co/Comfy-Org/YuE2",
+            "repository": "Comfy-Org/YuE2",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "8e6fcf0f23252ed188b634bd50d44f4b01fba890"
+          },
+          {
+            "url": "https://huggingface.co/DavidAU/Qwen3.8-27B-TWIN-TURBO-Fable-Cold-Fusion-709-L-Uncensored-NM-DAU-NEO-MTP-GGUF",
+            "repository": "DavidAU/Qwen3.8-27B-TWIN-TURBO-Fable-Cold-Fusion-709-L-Uncensored-NM-DAU-NEO-MTP-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "88399315d3fe53a5a551e6b7d55461271f2991bc"
+          },
+          {
+            "url": "https://huggingface.co/MiniMaxAI/MiniMax-H3",
+            "repository": "MiniMaxAI/MiniMax-H3",
+            "disposition": "already-assessed",
+            "record": "repositories",
+            "pinned_revision": "42ed227ee7df40d41602854ae760620d6eb651fe"
+          },
+          {
+            "url": "https://huggingface.co/DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+            "repository": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+            "disposition": "already-queued",
+            "record": "additional_research_queue",
+            "pinned_revision": "0b4bc07a8c549be631ed8f5fd78b68fb0e80eced"
+          },
+          {
+            "url": "https://huggingface.co/Lightricks/LTX-2.5",
+            "repository": "Lightricks/LTX-2.5",
+            "disposition": "already-assessed",
+            "record": "repositories",
+            "pinned_revision": "5e6e71018ee1756ed329b697a7b4aedc934dfce9"
+          },
+          {
+            "url": "https://huggingface.co/laion/CLIP-ViT-L-14-laion2B-s32B-b82K",
+            "repository": "laion/CLIP-ViT-L-14-laion2B-s32B-b82K",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "1627032197142fbe2a7cfec626f4ced3ae60d07a"
+          }
+        ]
+      }
+    ],
     "entries": [
       {
         "url": "https://huggingface.co/peasantsmith/Qwen3.8-Flash-Next-PS-IQ2_XXS-GGUF",
@@ -143,9 +266,31 @@
       {
         "url": "https://huggingface.co/DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
         "repository": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
-        "state": "queued",
+        "state": "investigated",
         "investigated": true,
-        "qualified": false
+        "qualified": false,
+        "submitted": "2026-09-11; resubmitted 2026-09-12",
+        "revision": "0b4bc07a8c549be631ed8f5fd78b68fb0e80eced",
+        "checked_at": "2026-09-12T23:14:21-0400",
+        "gated": false,
+        "pipeline_tag": "image-text-to-text",
+        "repository_bytes": 424063100658,
+        "license": "apache-2.0",
+        "architecture": "qwen35 dense (API GGUF metadata: 26,895,998,464 parameters, 262144 context); regular and MTP NEO-CODER MAX dual-imatrix GGUFs with F16, BF16 and F32 projectors",
+        "gguf_file_count": 25,
+        "selected_gguf_bytes": {
+          "Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-Q4_K_M.gguf": 18498573856,
+          "Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-LOW-MTP-Q6_K.gguf": 22431000096,
+          "Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-Q6_K.gguf": 24033703456,
+          "Qwen3.8-27B-TurboFCFusion-735-882-Here-Uncen-NEO-CODER-MAX-MTP-Q8_0.gguf": 30239020576,
+          "mmproj-BF16.gguf": 931145920
+        },
+        "resource_class": "fits-gpu-pool",
+        "resource_basis": "all 22 model GGUFs are 10.87 GiB to 28.16 GiB; MTP-Q8_0 28.16 GiB is also below one V620 before KV",
+        "runtime_route": "llama.cpp qwen35, registered in the pinned 790cf51a; the router already serves qwen35 MTP GGUFs with draft-mtp",
+        "disposition": "candidate for the same best-fit comparison as its 709 sibling; not a new capability",
+        "next_gate": "choose one quant for the 27B placement, re-pin, download in a separately authorized lane, serialized qualification",
+        "notes": "Publisher claims (ARC-C 735 at 8-bit and 719 at 4-bit, 1/2 to 1/10 of the thinking tokens) are not local evidence. The 2026-09-12 resubmission resolves to this entry rather than a second row."
       },
       {
         "url": "https://huggingface.co/nex-agi/Nex-N2.5-Max",
@@ -154,6 +299,287 @@
         "investigated": false,
         "qualified": false,
         "notes": "Nex-N2.5 family largest variant. Research pending: param count, MoE active params, GGUF sizes, router compatibility."
+      },
+      {
+        "url": "https://huggingface.co/meshllm/Kimi-K3-UD-Q4_K_XL-layers",
+        "repository": "meshllm/Kimi-K3-UD-Q4_K_XL-layers",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "79c7dbdd23a468e970195075b07a01a6bab605be",
+        "checked_at": "2026-09-12T23:14:19-0400",
+        "gated": false,
+        "pipeline_tag": "image-text-to-text",
+        "repository_bytes": 1512934515433,
+        "license": "other (card: inherits unsloth/Kimi-K3-GGUF terms)",
+        "format": "mesh-llm layer package: per-layer GGUFs split from unsloth/Kimi-K3-GGUF UD-Q4_K_XL at source revision a0836360ce58dfec088d966a97f2ddc8a606279b",
+        "artifact_bytes": {
+          "layers/ (93 files)": 1506813644512,
+          "shared/": 2523687936,
+          "projectors/": 3597141088
+        },
+        "resource_class": "exceeds-host",
+        "resource_basis": "1409.03 GiB of GGUF against 150.62 GiB of GPU pool plus visible RAM (about 9.4x)",
+        "runtime_route": "mesh-llm serve --split across several machines (skippy layer runtime); not a single GGUF that llama-server loads. The pinned llama.cpp registers kimi-k3, which applies to the source GGUF, not to this package format.",
+        "disposition": "reject for this host",
+        "next_gate": "none; multi-machine serving is outside this single-host repository",
+        "notes": "The card records the parameter scale as 'not recorded', so no parameter count is asserted here."
+      },
+      {
+        "url": "https://huggingface.co/textclf/Qwen3.8-Flash-Next-TQ-4bit",
+        "repository": "textclf/Qwen3.8-Flash-Next-TQ-4bit",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "7836525214a789b6be7a21e28dc0e89572c0b80e",
+        "checked_at": "2026-09-12T23:14:20-0400",
+        "gated": false,
+        "pipeline_tag": "text-generation",
+        "repository_bytes": 94249974938,
+        "license": "apache-2.0 (card tag; the card defers to upstream Qwen terms)",
+        "format": "TextCLF Quant (TQ) calibration-free 4-bit safetensors, tq_layout native_vllm; config qwen4_exp, 48 layers, 512 experts top-10, 262144 positions",
+        "artifact_bytes": {
+          "quantization_data/*.safetensors (18 files)": 91014583512,
+          "model-*.safetensors (131 files)": 3063872368
+        },
+        "resource_class": "ram-offload",
+        "resource_basis": "87.62 GiB of safetensors exceeds the 56.45 GiB pool; the runtime, not the size, blocks it",
+        "runtime_route": "Card: vLLM with the TQ quantization plugin and custom CUDA kernels from the textclf/tq-quant Docker image, with NVIDIA Docker as the stated prerequisite. No ROCm path is stated, and this repository is ROCm-only.",
+        "disposition": "reject this exact format (CUDA-only runtime)",
+        "next_gate": "none for this artifact; Qwen3.8-Flash-Next stays covered by the GGUF records already in this inventory",
+        "notes": "Hub safetensors parameter metadata counts packed stored tensors, as the card itself warns, so no parameter count is asserted."
+      },
+      {
+        "url": "https://huggingface.co/tencent/AuK-Flash",
+        "repository": "tencent/AuK-Flash",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "575b92f0895f75180bf2cbd35f2e176c5732b8ed",
+        "checked_at": "2026-09-12T23:14:20-0400",
+        "gated": false,
+        "pipeline_tag": "text-to-speech",
+        "repository_bytes": 6762657045,
+        "license": "mit (LICENSE file)",
+        "role": "speech generation and editing: zero-shot and instruction TTS, voice cloning, content, acoustic and paralinguistic editing, enhancement, source separation; 4-step distilled variant of tencent/AuK (card: 1.5B foundation model)",
+        "artifact_bytes": {
+          "auk_flash.safetensors": 6122209092,
+          "vae.safetensors": 637322604
+        },
+        "required_companions": {
+          "Qwen/Qwen2.5-Omni-3B": {
+            "revision": "f75b40e3da2003cdd6e1829b1f420ca70797c34e",
+            "repository_bytes": 11989103936,
+            "license": "other"
+          }
+        },
+        "resource_class": "fits-single-gpu",
+        "resource_basis": "6.30 GiB checkpoint and VAE plus at most 11.17 GiB of MLLM encoder repository fits the 29.98 GiB V620 by bytes; activations unmeasured",
+        "runtime_route": "Tencent-Hunyuan/AuK GitHub code for inference, Gradio and ComfyUI (per card); not reviewed here; ROCm PyTorch execution unproven",
+        "disposition": "isolated media evaluation candidate (distinct speech stack)",
+        "next_gate": "review the pinned GitHub code and dependencies, then an isolated V620 run judged by the ASR intelligibility round-trip ADR 0002 requires for TTS",
+        "notes": "Base tencent/AuK is already a queue entry. The local TTS lane is Qwen3-TTS-12Hz-1.7B-Base; speech editing, enhancement and separation are not covered locally."
+      },
+      {
+        "url": "https://huggingface.co/m-a-p/SheetSage2",
+        "repository": "m-a-p/SheetSage2",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "eab522a8168e8b8b8c4856bf8609cd86198f01fe",
+        "checked_at": "2026-09-12T23:14:20-0400",
+        "gated": false,
+        "pipeline_tag": "feature-extraction",
+        "repository_bytes": 232629154,
+        "license": "cc-by-nc-4.0 (non-commercial)",
+        "role": "music transcription: recordings to lead sheets (ABC), MIDI, beats, downbeats, key, chords and structure; adapter on m-a-p/MERT-v2-FullSong",
+        "artifact_bytes": {
+          "model.safetensors": 228738564
+        },
+        "required_companions": {
+          "m-a-p/MERT-v2-FullSong": {
+            "revision": "d8ba1c745e733b3908ce6ad16ebeb17ac7600a42",
+            "repository_bytes": 2530365136,
+            "license": "cc-by-nc-4.0"
+          }
+        },
+        "resource_class": "fits-single-gpu",
+        "resource_basis": "0.21 GiB adapter plus 2.36 GiB base repository; any single card, and the card also falls back to CPU",
+        "runtime_route": "transformers trust_remote_code (custom modeling, processing and rendering Python in the repository) with FFmpeg 6.1; the card installs a CUDA 12.6 torch 2.8.0 wheel, so the ROCm torch path is unproven",
+        "disposition": "isolated media evaluation candidate (distinct music-analysis stack)",
+        "next_gate": "pin and review the remote-code files by digest, as the WeMM policy gate does, accept the non-commercial license, then an isolated transcription check",
+        "notes": "The card asks for signed-in access to it and its MERT parent, while the API reports gated false for both at these revisions. SheetSage2 is also the audio encoder packaged in Comfy-Org/YuE2 and the card's ABC source for YuE2 melody conditioning."
+      },
+      {
+        "url": "https://huggingface.co/peculiar-ragdoll/Cyber-Tiel-Coder-35B-A3B-GGUF-MTP",
+        "repository": "peculiar-ragdoll/Cyber-Tiel-Coder-35B-A3B-GGUF-MTP",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "d835c87ac12ef0d02867e6e03cb6d425ddeb373b",
+        "checked_at": "2026-09-12T23:14:20-0400",
+        "gated": false,
+        "pipeline_tag": "image-text-to-text",
+        "repository_bytes": 227154633342,
+        "license": "mit",
+        "architecture": "qwen35moe MoE (API GGUF metadata: 35,505,251,456 parameters, 262144 context); vision projector included",
+        "lineage": "huihui-ai/Huihui-Ornith-1.5-35B-A3B-abliterated, itself from ornith-ai/Ornith-1.5-35B-A3B; abliterated, re-quantized with a cyber-weighted imatrix",
+        "gguf_bytes": {
+          "mmproj-BF16.gguf": 902822016,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q2_K_XL.gguf": 12680053056,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-IQ3_XXS.gguf": 13600579904,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q3_K_XL.gguf": 17234936128,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-IQ4_XS.gguf": 18119934272,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q4_K_S.gguf": 21282439488,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q4_K_M.gguf": 22523953472,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q4_K_XL.gguf": 22749880640,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q5_K_XL.gguf": 26981933376,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q6_K_XL.gguf": 32233201984,
+          "Cyber-Tiel-Coder-35B-A3B-MTP-UD-Q8_K_XL.gguf": 38840607040
+        },
+        "resource_class": "fits-gpu-pool",
+        "resource_basis": "every tier (11.81 GiB to 36.17 GiB) plus the 0.84 GiB projector is within the 56.45 GiB pool; UD-Q4_K_XL 21.19 GiB and UD-Q5_K_XL 25.13 GiB are also below one V620 before KV",
+        "runtime_route": "llama.cpp: the pinned 790cf51a registers qwen35moe, and the card's --spec-type draft-mtp is the speculative mode the router presets already set; --n-cpu-moe moves routed experts to RAM if needed",
+        "disposition": "candidate for the coding/repository-agent lane",
+        "next_gate": "choose a tier (card recommends UD-Q4_K_XL), pinned download in a separately authorized lane, then serialized functional qualification; publisher SWE-bench-Live and Cybench results are not local evidence",
+        "notes": "The card warns the model does not refuse and insists on OS-level sandboxing. The repository-agent gate already runs candidate-written code only inside Bubblewrap; any wider use needs an equivalent boundary."
+      },
+      {
+        "url": "https://huggingface.co/yandex/AliceAI-T5-35B-A0.6B",
+        "repository": "yandex/AliceAI-T5-35B-A0.6B",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "a0d71f58c40d6affe461797b30b35ff47f52a5f2",
+        "checked_at": "2026-09-12T23:14:20-0400",
+        "gated": false,
+        "pipeline_tag": null,
+        "repository_bytes": 69143365687,
+        "license": "apache-2.0 (LICENSE file; the card metadata has no license field)",
+        "architecture": "encoder-decoder MoE pretrained base (card: 34.35B unique parameters, 512 experts per MoE layer with top-8 routing, 16-layer encoder, 12-layer decoder, RoPE with YaRN, 128K context); Hub safetensors metadata 34,561,885,184 parameters",
+        "artifact_bytes": {
+          "model-000NN-of-00015.safetensors (15 files, BF16)": 69123905384
+        },
+        "resource_class": "ram-offload",
+        "resource_basis": "64.38 GiB BF16 exceeds the 56.45 GiB pool but is within 150.62 GiB; no quantized release",
+        "runtime_route": "transformers trust_remote_code (aliceai_t5_moe); card examples place the model on cuda:0; the pinned llama.cpp registers t5 and t5encoder but no AliceAI MoE variant",
+        "disposition": "watch; a pretrained base for fine-tuning, not an instruction or agent driver",
+        "next_gate": "none until an instruction-tuned release or a llama.cpp-registered quantized format exists; any trial needs remote-code review",
+        "notes": "The name states A0.6B active; the card table gives no active-parameter figure, so none is asserted beyond the name. Card benchmarks are publisher pretrain scores computed on internal infrastructure."
+      },
+      {
+        "url": "https://huggingface.co/dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
+        "repository": "dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "d61c59ea5e514e25d305b5850e8a432f7a9969f2",
+        "checked_at": "2026-09-12T23:14:20-0400",
+        "gated": false,
+        "pipeline_tag": "image-text-to-text",
+        "repository_bytes": 510310579545,
+        "license": "mit",
+        "architecture": "deepseek_v41 (config: 40 layers, 384 routed experts top-6, 1048576 positions); card: 552B backbone, 8B/16B active per token, FP8 e4m3 weights with FP4 routed experts",
+        "artifact_bytes": {
+          "*.safetensors": 510296708312
+        },
+        "resource_class": "exceeds-host",
+        "resource_basis": "475.25 GiB against 150.62 GiB",
+        "runtime_route": "card: SGLang dsv4.1 preview branch in a CUDA container with tensor and expert parallelism 4; no ROCm route stated; the pinned llama.cpp registering deepseek4 does not make this FP8/FP4 safetensors checkpoint loadable",
+        "disposition": "reject for this host (size and runtime)",
+        "next_gate": "none",
+        "notes": "Abliterated derivative of deepseek-ai/DeepSeek-V4.1-Flash, already a queue entry of the same size class. Hub safetensors metadata reports stored elements across FP8, I8, BF16 and F32; it is not asserted as a parameter count."
+      },
+      {
+        "url": "https://huggingface.co/Comfy-Org/YuE2",
+        "repository": "Comfy-Org/YuE2",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "8e6fcf0f23252ed188b634bd50d44f4b01fba890",
+        "checked_at": "2026-09-12T23:14:20-0400",
+        "gated": false,
+        "pipeline_tag": null,
+        "repository_bytes": 13147792194,
+        "license": "cc-by-nc-4.0 (non-commercial)",
+        "role": "song generation (YuE2-3B) with the SheetSage2 audio encoder, repackaged for ComfyUI",
+        "artifact_bytes": {
+          "checkpoints/yue2_3b_bf16.safetensors": 7799983228,
+          "checkpoints/yue2_3b_int8_convrot.safetensors": 3960938800,
+          "audio_encoders/sheetsage2_bf16.safetensors": 1386868122
+        },
+        "resource_class": "fits-single-gpu",
+        "resource_basis": "BF16 checkpoint plus encoder 8.56 GiB fits one RX 6900 XT or the V620 by bytes; INT8 checkpoint 3.69 GiB; activations unmeasured",
+        "runtime_route": "ComfyUI native loading; the installed ComfyUI 0.34.0 at 3216c62 (2026-09-01) contains no YuE2 or SheetSage2 code, so a pinned ComfyUI update would come first",
+        "disposition": "hold behind the existing ACE-Step 1.5 music lane",
+        "next_gate": "review a pinned ComfyUI update, then an isolated generation compared with the ACE-Step 1.5 lane",
+        "notes": "checkpoints/yue2_3b_bf16.safetensors (7,799,983,228 bytes) differs from m-a-p/YuE2-3B model.safetensors (7,261,441,640 bytes at 29b3558d), so this is a conversion rather than a mirror. m-a-p/YuE2-3B remains the earlier comparison entry, not part of this batch."
+      },
+      {
+        "url": "https://huggingface.co/DavidAU/Qwen3.8-27B-TWIN-TURBO-Fable-Cold-Fusion-709-L-Uncensored-NM-DAU-NEO-MTP-GGUF",
+        "repository": "DavidAU/Qwen3.8-27B-TWIN-TURBO-Fable-Cold-Fusion-709-L-Uncensored-NM-DAU-NEO-MTP-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "88399315d3fe53a5a551e6b7d55461271f2991bc",
+        "checked_at": "2026-09-12T23:14:21-0400",
+        "gated": false,
+        "pipeline_tag": "image-text-to-text",
+        "repository_bytes": 619038318822,
+        "license": "apache-2.0",
+        "architecture": "qwen35 dense (API GGUF metadata: 26,895,998,464 parameters, 262144 context); regular, MTP, NEO and NEO MAX imatrix GGUFs with F16, BF16 and F32 projectors",
+        "gguf_file_count": 37,
+        "selected_gguf_bytes": {
+          "Qwen3.8-27B-TTURBO-Fable-C-Fusion-709-L-Uncen-NM-DAU-NEO-MTP-Q4_K_M.gguf": 16810722656,
+          "Qwen3.8-27B-TTURBO-Fable-C-Fusion-709-L-Uncen-NM-DAU-NEO-MTP-Q6_K.gguf": 22431008096,
+          "Qwen3.8-27B-TTURBO-Fable-C-Fusion-709-L-Uncen-NM-DAU-NEO-MAX-MTP-Q6_K.gguf": 24033711456,
+          "Qwen3.8-27B-TTURBO-Fable-C-Fusion-709-L-Uncen-NM-DAU-NEO-MTP-Q8_0.gguf": 29047092576,
+          "Qwen3.8-27B-TTURBO-Fable-C-Fusion-709-L-Uncen-NM-DAU-NEO-MAX-MTP-Q8_0.gguf": 30239028576,
+          "mmproj-BF16.gguf": 931145952
+        },
+        "resource_class": "fits-gpu-pool",
+        "resource_basis": "all 34 model GGUFs are 9.32 GiB to 28.16 GiB; NEO-MTP-Q8_0 27.05 GiB is also below one V620 before KV",
+        "runtime_route": "llama.cpp qwen35, registered in the pinned 790cf51a; the router already serves qwen35 MTP GGUFs with draft-mtp",
+        "disposition": "candidate for a best-fit comparison against the router's current Qwen 27B presets; not a new capability",
+        "next_gate": "choose one quant for the 27B placement, re-pin, download in a separately authorized lane, serialized qualification",
+        "notes": "Publisher claims (ARC-C 709 at 8-bit and 701 at 4-bit, 1/2 to 1/20 of the thinking tokens, lightly uncensored with a stronger variant announced) are not local evidence. Repository lastModified 2026-09-13T03:11:13.000Z, so re-pin before any download."
+      },
+      {
+        "url": "https://huggingface.co/laion/CLIP-ViT-L-14-laion2B-s32B-b82K",
+        "repository": "laion/CLIP-ViT-L-14-laion2B-s32B-b82K",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-12",
+        "revision": "1627032197142fbe2a7cfec626f4ced3ae60d07a",
+        "checked_at": "2026-09-12T23:14:21-0400",
+        "gated": false,
+        "pipeline_tag": "zero-shot-image-classification",
+        "repository_bytes": 6847435463,
+        "license": "mit",
+        "architecture": "CLIP ViT-L/14 image and text towers (Hub safetensors metadata 427,616,846 parameters; config model_type clip)",
+        "role": "zero-shot image classification and image-text retrieval (card); card reports 75.3% zero-shot ImageNet-1k top-1",
+        "artifact_bytes": {
+          "model.safetensors": 1710540580,
+          "open_clip_pytorch_model.safetensors": 1710517748,
+          "open_clip_pytorch_model.bin": 1710631365,
+          "pytorch_model.bin": 1710660257
+        },
+        "resource_class": "fits-single-gpu",
+        "resource_basis": "one weight copy is 1.59 GiB; the four files are redundant formats of the same model; any card, or CPU",
+        "runtime_route": "open_clip (not installed in any local venv) or transformers CLIPModel (transformers is present); torchvision exists only in the ComfyUI venv",
+        "disposition": "small isolated evaluation candidate once a consumer is named",
+        "next_gate": "name the consumer (image retrieval beside WeMM, whose image path is runtime-blocked, or image-generation scoring), then the fixed-taxonomy in-domain testing the card asks for",
+        "notes": "The card scopes the model to research: any deployed use is out of scope, untested constrained image search is not recommended, and surveillance or face recognition is always out of scope."
       }
     ]
   },

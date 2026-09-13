@@ -535,25 +535,32 @@ python3 -m pytest --ignore=verification/repository-agent
 
 ## Upgrading llama.cpp
 
-Per [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md). Do not skip
+Per [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md), which tracks
+upstream `master` at an exact commit rather than release tags. Do not skip
 step 4: staging picks up whatever the worktree is on, so a fetch left checked out
-on `master` pins `master` for every later clone while every other record still
-reads the release.
+on a branch tip pins that tip for every later clone while every other record
+still reads the previous commit.
 
-1. Review the upstream release and resolve its tag to an exact commit.
-2. In the submodule, fetch tags and check out that commit detached:
+1. Resolve upstream `master` to an exact commit and review the delta from the
+   running binary.
+2. In the submodule, fetch that commit and check it out detached:
    ```bash
-   git -C upstream/llama.cpp fetch --tags origin
+   git -C upstream/llama.cpp fetch origin <commit>
    git -C upstream/llama.cpp checkout --detach <commit>
    ```
-3. Update `upstream/llama-cpp.lock.json` to the same tag and commit.
+3. Update `commit` in `upstream/llama-cpp.lock.json`; `branch` stays `master`
+   and the lock carries no `tag` field.
 4. Stage the submodule and confirm the gitlink agrees:
    ```bash
    git add upstream/llama.cpp
    git ls-files -s upstream/llama.cpp
    python3 -m pytest verification/upstream-pin/test_llama_cpp_pin.py
    ```
-5. Run `scripts/build-llama-cpp.sh`, only when no other optimized build is active.
+5. Run `scripts/build-llama-cpp.sh`, only when no other optimized build is active
+   and `upstream/llama.cpp/build/bin` is a real directory. CMake writes binaries
+   and libraries into `build/bin`, so while that path is the symlinked bundle
+   installed on 2026-09-13 a build would overwrite the running binaries through
+   the link.
 6. Run functional qualification. No token-rate or latency measurement.
 7. Commit the outer gitlink, lock, service paths, documentation and verification
    together.
@@ -575,6 +582,14 @@ git submodule update --init --recursive upstream/llama.cpp
 `scripts/build-llama-cpp.sh`, then reinstall the tracked user units. Do not keep
 an untracked second production checkout as a rollback mechanism — that is the
 failure ADR 0005 exists to prevent.
+
+The 2026-09-13 installation kept the previous binaries on disk.
+`upstream/llama.cpp/build/bin` is a symlink to the externally built `790cf51a`
+bundle, and `upstream/llama.cpp/build/bin.rollback-8ea290247` holds the
+`8ea29024` build. Pointing `build/bin` back at that directory is a binary
+rollback without a rebuild. It needs a router restart, which is a separate
+operator decision, and the outer repository stays pinned to `790cf51a` until the
+prior commit is checked out as above.
 
 **Router.** `llama-ridge.service` runs `scripts/serve-ridge.sh` as a single-model
 fallback. It must never run at the same time as `llama-router.service`: both bind

@@ -71,6 +71,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`scripts/serve-gemma4-heretic.sh`](../../scripts/serve-gemma4-heretic.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-heretic.sh`](../../scripts/serve-heretic.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-model.py`](../../scripts/serve-model.py) | [Reference](../MODEL-RUNS.md) |
+| [`scripts/serve-nex.sh`](../../scripts/serve-nex.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-obliterated-vision.sh`](../../scripts/serve-obliterated-vision.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-obliterated.sh`](../../scripts/serve-obliterated.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-phr00ty.sh`](../../scripts/serve-phr00ty.sh) | [Reference](../MODEL-RUNS.md) |
@@ -78,7 +79,9 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`scripts/serve-qwen3-coder-next.sh`](../../scripts/serve-qwen3-coder-next.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-qwen3-embedding-8b.sh`](../../scripts/serve-qwen3-embedding-8b.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-qwen3-reranker-8b.sh`](../../scripts/serve-qwen3-reranker-8b.sh) | [Reference](../MODEL-RUNS.md) |
+| [`scripts/serve-qwopus.sh`](../../scripts/serve-qwopus.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/serve-ridge.sh`](../../scripts/serve-ridge.sh) | [Reference](../MODEL-RUNS.md) |
+| [`scripts/serve-signal.sh`](../../scripts/serve-signal.sh) | [Reference](../MODEL-RUNS.md) |
 | [`scripts/verify-hermes-models.sh`](../../scripts/verify-hermes-models.sh) | [Reference](OPERATIONS.md) |
 | [`scripts/verify-router-models.py`](../../scripts/verify-router-models.py) | [Reference](OPERATIONS.md) |
 | [`services/sidecar-embeddings.env`](../../services/sidecar-embeddings.env) | [Reference](CONFIGURATION.md) |
