@@ -468,21 +468,19 @@ in disposable synthetic environments.
 
 ## Hardware profile backups
 
-`config/hardware/amdgpu/<capture>/` holds byte-for-byte copies of every
-`/etc/default/amdgpu*` file, one directory per capture, each with its own
-`SHA256SUMS` and a `README.md` recording what the source said at that moment.
+`config/hardware/amdgpu/` holds one current byte-for-byte copy of each
+`/etc/default/amdgpu-custom-state.card0`, `.card1`, and `.card2` file, using
+the original filenames, with one `SHA256SUMS` and `README.md`.
 
 **These are archives, not inputs.** Nothing in this repository reads them, no
 automation applies them, and copying one back into `/etc` is an operator action
 this repository does not perform. `amdgpu-clocks` discovers the files under
 `/etc/default`; installing a file there is still not applying it.
 
-Keep the older captures. The pair captured on 2026-09-08 is the only record that
-`card0` and `card1` were retuned toward nominal voltage between 12:37 and 16:15
-that day, each gaining a crash annotation above its new value. That is a tuning
-history, not a stability verdict: this repository holds no qualification evidence
-for any of these values, and a gate result taken while the host is faulting
-describes the host rather than the model under test.
+Refresh the three copies in place and regenerate checksums when the operator
+changes the persisted profiles. Do not keep dated duplicate directories; Git
+history preserves older versions. These copies do not establish stability, and
+a gate result taken while the host is faulting does not isolate model behavior.
 
 Verify a capture from inside its directory with `sha256sum -c SHA256SUMS`. Before
 restoring anything, re-check PCI identities and DRM card numbering — this host

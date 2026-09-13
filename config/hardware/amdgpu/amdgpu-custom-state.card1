@@ -6,8 +6,8 @@
 # Negative voltage offsets and clock overclocking are NOT verified supported.
 # Do not copy 6900 XT clocks, voltage offsets, or power limits here.
 OD_VDDGFX_OFFSET:
-#-125mV crash
--120mV
+#-70mV crash
+-65mV
 
 # Previously observed current and maximum cap: 250 W (microwatts).
 # Explicit fields avoid card0 power/performance inheritance in the helper.

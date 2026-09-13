@@ -267,16 +267,11 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/benchmarks/qwen3-reranker-8b.md`](../../docs/benchmarks/qwen3-reranker-8b.md) | [Reference](../MODEL-RUNS.md) |
 | [`docs/reference/PLACEMENT-MEASUREMENTS.md`](../../docs/reference/PLACEMENT-MEASUREMENTS.md) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
 | [`docs/HANDOFF-2026-09-07.md`](../../docs/HANDOFF-2026-09-07.md) | [Reference](DEVELOPER-GUIDE.md) |
-| [`config/hardware/amdgpu/2026-09-08/README.md`](../../config/hardware/amdgpu/2026-09-08/README.md) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08/SHA256SUMS`](../../config/hardware/amdgpu/2026-09-08/SHA256SUMS) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card1) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-08/amdgpu-custom-state.card2) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08T1924-0400/README.md`](../../config/hardware/amdgpu/2026-09-08T1924-0400/README.md) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08T1924-0400/SHA256SUMS`](../../config/hardware/amdgpu/2026-09-08T1924-0400/SHA256SUMS) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card1) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-08T1924-0400/amdgpu-custom-state.card2) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/README.md`](../../config/hardware/amdgpu/README.md) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/SHA256SUMS`](../../config/hardware/amdgpu/SHA256SUMS) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/amdgpu-custom-state.card0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/amdgpu-custom-state.card1) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/amdgpu-custom-state.card2) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
 | [`docs/decisions/0007-conditional-custom-quantization.md`](../../docs/decisions/0007-conditional-custom-quantization.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`scripts/qualification_status.py`](../../scripts/qualification_status.py) | [Reference](OPERATIONS.md) |
 | [`verification/qualification-supervisor/qualification_cache.py`](../../verification/qualification-supervisor/qualification_cache.py) | [Reference](ARCHITECTURE.md) |
@@ -289,11 +284,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/qualification-supervisor/test_qualification_performance.py`](../../verification/qualification-supervisor/test_qualification_performance.py) | [Reference](QUALIFICATION-PERFORMANCE.md) |
 | [`docs/reference/QUALIFICATION-MIGRATION.md`](../../docs/reference/QUALIFICATION-MIGRATION.md) | [Reference](QUALIFICATION-MIGRATION.md) |
 | [`docs/reference/QUALIFICATION-PERFORMANCE.md`](../../docs/reference/QUALIFICATION-PERFORMANCE.md) | [Reference](QUALIFICATION-PERFORMANCE.md) |
-| [`config/hardware/amdgpu/2026-09-09T0106-0400/README.md`](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
-| [`config/hardware/amdgpu/2026-09-09T0106-0400/SHA256SUMS`](../../config/hardware/amdgpu/2026-09-09T0106-0400/SHA256SUMS) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
-| [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card0) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
-| [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card1) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
-| [`config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/2026-09-09T0106-0400/amdgpu-custom-state.card2) | [Reference](../../config/hardware/amdgpu/2026-09-09T0106-0400/README.md) |
+
 | [`verification/qualification-supervisor/test_serialized_runner_router_restore.py`](../../verification/qualification-supervisor/test_serialized_runner_router_restore.py) | [Reference](TROUBLESHOOTING.md) |
 | [`verification/conftest.py`](../../verification/conftest.py) | [Reference](QUALIFICATION-PERFORMANCE.md) |
 | [`docs/decisions/0008-local-frankenstein-artwork-and-animation.md`](../../docs/decisions/0008-local-frankenstein-artwork-and-animation.md) | [Reference](../decisions/README.md) |

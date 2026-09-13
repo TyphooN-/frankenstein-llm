@@ -263,6 +263,30 @@ def test_coverage_map_contains_all_outer_tracked_files():
     assert tracked == mapped, {"missing": sorted(tracked - mapped), "obsolete": sorted(mapped - tracked)}
 
 
+def test_amdgpu_profiles_are_one_current_copy_per_card():
+    tracked = [
+        path for path in subprocess.check_output(
+            ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")
+        if path.startswith("config/hardware/amdgpu/")
+    ]
+    expected = {
+        "config/hardware/amdgpu/README.md",
+        "config/hardware/amdgpu/SHA256SUMS",
+        "config/hardware/amdgpu/amdgpu-custom-state.card0",
+        "config/hardware/amdgpu/amdgpu-custom-state.card1",
+        "config/hardware/amdgpu/amdgpu-custom-state.card2",
+    }
+    assert set(tracked) == expected
+    assert not any("/20" in path for path in tracked)
+    checksums = (ROOT / "config/hardware/amdgpu/SHA256SUMS").read_text().splitlines()
+    names = {line.split("  ", 1)[1] for line in checksums if line}
+    assert names == {
+        "amdgpu-custom-state.card0",
+        "amdgpu-custom-state.card1",
+        "amdgpu-custom-state.card2",
+    }
+
+
 def test_documentation_audit_inventory_and_disposition_counts():
     audit = json.loads((ROOT / "docs/reference/documentation-audit-2026-09-07.json").read_text())
     tracked = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")

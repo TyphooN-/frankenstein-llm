@@ -23,9 +23,9 @@
     "Every 127.0.0.1:<port> in documentation matches a port in a tracked unit, env file or script.",
     "The CONFIGURATION.md alias table is compared field by field against llama-models.ini by an added test."
   ],
-  "inventory_count": 67,
+  "inventory_count": 65,
   "disposition_counts": {
-    "added": 8,
+    "added": 6,
     "updated": 11,
     "historical": 22,
     "aligned": 26
@@ -459,18 +459,11 @@
       "change": "Added as proposed, and listed in README.md and docs/decisions/README.md. Proposed is its real status: no conversion has been performed or qualified."
     },
     {
-      "path": "config/hardware/amdgpu/2026-09-08/README.md",
+      "path": "config/hardware/amdgpu/README.md",
       "disposition": "added",
-      "finding": "The 12:37/13:03 capture of /etc/default/amdgpu* had no inventory entry.",
-      "source_evidence": "config/hardware/amdgpu/2026-09-08/SHA256SUMS verifies against the files beside it; the offsets quoted in the table are the ones the captured files configure.",
-      "change": "Inventoried, and given a one-line pointer to the later capture that supersedes it for card0 and card1. Its own checksums and offsets were left as recorded."
-    },
-    {
-      "path": "config/hardware/amdgpu/2026-09-08T1924-0400/README.md",
-      "disposition": "added",
-      "finding": "card0 and card1 had been retuned after the earlier capture, so the repository's backup no longer matched /etc/default.",
-      "source_evidence": "Source hashed before copy and both source and destination re-hashed after: card0 2052c604..., card1 1f2c9467..., card2 5b3d535e... unchanged. Source mtimes 15:38:42, 16:15:42 and 08:44:30 on 2026-09-08.",
-      "change": "Added the refreshed capture with its own SHA256SUMS and README. No /etc file was written, no GPU setting applied and no service restarted."
+      "finding": "Operator requested one current profile per card instead of dated duplicates.",
+      "source_evidence": "config/hardware/amdgpu/SHA256SUMS; byte-for-byte comparisons against /etc/default/amdgpu-custom-state.card0, card1 and card2.",
+      "change": "Consolidated current copies under original filenames; older versions remain in Git history. No live settings changed."
     },
     {
       "path": "docs/reference/QUALIFICATION-MIGRATION.md",
@@ -486,13 +479,7 @@
       "source_evidence": "scripts/qualification_performance.py; verification/qualification-supervisor/test_qualification_performance.py",
       "change": "Documented and verified against the referenced implementation or captured source; not part of the original audit."
     },
-    {
-      "path": "config/hardware/amdgpu/2026-09-09T0106-0400/README.md",
-      "disposition": "added",
-      "finding": "Added during qualification naming, telemetry and profile backup continuation.",
-      "source_evidence": "config/hardware/amdgpu/2026-09-09T0106-0400/SHA256SUMS; byte-for-byte source comparisons",
-      "change": "Documented and verified against the referenced implementation or captured source; not part of the original audit."
-    },
+
     {
       "path": "docs/reference/HOST-SYSTEM-AND-PCIE.md",
       "disposition": "added",
