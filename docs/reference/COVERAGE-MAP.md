@@ -295,5 +295,14 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 
 | [`scripts/proof_layout.py`](../../scripts/proof_layout.py) | [Reference](OPERATIONS.md#local-proof-storage) |
 | [`verification/proof-storage/test_proof_layout.py`](../../verification/proof-storage/test_proof_layout.py) | [Reference](OPERATIONS.md#local-proof-storage) |
+| [`rust/Cargo.toml`](../../rust/Cargo.toml) | [Reference](CONFIGURATION.md) |
+| [`rust/src/cli.rs`](../../rust/src/cli.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/src/config.rs`](../../rust/src/config.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/src/doctor.rs`](../../rust/src/doctor.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/src/error.rs`](../../rust/src/error.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/src/gpu.rs`](../../rust/src/gpu.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/src/lib.rs`](../../rust/src/lib.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/src/main.rs`](../../rust/src/main.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/tests/serve_parity.rs`](../../rust/tests/serve_parity.rs) | [Reference](CONFIGURATION.md) |
 
-Inventory entries: 294, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 303, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
