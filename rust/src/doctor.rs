@@ -157,9 +157,41 @@ impl Doctor {
                                 .map(|s| s.to_string())
                         });
                     match commit {
-                        Some(c) => {
-                            Check::pass(name, true, format!("commit {}", &c[..c.len().min(12)]))
-                        }
+                        Some(c) => match std::process::Command::new("git")
+                            .args([
+                                "-C",
+                                root.join("upstream/llama.cpp").to_str().unwrap_or("."),
+                                "rev-parse",
+                                "HEAD",
+                            ])
+                            .output()
+                        {
+                            Ok(out) if out.status.success() => {
+                                let head = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                                if head == c {
+                                    Check::pass(
+                                        name,
+                                        true,
+                                        format!("commit {}", &c[..c.len().min(12)]),
+                                    )
+                                } else {
+                                    Check::fail(
+                                        name,
+                                        true,
+                                        format!("lock {c} != submodule HEAD {head}"),
+                                    )
+                                }
+                            }
+                            Ok(out) => Check::fail(
+                                name,
+                                true,
+                                format!(
+                                    "git rev-parse failed: {}",
+                                    String::from_utf8_lossy(&out.stderr)
+                                ),
+                            ),
+                            Err(e) => Check::fail(name, true, format!("git rev-parse: {e}")),
+                        },
                         None => Check::fail(name, true, "lock has no commit field".to_string()),
                     }
                 }
@@ -231,5 +263,17 @@ mod tests {
         // silently reported as healthy.
         assert!(!d.ok());
         assert!(!d.render().is_empty());
+    }
+
+    #[test]
+    fn doctor_pin_matches_this_checkout() {
+        let root = repo_root().canonicalize().expect("repo root");
+        let d = Doctor::run(root, None);
+        let pin = d
+            .checks
+            .iter()
+            .find(|c| c.name == "upstream pin sanity")
+            .expect("pin check");
+        assert!(pin.passed, "{}", pin.detail);
     }
 }

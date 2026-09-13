@@ -38,9 +38,9 @@ fn run(cmd: &Commands, root: &std::path::Path) -> std::result::Result<String, St
         Commands::Doctor { expected_gpus } => {
             let d = Doctor::run(root.to_path_buf(), *expected_gpus);
             let report = d.render();
-            // Fail closed: a mandatory failure is a non-zero exit.
             if !d.ok() {
-                return Ok(report); // printed; exit code set by caller via ok()
+                eprint!("{report}");
+                return Err("doctor failed".to_string());
             }
             Ok(report)
         }
@@ -86,21 +86,43 @@ fn model_list(root: &std::path::Path) -> std::result::Result<String, String> {
     let catalog =
         config::load_catalog(&root.join("config/model-catalog.json")).map_err(|e| e.to_string())?;
 
-    let mut out = String::new();
-    let mut aliases: Vec<&String> = presets.keys().collect();
-    aliases.sort();
-    for a in aliases {
-        let preset = &presets[a];
-        let model = preset.get("model").unwrap_or("<no-model>");
-        let catalog_entry = catalog.get(a);
-        let cat = match catalog_entry {
-            Some(e) => format!("[{}/{}]", e.source, e.purpose),
-            None => "[no-catalog-entry]".to_string(),
+    let mut rows = Vec::new();
+    for (alias, preset) in &presets {
+        let mut names = Vec::new();
+        if let Some(model) = preset.get("model") {
+            names.push(
+                std::path::Path::new(model)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(model)
+                    .to_string(),
+            );
+        }
+        if let Some(mmproj) = preset.get("mmproj") {
+            names.push(
+                std::path::Path::new(mmproj)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(mmproj)
+                    .to_string(),
+            );
+        }
+        let identity = if names.is_empty() {
+            "not a configured preset".to_string()
+        } else {
+            names.join(" + ")
         };
-        let n_params = preset.get("gpu-layers").unwrap_or("0");
-        out.push_str(&format!(
-            "{a:14} {n_params:>4}-layers {model}\n           {cat}\n"
-        ));
+        let purpose = catalog
+            .get(alias)
+            .map(|e| e.purpose.as_str())
+            .unwrap_or("no catalog entry");
+        rows.push((format!("{identity} ({purpose})"), alias.clone()));
+    }
+    rows.sort_by(|a, b| a.1.cmp(&b.1));
+    let width = rows.iter().map(|(body, _)| body.len()).max().unwrap_or(0);
+    let mut out = String::new();
+    for (body, alias) in rows {
+        out.push_str(&format!("{body:<width$}  [compatibility alias: {alias}]\n"));
     }
     Ok(out)
 }
