@@ -80,3 +80,6 @@ __pycache__/
 *.swp
 
 verification/qualification-supervisor/*.performance.jsonl
+
+# frankenctl build output.
+/rust/target/
