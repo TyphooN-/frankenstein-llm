@@ -1,77 +1,65 @@
-//! Integration test: the Rust `llama-server` launch planner must produce an
-//! argument vector **identical** to the Python `scripts/serve-model.py`
-//! `command()` for real presets read from the repository's
-//! `llama-models.ini`. This is the parity gate the migration brief requires
-//! before the Rust path may ever execute a launch.
+//! Compare the Rust planner to live Python `scripts/serve-model.py::command()`.
 //!
-//! The test reads the real repo config so it stays honest as presets change;
-//! it fails if the two implementations ever diverge on an existing preset.
+//! The Python module is loaded from the main checkout when this crate lives in
+//! a worktree, so the test follows current presets rather than a duplicated
+//! Rust oracle.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use frankenctl::config::{self, Serving};
 
-/// Resolve the repository root relative to this crate.
 fn repo_root() -> PathBuf {
     let mut p = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    p.pop(); // <repo>/rust -> <repo>
+    p.pop();
     p.canonicalize().expect("repo root canonicalize")
 }
 
-/// The canonical command the Python implementation would build, expressed
-/// here as the expected token list for a preset. We re-implement the *contract*
-/// (documented in the migration brief) as the reference, then assert the Rust
-/// planner agrees with it for every real preset.
-fn reference_command(
-    llama_bin: &Path,
-    alias: &str,
-    preset: &frankenctl::config::Preset,
-    serving: &Serving,
-) -> Result<Vec<String>, String> {
-    // Mirror serve-model.py:command() exactly.
-    let _model = preset.model().ok_or("no model")?;
-    let mut cmd: Vec<String> = vec![
-        llama_bin.to_string_lossy().into_owned(),
-        "--host".to_string(),
-        serving.host.to_string(),
-        "--port".to_string(),
-        serving.port.to_string(),
-        "--alias".to_string(),
-        alias.to_string(),
-    ];
-    let mut seen = std::collections::BTreeSet::new();
-    // `alias` is added manually above and is never a preset key; `model` is a
-    // preset key and must be emitted as `--model <path>`, so it is NOT pre-seen.
-    seen.insert("alias".to_string());
-    for (k, v) in preset.iter() {
-        if seen.contains(k) {
-            continue;
-        }
-        seen.insert(k.to_string());
-        let k = k;
-        match k {
-            "jinja" if v == "1" => cmd.push("--jinja".into()),
-            "jinja" if v == "0" => cmd.push("--no-jinja".into()),
-            "jinja" => return Err(format!("invalid jinja value: {v}")),
-            "embedding" if v == "1" => cmd.push("--embedding".into()),
-            "embedding" if v == "0" => {}
-            "embedding" => return Err(format!("invalid embedding value: {v}")),
-            "reranking" if v == "1" => cmd.push("--reranking".into()),
-            "reranking" if v == "0" => {}
-            "reranking" => return Err(format!("invalid reranking value: {v}")),
-            _ => {
-                cmd.push(format!("--{k}"));
-                cmd.push(v.to_string());
-            }
-        }
+fn python_root(repo: &Path) -> PathBuf {
+    let main = PathBuf::from("/home/typhoon/git/frankenstein-llm");
+    if main.join("scripts/serve-model.py").is_file() {
+        main
+    } else {
+        repo.to_path_buf()
     }
-    Ok(cmd)
+}
+
+fn python_commands(root: &Path) -> BTreeMap<String, Vec<String>> {
+    let script = r#"
+import importlib.util
+import json
+import sys
+from pathlib import Path
+root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "scripts"))
+from model_catalog import presets
+spec = importlib.util.spec_from_file_location("serve_model", root / "scripts" / "serve-model.py")
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+serving = json.loads((root / "config" / "serving.json").read_text())
+out = {}
+for alias, values in presets(root / "llama-models.ini").items():
+    out[alias] = mod.command(alias, values, serving)
+print(json.dumps(out))
+"#;
+    let output = Command::new("python3")
+        .args(["-c", script, root.to_str().expect("utf8 path")])
+        .output()
+        .expect("run python reference");
+    assert!(
+        output.status.success(),
+        "python reference failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("python json")
 }
 
 #[test]
-fn rust_planner_matches_python_contract_for_all_presets() {
-    let root = repo_root();
-    let ini = root.join("llama-models.ini");
+fn rust_planner_matches_live_python_for_all_presets() {
+    let rust_root = repo_root();
+    let py_root = python_root(&rust_root);
+    let ini = py_root.join("llama-models.ini");
     assert!(
         ini.is_file(),
         "llama-models.ini missing at {}",
@@ -81,24 +69,25 @@ fn rust_planner_matches_python_contract_for_all_presets() {
     let presets = config::load_presets(&ini).expect("load presets");
     assert!(!presets.is_empty(), "no presets loaded");
 
-    // serving.json in the repo; if absent, fall back to the loopback contract.
-    let serving_path = root.join("config/serving.json");
-    let serving = if serving_path.is_file() {
-        config::load_serving(&serving_path).expect("load serving")
-    } else {
-        Serving {
-            host: "127.0.0.1",
-            port: 8080,
-        }
-    };
+    let serving = config::load_serving(&py_root.join("config/serving.json")).expect("serving");
+    let llama_bin = py_root.join("upstream/llama.cpp/build/bin/llama-server");
+    let python = python_commands(&py_root);
+    assert_eq!(
+        presets.keys().cloned().collect::<Vec<_>>(),
+        python.keys().cloned().collect::<Vec<_>>(),
+        "alias set mismatch"
+    );
 
-    let llama_bin = root.join("upstream/llama.cpp/build/bin/llama-server");
-    let n = presets.len();
     for (alias, preset) in &presets {
         let got = config::command(&llama_bin, alias, preset, &serving)
             .unwrap_or_else(|e| panic!("rust planner failed for {alias}: {e}"));
-        let want = reference_command(&llama_bin, alias, preset, &serving)
-            .unwrap_or_else(|e| panic!("reference failed for {alias}: {e}"));
-        assert_eq!(got, want, "planner mismatch for preset {alias} (1 of {n})");
+        let want = python
+            .get(alias)
+            .unwrap_or_else(|| panic!("python missing {alias}"));
+        assert_eq!(&got, want, "planner mismatch for preset {alias}");
     }
+    let _ = Serving {
+        host: serving.host,
+        port: serving.port,
+    };
 }

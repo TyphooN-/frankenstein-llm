@@ -14,7 +14,7 @@
 //! fail-closed validation, and the same `--flag` / `--flag value` shapes.
 //! Parity is proven by the integration fixtures in `tests/serve_plan.rs`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use serde::Deserialize;
@@ -52,25 +52,35 @@ pub struct Serving {
 /// are the raw string the operator wrote, so the launcher can pass them
 /// through verbatim.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct Preset(BTreeMap<String, String>);
+pub struct Preset(Vec<(String, String)>);
 
 impl Preset {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Insert a key/value. The INI loader uses this to merge the shared and
-    /// per-alias sections.
+    /// Insert a key/value. Existing keys keep their position so later alias
+    /// overrides do not reshuffle the shared `[*]` order, matching Python
+    /// `{**common, **section}`.
     pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        self.0.insert(key.into(), value.into());
+        let key = key.into();
+        let value = value.into();
+        if let Some((_, current)) = self.0.iter_mut().find(|(k, _)| k == &key) {
+            *current = value;
+            return;
+        }
+        self.0.push((key, value));
     }
 
     pub fn get(&self, key: &str) -> Option<&str> {
-        self.0.get(key).map(|s| s.as_str())
+        self.0
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
     }
 
     pub fn contains_key(&self, key: &str) -> bool {
-        self.0.contains_key(key)
+        self.0.iter().any(|(k, _)| k == key)
     }
 
     pub fn len(&self) -> usize {
@@ -91,10 +101,7 @@ impl Preset {
         self.get("mmproj")
     }
 
-    /// Keys in stable order. `llama-server` does not care about flag order,
-    /// but the fixtures compare exact command sequences, so the launcher and
-    /// the tests must agree on one order. `BTreeMap` gives us a total order
-    /// that is independent of INI line order.
+    /// Keys in insertion order: shared `[*]` first, then alias-only keys.
     pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> + '_ {
         self.0.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
@@ -314,7 +321,7 @@ pub fn load_serving(path: &Path) -> std::result::Result<Serving, ConfigError> {
 ///   line is not a header, a pair, a comment, or blank.
 pub fn load_presets(path: &Path) -> std::result::Result<BTreeMap<String, Preset>, ConfigError> {
     let raw = std::fs::read_to_string(path).map_err(|e| ConfigError::io(path, &e))?;
-    let mut sections: BTreeMap<String, std::collections::HashMap<String, String>> = BTreeMap::new();
+    let mut sections: HashMap<String, Vec<(String, String)>> = HashMap::new();
     let mut current: Option<String> = None;
     for (lineno, raw_line) in raw.lines().enumerate() {
         let line = raw_line.trim();
@@ -340,7 +347,7 @@ pub fn load_presets(path: &Path) -> std::result::Result<BTreeMap<String, Preset>
                 format!("line {}: not a key=value pair", lineno + 1),
             )
         })?;
-        let key = key.trim().to_string();
+        let key = key.trim().to_ascii_lowercase();
         let value = value.trim().to_string();
         if key.is_empty() {
             return Err(ConfigError::Json(
@@ -354,10 +361,14 @@ pub fn load_presets(path: &Path) -> std::result::Result<BTreeMap<String, Preset>
                 format!("line {}: key before any section", lineno + 1),
             )
         })?;
-        sections
+        let pairs = sections
             .get_mut(&section)
-            .expect("section was created by its header")
-            .insert(key, value);
+            .expect("section was created by its header");
+        if let Some((_, current)) = pairs.iter_mut().find(|(k, _)| k == &key) {
+            *current = value;
+        } else {
+            pairs.push((key, value));
+        }
     }
 
     let shared = sections.get("*").cloned().unwrap_or_default();
