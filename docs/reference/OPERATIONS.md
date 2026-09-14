@@ -298,33 +298,44 @@ scripts/redownload-heretic-after-crash.sh    # same, and clears a bad .partial
 All of them verify a publisher SHA-256 before renaming into place.
 `download-writing-models.sh` additionally holds a `flock` on the partial.
 
-### The chained download queues
+### The download service
 
-The four queues are the supported path for everything else, one systemd unit
-each, each waiting for its predecessors' stamps. They are listed by content;
-their unit and file names retain the original `phaseN` spelling because the
-completion stamps that record what was downloaded use it, and renaming them would
-rewrite evidence rather than clarify it.
+The four queues are the supported path for everything else. One unit,
+`local-ai-model-downloads.service`, runs `download_service.py`, which processes
+them one after another and holds all four queue locks for the whole run. Their
+queue, state, lock, stamp and log files keep the `phaseN` spelling from when each
+queue had its own unit, because the completion stamps that record what was
+downloaded use it, and renaming them would rewrite evidence rather than clarify
+it.
 
-| Queue unit | Installs |
-|---|---|
-| `local-ai-model-downloads.service` | core capabilities: embeddings, reranker, OCR, ASR, TTS, music, image, FIM |
-| `local-ai-model-downloads-phase2.service` | computer-use grounding: UI-TARS |
-| `local-ai-model-downloads-phase3.service` | image editing: Qwen Image Edit set |
-| `local-ai-model-downloads-phase4.service` | researched candidates: Qwen3-Coder-Next, Gemma-4 Heretic, UI-Mate, WeMM, FLUX.2 Klein |
+| Order | Queue file | Installs |
+|---|---|---|
+| 1 | `download-queue.json` | core capabilities: embeddings, reranker, OCR, ASR, TTS, music, image, FIM |
+| 2 | `download-queue-phase2.json` | computer-use grounding: UI-TARS |
+| 3 | `download-queue-phase3.json` | image editing: Qwen Image Edit set |
+| 4 | `download-queue-phase4.json` | researched candidates: Qwen3-Coder-Next, Gemma-4 Heretic, UI-Mate, WeMM, FLUX.2 Klein |
 
-All four completed on this host; starting one revalidates rather than refetches.
+All four completed on this host; starting the service revalidates rather than
+refetches. A queue that fails does not stop the queues after it, and the service
+exits 1 when any of them failed. If another writer already holds one of the four
+locks, the service exits 75 without starting anything. The slot queue
+(`download-queue-slot-uncensored-27b.json`) is not part of the service.
 
 ```bash
 systemctl --user start local-ai-model-downloads.service
-systemctl --user start local-ai-model-downloads-phase2.service
-systemctl --user start local-ai-model-downloads-phase3.service
-systemctl --user start local-ai-model-downloads-phase4.service
 
 journalctl --user -u local-ai-model-downloads.service -f
 ```
 
-To run one by hand, set the environment rather than passing arguments — the
+To inspect the ordered queue paths without starting the service, use
+`python3 verification/local-coverage-foundation/download_service.py --plan`.
+It emits JSON with `plan_only: true` and the queue, state, lock, stamp and log
+paths. It does not read manifests or weights, take locks, write evidence, or
+change signal handlers. This is a path plan, not artifact validation or a
+download-completion report. Extra arguments are rejected.
+
+To run one queue by hand, stop the service first — it holds every queue's lock
+while it runs — and set the environment rather than passing arguments; the
 program takes none:
 
 ```bash
@@ -339,6 +350,24 @@ python3 verification/local-coverage-foundation/download_queue.py
 Interrupting is safe. The queue resumes into `.partial` siblings, promotes only
 after an exact size and digest match, and revalidates finished files on the next
 run. Progress is in `downloads*.log` and `download-state*.json`.
+
+**Retiring the phase units on an installed host.** Installed units are copies, so
+a host set up before the service still has `local-ai-model-downloads-phase2`,
+`-phase3` and `-phase4` enabled. They start at every boot, and once their waiter
+scripts are gone from the checkout each one fails and restarts every minute.
+Replace them while every download unit is inactive. Nothing under `models/` or
+`verification/local-coverage-foundation/` moves; the service reads the same
+state and stamps.
+
+```bash
+systemctl --user list-units --all 'local-ai-model-downloads*'   # every one inactive
+systemctl --user disable local-ai-model-downloads-phase2.service local-ai-model-downloads-phase3.service local-ai-model-downloads-phase4.service
+mkdir -p ~/.config/systemd/retired-units
+mv ~/.config/systemd/user/local-ai-model-downloads-phase{2,3,4}.service ~/.config/systemd/retired-units/
+install -Dm644 services/systemd/local-ai-model-downloads.service ~/.config/systemd/user/local-ai-model-downloads.service
+install -Dm644 services/systemd/local-ai-qualification.service ~/.config/systemd/user/local-ai-qualification.service
+systemctl --user daemon-reload
+```
 
 ### Read-only reconciliation
 
@@ -620,8 +649,8 @@ for the full path. The short operational version:
 
 1. Collect exact metadata (`research/collect_hf_metadata.py`) and build a queue
    entry from it. Never hand-type a size or digest.
-2. Update the queue's `total_bytes` **and** every copy of it — the phase runner
-   and the qualification supervisor — then run `test_queue_manifests.py`.
+2. Update the queue's `total_bytes` **and** its copy in the qualification
+   supervisor, then run `test_queue_manifests.py`.
 3. Download through the queue.
 4. Add the router preset or sidecar env file.
 5. Give it a privilege tier in `candidate_policy`, or the router gate will fail

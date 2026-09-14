@@ -1,11 +1,11 @@
 [Unit]
-Description=Download and verify local AI roadmap artifacts
+Description=Download and verify the maintained local AI model queues
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/download_queue.py
+ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/download_service.py
 Restart=on-failure
 RestartSec=30
 TimeoutStartSec=infinity
@@ -14,6 +14,11 @@ IOSchedulingClass=idle
 IOSchedulingPriority=7
 CPUWeight=10
 IOWeight=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/typhoon/git/frankenstein-llm/models /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation
 Environment=PYTHONUNBUFFERED=1
 Environment=HERMES_DOWNLOAD_WORKERS=16
 Environment=HERMES_DOWNLOAD_CONNECTION_BUDGET=32

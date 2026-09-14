@@ -273,28 +273,25 @@ scripts/download-uncensored-models.sh          # obliterated + heretic
 scripts/download-writing-models.sh all         # fable + phr00ty
 ```
 
-**The chained download queues** for everything else — 18 artifacts, 118 files,
-about 219 GiB in four queues, pinned to repository revisions and exact sizes.
+**The download service** for everything else — 18 artifacts, 118 files, about
+219 GiB in four queues, pinned to repository revisions and exact sizes.
 LFS weight files carry SHA-256 values; some ancillary files have no SHA-256 in the
 queue. Do not describe those ancillary files as independently SHA-256 verified.
 
-All four have already completed on this host. Run them on a fresh checkout, or to
-re-verify: each revalidates finished files rather than refetching them.
+All four queues have already completed on this host. Run the service on a fresh
+checkout, or to re-verify: it revalidates finished files rather than refetching
+them.
 
 ```bash
-systemctl --user start local-ai-model-downloads.service         # core capabilities: embeddings, reranker, OCR, ASR, TTS, music, image, FIM
-systemctl --user start local-ai-model-downloads-phase2.service  # computer-use grounding: UI-TARS
-systemctl --user start local-ai-model-downloads-phase3.service  # image editing: Qwen Image Edit
-systemctl --user start local-ai-model-downloads-phase4.service  # researched candidates
+systemctl --user start local-ai-model-downloads.service   # core capabilities, computer-use grounding, image editing, researched candidates
 ```
 
-Queues are named here by what they install. The unit, queue, state and stamp
-files keep their original `phaseN` names because those names appear in completion
-stamps that record what was actually downloaded; renaming them would rewrite
-evidence. Each queue waits for its predecessor's completion stamp to match an
-exact byte total. Transfers resume into `.partial` siblings, verify exact size and any
-published SHA-256 recorded in the queue,
-and promote only verified bytes with `os.replace`. Independent files run
+One process runs the four queues in that order and holds every queue's lock
+while it does. The queue, state and stamp files keep their original `phaseN`
+names because those names appear in completion stamps that record what was
+actually downloaded; renaming them would rewrite evidence. Transfers resume into
+`.partial` siblings, verify exact size and any published SHA-256 recorded in the
+queue, and promote only verified bytes with `os.replace`. Independent files run
 concurrently; model loading and qualification stay serialized. Interrupting is
 safe — the next run revalidates and continues. Details:
 [operations → downloading weights](reference/OPERATIONS.md#downloading-weights).

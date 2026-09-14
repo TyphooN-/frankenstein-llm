@@ -83,7 +83,7 @@ Two rules constrain nearly every module:
   │ layer 2  ACQUISITION                   │  │   candidate-qual      │
   │   download-queue*.json  (pins)         │  └───────────┬───────────┘
   │   download_queue.py     (transfers)    │              │ writes
-  │   run_download_phase{2,3,4}.py         │              ▼
+  │   download_service.py   (one owner)    │              ▼
   └───────────────┬────────────────────────┘   verification/*/evidence/
                   │ promotes verified bytes                │  (ignored)
                   ▼                                        │
@@ -242,17 +242,24 @@ per file.
 
 Promotion is `os.replace` **after** an exact size match and, when the publisher
 publishes one, an exact SHA-256 match — and after the partial's own bytes are
-fsynced. The parent directory is fsynced too, because downstream phases trust the
-completion stamp and a rename that evaporates on power loss would leave a stamp
-describing bytes that are not there.
+fsynced. The parent directory is fsynced too, because the qualification supervisor
+trusts the completion stamp and a rename that evaporates on power loss would leave
+a stamp describing bytes that are not there.
 
 On success the queue writes `downloads[-phaseN]-complete.ok` containing the exact
-byte total. Phases 2–4 refuse to start until every earlier phase's state says
-`complete` *and* its stamp matches the byte total compiled into the runner; the
-qualification supervisor makes the same check across all four. Those repeated totals
-are cross-checked offline by `test_queue_manifests.py`, because a queue edited
-without updating its copies produces either a post-transfer stamp mismatch or a
-supervisor waiting forever for a number nothing will write.
+byte total. The qualification supervisor waits until every queue's state says
+`complete` *and* its stamp matches the byte total it carries. That repeated total
+is cross-checked offline by `test_queue_manifests.py`, because a queue edited
+without updating it produces a supervisor waiting forever for a number nothing
+will write.
+
+`download_service.py` runs the four queues one after another in one process, and
+takes every queue's lock before it starts, so no queue can be started by hand
+between two of them. It replaced one unit per queue, where the later three waited
+for the previous queue's stamp: once every stamp existed that waiting ordered
+nothing, and after each boot all four queues re-hashed the disk at the same time.
+A failed queue does not stop the queues after it; the service exits non-zero if
+any failed.
 
 ## Layer 3 — admission policy
 
@@ -570,8 +577,9 @@ stricter for model promotion, because downstream execution trusts the stamp.
 leaves the plain suffix behind.
 
 **Single writer.** Every long-running writer takes an exclusive `flock` and exits
-75 rather than racing: the download queue per phase, the qualification supervisor, the
-computer-use gate. The kernel releases the lock on any death, including SIGKILL.
+75 rather than racing: each download queue (the download service holds all four),
+the qualification supervisor, the computer-use gate. The kernel releases the lock
+on any death, including SIGKILL.
 
 **Untrusted data.** Screen text, retrieved documents and corpus rows are data,
 never instructions. The grounding gate scores injection compliance explicitly,

@@ -1,7 +1,7 @@
 {
   "additional_research_queue": {
-    "integrity": "User-submitted identifiers. An entry marked investigated carries its recorded research; entries researched in an intake batch cite the revision they were read at, with no weight download or remote code execution. Integrated entries name the router alias that loads them. No entry is qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 26,
+    "integrity": "User-submitted identifiers. An entry marked investigated carries its recorded research; entries researched in an intake batch cite the revision they were read at, with no weight download or remote code execution. Integrated entries name the router alias that loads them. An entry with a license_review stays download_admission blocked until that review records acceptance. No entry is qualified. Separate from the historical assessed-inventory and submission-batch counts.",
+    "unique_repository_count": 27,
     "intake_batches": [
       {
         "batch": "2026-09-12",
@@ -121,6 +121,31 @@
             "disposition": "new",
             "record": "additional_research_queue",
             "pinned_revision": "1627032197142fbe2a7cfec626f4ced3ae60d07a"
+          }
+        ]
+      },
+      {
+        "batch": "2026-09-13",
+        "recorded_at": "2026-09-13T19:12:03-0400",
+        "integrity": "Hugging Face API metadata, the complete pinned tree with LFS sha256, paths-info, HEAD x-linked headers, the publisher SHA256SUMS files and the GGUF and base model cards read unauthenticated on 2026-09-13; the pin was re-read as main at 2026-09-13T23:05:23Z, and paths-info at feda19f40b49686ac426223b439b21cf0e1e3c9e was read to trace SHA256SUMS.quants. No access request, no license acceptance, no weight download, no remote code execution, no router, preset, runtime or download-queue change. Publisher benchmark and behaviour claims are recorded as claims. Investigated is not qualified.",
+        "capacity_basis": {
+          "source": "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md, Hardware and runtime boundary",
+          "same_as_batch": "2026-09-12"
+        },
+        "submitted_url_count": 1,
+        "unique_repository_count": 1,
+        "newly_queued_count": 1,
+        "already_queued_count": 0,
+        "already_assessed_count": 0,
+        "qualified_count": 0,
+        "comparison_not_submitted": "agentionai/Signal-3.8-27B-GGUF is an earlier queue entry named as the comparison, and ukisai/Swift-Qwen3.8-27b is the base model; neither is a URL of this batch.",
+        "entries": [
+          {
+            "url": "https://huggingface.co/ukisai/Swift-Qwen3.8-27B-GGUF",
+            "repository": "ukisai/Swift-Qwen3.8-27B-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "b12fc8f44af7bdf31a3c3309891acb345d3106a2"
           }
         ]
       }
@@ -580,6 +605,58 @@
         "disposition": "small isolated evaluation candidate once a consumer is named",
         "next_gate": "name the consumer (image retrieval beside WeMM, whose image path is runtime-blocked, or image-generation scoring), then the fixed-taxonomy in-domain testing the card asks for",
         "notes": "The card scopes the model to research: any deployed use is out of scope, untested constrained image search is not recommended, and surveillance or face recognition is always out of scope."
+      },
+      {
+        "url": "https://huggingface.co/ukisai/Swift-Qwen3.8-27B-GGUF",
+        "repository": "ukisai/Swift-Qwen3.8-27B-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-13",
+        "revision": "b12fc8f44af7bdf31a3c3309891acb345d3106a2",
+        "checked_at": "2026-09-13T18:39:53-0400",
+        "gated": false,
+        "pipeline_tag": "image-text-to-text",
+        "repository_bytes": 447873293500,
+        "license": "other (card: swift-open-license-1.0; no LICENSE file in this or the base repository)",
+        "license_review": {
+          "state": "pending-operator-review",
+          "accepted": false,
+          "access_requested": false,
+          "terms_source": "https://huggingface.co/ukisai/Swift-Qwen3.8-27b#license-and-access, base card read at 1b30aaaf753fe5c1cb51ada2ea0367a53445359c",
+          "terms_summary": "Card summary only: personal, research, educational, evaluation and commercial use are free for individuals and organizations with annual recurring revenue, including affiliates, of up to US$1,000,000; commercial use above that requires a separate Swift Enterprise License from UkisAI.",
+          "open_questions": [
+            "The full Swift Open License v1.0 text is not in either repository, so redistribution, attribution, termination and warranty terms are unread.",
+            "The GGUF card says the weights are distributed through gated access and the base card metadata says gated: true, but the Hub API reports gated: false for both repositories, so no acceptance step stands between a client and the weights.",
+            "The card credits a transfer component derived from bottlecapai/ThinkingCap-Qwen3.6-27B, tagged apache-2.0 but gated behind an access form; its LICENSE and README returned HTTP 401 unauthenticated and access was not requested."
+          ]
+        },
+        "download_admission": "blocked",
+        "architecture": "qwen35 hybrid (API GGUF metadata: 27,320,697,856 parameters, 262144 context; card: 48 of 64 blocks recurrent, 16 full attention, MTP head at Q8_0 in every tier); 24 quant tiers, three F16 shards and an F16 projector",
+        "lineage": "base_model: ukisai/Swift-Qwen3.8-27b at 1b30aaaf753fe5c1cb51ada2ea0367a53445359c: finetune of Qwen/Qwen3.8-27B (card tag lora), swift-open-license-1.0; upstream: Qwen/Qwen3.8-27B at 1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0: apache-2.0 LICENSE file; transfer_source: bottlecapai/ThinkingCap-Qwen3.6-27B at 339f3b96a0af8e1cf6d0232c2b43ea68ea89f932: apache-2.0 tag, gated auto, files not read",
+        "gguf_file_count": 28,
+        "selected_gguf_bytes": {
+          "Swift-Qwen3.8-27B-Q4_K_M.gguf": 18024380576,
+          "Swift-Qwen3.8-27B-Q5_K_M.gguf": 20199745696,
+          "Swift-Qwen3.8-27B-Q6_K.gguf": 22884407456,
+          "Swift-Qwen3.8-27B-Q6_K_L.gguf": 25171245152,
+          "Swift-Qwen3.8-27B-Q8_0.gguf": 29116389280,
+          "mmproj-Swift-Qwen3.8-27B-F16.gguf": 927606976
+        },
+        "selected_gguf_sha256": {
+          "Swift-Qwen3.8-27B-Q4_K_M.gguf": "ad5811e291431bd0de1cec0c4004a5eac98daee9850882edac69a823209e88ab",
+          "Swift-Qwen3.8-27B-Q5_K_M.gguf": "8803944ed95e724f0d9864aea99c92383277a9d00de1b2ede9744e5e6193cc01",
+          "Swift-Qwen3.8-27B-Q6_K.gguf": "7f4de8abd5446c08b0f975a1b38e43d02639f4ae9ecdd2ddfd5c5b0f612bda59",
+          "Swift-Qwen3.8-27B-Q6_K_L.gguf": "4c90c8e1a70d10b91fe30a8e32f4432c5807a6a0e6096bd712d15be629104e9b",
+          "Swift-Qwen3.8-27B-Q8_0.gguf": "83cc7e31e095fbf0a12ff8f883f97e6e399192be74244c06c470affcd1b51b70",
+          "mmproj-Swift-Qwen3.8-27B-F16.gguf": "daa1116c9422fa390cc8688495da0e91781f92841dfc3b31a378ff252571745a"
+        },
+        "resource_class": "fits-gpu-pool",
+        "resource_basis": "all 24 quant GGUFs are 8.47 GiB to 27.12 GiB and the three F16 shards total 50.90 GiB, all below the 56.45 GiB pool before KV; Q8_0 27.12 GiB is also below one V620; projector 0.86 GiB",
+        "runtime_route": "llama.cpp qwen35, registered in the pinned 790cf51a; the router already serves qwen35 MTP GGUFs with draft-mtp. The publisher built the files with llama.cpp b10896.",
+        "disposition": "license review first; only then a candidate for the best-fit 27B comparison against signal and the router's current Qwen 27B presets; not a new capability",
+        "next_gate": "operator reviews the Swift Open License v1.0 and the ThinkingCap-derived component and records the decision in license_review; only after acceptance: re-pin, choose one tier, download in a separately authorized lane verified against the pinned LFS sha256, serialized qualification against signal",
+        "notes": "Publisher claims (58.3% fewer thinking tokens, under 1% loss, x1.95 speed-up) are not local evidence: the card says its results come from the BF16 and INT4 checkpoints, not these GGUFs, and for this release reports only a finite-tensor check and a CPU text-generation smoke test, with multimodal generation not re-evaluated. The card's own table shows AIME 2026 falling from 98.67% to 94.00% and HMMT from 99.33% to 96.00%, and 58.3% is the GPQA-Diamond median reduction (mean reductions 24.3% to 50.6%). SHA256SUMS at the pin matches the LFS sha256 of all 28 GGUFs. SHA256SUMS.quants was last changed at feda19f40b49686ac426223b439b21cf0e1e3c9e (2026-09-11) and, per paths-info at that commit, lists that commit's Q4_K_M, Q5_K_M and Q6_K uploads; all three were replaced on 2026-09-12 by files with different sizes and sha256, so verify only against the pinned LFS sha256. Do not use the card's curl | sh installer or llama-server -hf auto-fetch: -hf bypasses both this license review and pinned-hash verification. The publisher added tiers on 2026-09-13 (lastModified 2026-09-13T11:23:21.000Z), so re-pin before any download."
       }
     ]
   },

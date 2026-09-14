@@ -95,9 +95,6 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`services/systemd/local-ai-computer-use-gate.service`](../../services/systemd/local-ai-computer-use-gate.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-qualification.service`](../../services/systemd/local-ai-qualification.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-media-schema-gate.service`](../../services/systemd/local-ai-media-schema-gate.service) | [Reference](CONFIGURATION.md) |
-| [`services/systemd/local-ai-model-downloads-phase2.service`](../../services/systemd/local-ai-model-downloads-phase2.service) | [Reference](CONFIGURATION.md) |
-| [`services/systemd/local-ai-model-downloads-phase3.service`](../../services/systemd/local-ai-model-downloads-phase3.service) | [Reference](CONFIGURATION.md) |
-| [`services/systemd/local-ai-model-downloads-phase4.service`](../../services/systemd/local-ai-model-downloads-phase4.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-model-downloads.service`](../../services/systemd/local-ai-model-downloads.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-repo-agent-gate.service`](../../services/systemd/local-ai-repo-agent-gate.service) | [Reference](CONFIGURATION.md) |
 | [`services/systemd/local-ai-tts-gate.service`](../../services/systemd/local-ai-tts-gate.service) | [Reference](CONFIGURATION.md) |
@@ -171,6 +168,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json`](../../verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json) | [Reference](CONFIGURATION.md) |
 | [`verification/local-coverage-foundation/download-queue.json`](../../verification/local-coverage-foundation/download-queue.json) | [Reference](CONFIGURATION.md) |
 | [`verification/local-coverage-foundation/download_queue.py`](../../verification/local-coverage-foundation/download_queue.py) | [Reference](ARCHITECTURE.md) |
+| [`verification/local-coverage-foundation/download_service.py`](../../verification/local-coverage-foundation/download_service.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav`](../../verification/local-coverage-foundation/fixtures/asr/librispeech-mr-quilter.wav) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/fixtures/asr/qwen-asr-en.wav`](../../verification/local-coverage-foundation/fixtures/asr/qwen-asr-en.wav) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/fixtures/ground-truth.json`](../../verification/local-coverage-foundation/fixtures/ground-truth.json) | [Reference](CONFIGURATION.md) |
@@ -185,9 +183,6 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/local-coverage-foundation/research/collect_hf_metadata.py`](../../verification/local-coverage-foundation/research/collect_hf_metadata.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/research/hf-lfs-index.tsv`](../../verification/local-coverage-foundation/research/hf-lfs-index.tsv) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/research/test_collect_hf_metadata.py`](../../verification/local-coverage-foundation/research/test_collect_hf_metadata.py) | [Reference](ARCHITECTURE.md) |
-| [`verification/local-coverage-foundation/run_download_phase2.py`](../../verification/local-coverage-foundation/run_download_phase2.py) | [Reference](ARCHITECTURE.md) |
-| [`verification/local-coverage-foundation/run_download_phase3.py`](../../verification/local-coverage-foundation/run_download_phase3.py) | [Reference](ARCHITECTURE.md) |
-| [`verification/local-coverage-foundation/run_download_phase4.py`](../../verification/local-coverage-foundation/run_download_phase4.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/scripts/convert_qwen3_reranker_gguf.sh`](../../verification/local-coverage-foundation/scripts/convert_qwen3_reranker_gguf.sh) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/scripts/inspect_gguf.py`](../../verification/local-coverage-foundation/scripts/inspect_gguf.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/services/llama-sidecar@.service`](../../verification/local-coverage-foundation/services/llama-sidecar@.service) | [Reference](CONFIGURATION.md) |
@@ -195,6 +190,7 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/local-coverage-foundation/test_download_parallel.py`](../../verification/local-coverage-foundation/test_download_parallel.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/local-coverage-foundation/test_download_queue_cli.py`](../../verification/local-coverage-foundation/test_download_queue_cli.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/local-coverage-foundation/test_download_resume.py`](../../verification/local-coverage-foundation/test_download_resume.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`verification/local-coverage-foundation/test_download_service.py`](../../verification/local-coverage-foundation/test_download_service.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/local-coverage-foundation/test_queue_manifests.py`](../../verification/local-coverage-foundation/test_queue_manifests.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/local-coverage-foundation/validators/gate_asr.py`](../../verification/local-coverage-foundation/validators/gate_asr.py) | [Reference](ARCHITECTURE.md) |
 | [`verification/local-coverage-foundation/validators/gate_embeddings.py`](../../verification/local-coverage-foundation/validators/gate_embeddings.py) | [Reference](ARCHITECTURE.md) |

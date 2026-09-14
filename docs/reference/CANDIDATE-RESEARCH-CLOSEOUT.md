@@ -8,6 +8,100 @@ and the provisional ranking in
 [MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md). Those files retain
 useful header and pagination notes; they are not the current verdicts.
 
+## Submitted candidate intake — 2026-09-13
+
+One submitted URL, one identifier, compared case-insensitively against every
+section of [candidate-research-inventory.json](candidate-research-inventory.json):
+**new**. The record is in `additional_research_queue`, and its batch, with the
+exact URL and pinned revision, is in `additional_research_queue.intake_batches`.
+The base repository `ukisai/Swift-Qwen3.8-27b` is lineage for this row, not a
+submitted URL or a second entry.
+
+**Investigated is not qualified, and this row is not admitted to download.**
+Hugging Face API metadata, the complete pinned tree with LFS SHA-256, the
+publisher checksum files and both model cards were read unauthenticated on
+2026-09-13. The pin was still `main` when re-read at 23:05 UTC. No access was
+requested, no terms were accepted, no weights were downloaded, no remote code
+ran, and no router preset, runtime, or download queue changed.
+
+| Repository | Intake | Bytes and capacity | Route on this host | Disposition and next gate |
+|---|---|---|---|---|
+| `ukisai/Swift-Qwen3.8-27B-GGUF` | new, `b12fc8f4` | 8.47–27.12 GiB across 24 quants, 50.90 GiB F16 in three shards, 0.86 GiB projector; **GPU pool**, and Q8_0 (27.12 GiB) is below one V620 | llama.cpp `qwen35` (registered in `790cf51a`) with draft-mtp, like the current 27B presets | **License review first.** Only then a best-fit comparison against `signal` and the current 27B presets; not a new capability. |
+
+### Swift license and download gate
+
+The metadata says `license: other` and `license_name: swift-open-license-1.0`,
+and links to the "License and access" section of the base card at `1b30aaaf`.
+That section is the only statement of the terms in either repository. Personal,
+research, educational, evaluation, and commercial use are free for individuals
+and organizations with annual recurring revenue, including affiliates, of up to
+US$1,000,000. Commercial use above that needs a separate Swift Enterprise
+License. Neither repository contains a LICENSE file, so redistribution,
+attribution, termination, and warranty terms are unread, not absent.
+
+The Hub does not enforce the gate the cards describe. The GGUF card says the
+weights are "distributed through gated access", and the base card metadata says
+`gated: true`, but the API reports `gated: false` for both repositories. Nothing
+upstream stops a plain transfer, so the gate is held here. The record carries
+`license_review` with `accepted: false` and `download_admission: blocked`, and
+[test_documentation.py](../../verification/docs/test_documentation.py) fails if a
+download queue names the repository, or a router preset loads one of its recorded
+files, before the review records acceptance.
+
+The card also credits a transfer component derived from
+`bottlecapai/ThinkingCap-Qwen3.6-27B` (`339f3b96`). That repository is tagged
+Apache-2.0 but gated behind an access form. Its LICENSE and card returned HTTP
+401 unauthenticated, and access was not requested. The upstream
+`Qwen/Qwen3.8-27B` (`1d4bf0f2`) carries an Apache-2.0 LICENSE file.
+
+Do not follow the card's quick start. `curl … | sh` runs a remote installer, and
+`llama-server -hf` fetches a tier and the projector itself, bypassing both the
+license review and pinned-hash verification.
+
+### Swift pinned artifacts and checksums
+
+| Artifact at `b12fc8f4` | Bytes | GiB |
+|---|---:|---:|
+| `Swift-Qwen3.8-27B-Q4_K_M.gguf` | 18,024,380,576 | 16.79 |
+| `Swift-Qwen3.8-27B-Q5_K_M.gguf` | 20,199,745,696 | 18.81 |
+| `Swift-Qwen3.8-27B-Q6_K.gguf` | 22,884,407,456 | 21.31 |
+| `Swift-Qwen3.8-27B-Q6_K_L.gguf` | 25,171,245,152 | 23.44 |
+| `Swift-Qwen3.8-27B-Q8_0.gguf` | 29,116,389,280 | 27.12 |
+| `mmproj-Swift-Qwen3.8-27B-F16.gguf` | 927,606,976 | 0.86 |
+
+The full LFS SHA-256 of each is `selected_gguf_sha256` in the inventory record.
+The tree and `paths-info` agree on size and SHA-256 for all six. HEAD
+`x-linked-size` and `x-linked-etag` agree for the four files checked that way:
+Q4_K_M, Q6_K, Q8_0, and the projector. `SHA256SUMS` matches the LFS SHA-256 of
+all 28 GGUFs. `SHA256SUMS.quants` does not. It was last changed at `feda19f4`
+on 2026-09-11, and `paths-info` at that commit shows it lists that commit's
+Q4_K_M, Q5_K_M, and Q6_K uploads. All three were replaced on 2026-09-12 by files
+with different sizes and hashes. A download verified against that file would
+quarantine correct bytes, so verify against the pinned LFS SHA-256 only.
+
+**Publisher claims, not local evidence.** The card headlines "58.3% fewer
+thinking tokens", "<1% loss", and "x1.95 speed-up", and says its results come
+from the BF16 and INT4 checkpoints, not these files. For this release it reports
+only a finite-tensor check and a CPU text-generation smoke test; multimodal
+generation was not re-evaluated. The card's own table does not support "<1%
+loss" on mathematics: AIME 2026 falls from 98.67% to 94.00% and HMMT from
+99.33% to 96.00%. The 58.3% figure is the GPQA-Diamond median reduction; mean
+reductions run from 24.3% to 50.6%. The publisher added tiers on 2026-09-13
+(`lastModified` 11:23 UTC), so re-pin before any download.
+
+**Next gate, in order:**
+
+1. The operator reviews the Swift Open License v1.0 and the ThinkingCap-derived
+   component, and records the decision in `license_review`. If the card summary
+   is not enough, the full text has to come from UkisAI.
+2. Only after acceptance, re-pin and choose one tier. The card suggests Q4_K_M
+   for everyday use and Q6_K or higher for long agentic runs. Q6_K matches the
+   Q6_K-class residency of most current 27B presets.
+3. Download in a separately authorized lane, verified against the pinned LFS
+   SHA-256.
+4. Run serialized qualification against `signal`, which makes a similar
+   token-efficiency claim over the same base.
+
 ## Submitted candidate intake — 2026-09-12
 
 Thirteen submitted URLs, thirteen distinct identifiers, counted and compared

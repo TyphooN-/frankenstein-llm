@@ -209,10 +209,10 @@ CPU.
 | `SHA-256 mismatch` | Corrupt or truncated transfer. The partial is quarantined to `.bad-<digest prefix>` and the transfer restarts from zero | Nothing to do; it self-heals. Investigate if it repeats |
 | `quarantined invalid final` | A file already at the destination did not match size or digest | Expected after a bad copy or a power loss; the queue re-fetches |
 | `duplicate destination in queue` | Two queue entries resolve to the same real path | Fix the queue; per-file ownership is what makes concurrency safe |
-| Exit 75 | Another writer holds the phase lock | Wait, or stop the other unit |
+| Exit 75 | Another writer holds a queue lock. The download service holds all four for its whole run | Wait, or stop the other writer |
 | Exit 2 | Arguments were passed. The program takes none | Set `HERMES_DOWNLOAD_*` instead |
-| A phase never starts | The previous phase's state is not `complete`, or its stamp does not equal the expected byte total | `cat verification/local-coverage-foundation/downloads*-complete.ok` and compare against the queue's `total_bytes`; run `test_queue_manifests.py` |
-| `phase-one stamp mismatch` | The queue was edited without updating every copy of its byte total | Update queue, phase runner and qualification supervisor together |
+| `local-ai-model-downloads-phase2.service` (or `-phase3`, `-phase4`) fails at boot and restarts every minute | An installed copy of a retired per-queue unit whose waiter script is no longer in the checkout | Retire it: [operations → the download service](OPERATIONS.md#the-download-service) |
+| A stamp does not equal the expected byte total | The queue was edited without updating its total in `run_qualification.UPSTREAM`, or it has not completed since it changed | `cat verification/local-coverage-foundation/downloads*-complete.ok` and compare against the queue's `total_bytes`; run `test_queue_manifests.py` |
 
 Read-only reconciliation, safe on a busy host:
 
@@ -228,7 +228,7 @@ The supervisor logs why it is waiting to
 
 | `status` | Meaning | Action |
 |---|---|---|
-| `waiting-artifacts` | One or more phases are not `complete`, or a stamp mismatches | Finish the downloads; the log names the file and the reason |
+| `waiting-artifacts` | One or more queues are not `complete`, or a stamp mismatches | Finish the downloads; the log names the file and the reason |
 | `waiting-safe-host` | A **blocking** conflict (`kernel-build`, `inference` or `download-queue`) or `MemAvailable < 32 GiB`. Load average is not read at all | The log line names counts by reason and up to eight sample tasks |
 | `blocked-policy` | The candidate policy gate failed; nothing model-backed ran | Read `candidate-qualification/evidence/candidate-policy.json` → `problems` |
 | `interrupted` | An operator stop or a signal | Re-run; passed steps are skipped, the interrupted step repeats |
@@ -305,9 +305,9 @@ that survives fixing the kernel.
 
 The qualification skips a step only when its recorded `input_fingerprint` equals the
 one computed at startup. `qualification_inputs_fingerprint` hashes each
-`download-state*.json` document, and the download units start at boot too and
-rewrite those documents with fresh `started_at`/`completed_at` timestamps while
-they re-verify files that are already present and correct. Different bytes,
+`download-state*.json` document, and the download service starts at boot too and
+rewrites those documents with fresh `started_at`/`completed_at` timestamps while
+it re-verifies files that are already present and correct. Different bytes,
 different fingerprint, every pass invalidated.
 
 ```bash
