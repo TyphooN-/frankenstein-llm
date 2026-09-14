@@ -751,7 +751,7 @@ decision rather than blind deletion.
 | 5 | ran but produced no usable artifact | `run_when_idle.sh` (`EXIT_NO_ARTIFACT`) |
 | 65 | malformed input; nothing was examined | `frankenctl verify` (the manifest fails the queue schema or size bound) |
 | 66 | input absent | `frankenctl verify` (no manifest at the path) |
-| 74 | an I/O error prevented a check; the report keeps its operation, path, errno and offset | `frankenctl verify` |
+| 74 | an I/O error prevented a check | `frankenctl verify` (an artifact error keeps its operation, path, errno and offset in the report; a manifest read error is on stderr) |
 | 75 | another writer holds the lock, or the host is no longer idle | `download_queue.py`, qualification supervisor, serialized runners |
 | 128+N | terminated by signal N | qualification supervisor |
 
