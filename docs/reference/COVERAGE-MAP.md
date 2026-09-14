@@ -299,6 +299,9 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`rust/src/gpu.rs`](../../rust/src/gpu.rs) | [Reference](CONFIGURATION.md) |
 | [`rust/src/lib.rs`](../../rust/src/lib.rs) | [Reference](CONFIGURATION.md) |
 | [`rust/src/main.rs`](../../rust/src/main.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/src/manifest.rs`](../../rust/src/manifest.rs) | [Reference](OPERATIONS.md#verifying-artifacts-with-frankenctl) |
+| [`rust/src/verify.rs`](../../rust/src/verify.rs) | [Reference](OPERATIONS.md#verifying-artifacts-with-frankenctl) |
 | [`rust/tests/serve_parity.rs`](../../rust/tests/serve_parity.rs) | [Reference](CONFIGURATION.md) |
+| [`rust/tests/verify_cli.rs`](../../rust/tests/verify_cli.rs) | [Reference](OPERATIONS.md#verifying-artifacts-with-frankenctl) |
 
-Inventory entries: 303, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 296, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

@@ -369,6 +369,55 @@ install -Dm644 services/systemd/local-ai-qualification.service ~/.config/systemd
 systemctl --user daemon-reload
 ```
 
+### Verifying artifacts with frankenctl
+
+`frankenctl verify` checks local files against one download-queue manifest
+(`hermes-hf-artifact-queue/1`), read-only. The verification core is implemented
+and offline-tested. There is no verification unit yet, the command takes none of
+the download queues' locks, and it reads only the manifest named on its command
+line. The GLM shard manifest, the projector manifest and the download scripts'
+pinned files are not covered.
+
+```bash
+cargo build --offline --manifest-path rust/Cargo.toml
+F=verification/local-coverage-foundation
+rust/target/debug/frankenctl verify plan --manifest $F/download-queue-phase3.json
+rust/target/debug/frankenctl verify run --manifest $F/download-queue-phase3.json \
+  --artifact image-edit-qwen-vae
+```
+
+`plan` reads the manifest and nothing else. `run` checks each file of the selected
+artifacts (every artifact when no `--artifact` is given): exact size always, and
+SHA-256 when the queue records a publisher digest, hashed through one 8 MiB
+buffer. It never downloads, repairs, deletes, renames or promotes a file, never
+reads a completion stamp, and admits or qualifies nothing. The JSON report on
+stdout keeps each file's artifact key, repository, revision, `repo_path` and
+destination, with one outcome:
+
+| Outcome | Meaning |
+|---|---|
+| `verified-sha256` | exact size, and the publisher SHA-256 matched every byte |
+| `size-only-no-published-hash` | exact size; the queue records no digest, so the content was not read. Not a content check |
+| `missing` | nothing at the destination |
+| `size-mismatch` | wrong size; not read |
+| `sha256-mismatch` | right size, different content |
+| `unreadable` | an I/O error, kept with its operation, path, errno and offset |
+| `unsafe-path` | a symlink, a symlinked parent directory, or not a regular file; not read |
+| `changed-during-read` | the file grew, shrank, was rewritten or was replaced while it was read; no verdict |
+
+The whole manifest is validated first. An invalid digest, an unsafe or duplicate
+destination, a byte total that disagrees with its files, or any other schema
+problem exits 65 before any artifact is examined, rather than checking a smaller
+set. Exit 0 means every selected file matched, 1 an integrity problem, 2 bad
+usage (including an unknown `--artifact`), 66 an absent manifest, and 74 an I/O
+error. Exit 74 outranks 1, and an I/O error is never reported as a mismatch or a
+missing file.
+
+Run `verify run` only while nothing writes the same destinations:
+`local-ai-model-downloads.service` inactive, and no hand-started queue or
+download script running. A `run` reads every selected digest-bearing file in
+full, so while the storage pool reports errors prefer `plan` or a narrow
+`--artifact` selection.
 ### Read-only reconciliation
 
 ```bash
@@ -547,7 +596,13 @@ python3 -m pytest verification/qualification-supervisor/   # supervisor contract
 python3 -m pytest verification/docs/                 # documentation map and links
 python3 verification/generative-media/preflight.py   # static media preflight
 python3 verification/local-coverage-foundation/build_capability_ledger.py --print-only
+cargo test --offline -j4 --manifest-path rust/Cargo.toml   # frankenctl, including the artifact verifier
 ```
+
+`frankenctl`'s `doctor_pin_matches_this_checkout` compares the lock with the
+`upstream/llama.cpp` submodule's HEAD, so it fails in a linked worktree whose
+submodule was never initialized: there the lookup falls through to the outer
+checkout's commit.
 
 The live repository-agent gate creates private Linux namespaces through Bubblewrap; unit tests may mock subprocess boundaries. Broad tests can still invoke host probes reading /proc/<pid>/cmdline, a known hang hazard under kernel pressure.
 Run the complete suite only after builds and other host pressure have drained; a
@@ -687,11 +742,14 @@ decision rather than blind deletion.
 | Code | Meaning | Where |
 |---|---|---|
 | 0 | pass / complete | all |
-| 1 | failure with a verdict | gates, downloader, ledger (`problems` non-empty) |
-| 2 | bad usage, or a refused precondition | `download_queue.py`; `build-llama-cpp.sh` lock/worktree refusals |
+| 1 | failure with a verdict | gates, downloader, ledger (`problems` non-empty), `frankenctl verify` (an integrity problem) |
+| 2 | bad usage, or a refused precondition | `download_queue.py`; `build-llama-cpp.sh` lock/worktree refusals; `frankenctl verify` |
 | 3 | another instance already running | `gate_computer_use.py`; `post_reboot_gate.py` uses 3 for "not ready" |
 | 4 | interrupted by a handled signal | `gate_computer_use.py` |
 | 5 | ran but produced no usable artifact | `run_when_idle.sh` (`EXIT_NO_ARTIFACT`) |
+| 65 | malformed input; nothing was examined | `frankenctl verify` (the manifest fails the queue schema or size bound) |
+| 66 | input absent | `frankenctl verify` (no manifest at the path) |
+| 74 | an I/O error prevented a check | `frankenctl verify` (an artifact error keeps its operation, path, errno and offset in the report; a manifest read error is on stderr) |
 | 75 | another writer holds the lock, or the host is no longer idle | `download_queue.py`, qualification supervisor, serialized runners |
 | 128+N | terminated by signal N | qualification supervisor |
 
