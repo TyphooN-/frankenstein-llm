@@ -59,7 +59,7 @@ for pid in sorted(int(p.name) for p in Path('/proc').iterdir() if p.name.isdigit
     break
 
 services = {}
-for unit in ('local-ai-model-downloads.service', 'local-ai-model-downloads-phase2.service', 'llama-router.service'):
+for unit in ('local-ai-model-downloads.service', 'llama-router.service'):
     result = subprocess.run(
         ['systemctl', '--user', 'show', unit, '-p', 'ActiveState', '-p', 'SubState', '-p', 'ExecMainPID'],
         text=True, capture_output=True, check=False,

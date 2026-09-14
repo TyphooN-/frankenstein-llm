@@ -252,6 +252,71 @@ def test_research_queue_resolves_each_submission_to_one_record():
     assert problems == [], problems
 
 
+def test_unaccepted_license_keeps_a_research_record_out_of_downloads():
+    """Unaccepted license terms keep a researched repository off every download path.
+
+    ukisai/Swift-Qwen3.8-27B-GGUF is the case this exists for. Its card says the
+    weights are distributed through gated access under the custom Swift Open
+    License v1.0, yet the Hub reports the repository ungated, so nothing upstream
+    stands between a client and the weights. A record that carries a
+    ``license_review`` must state whether the terms were accepted. Until they
+    are, it must declare its download blocked, no download queue may name the
+    repository, and no router preset may load one of its recorded files.
+    """
+    inventory = json.loads((ROOT / "docs/reference/candidate-research-inventory.json").read_text())
+    reviewed = [row for row in inventory["additional_research_queue"]["entries"]
+                if "license_review" in row]
+    assert "ukisai/Swift-Qwen3.8-27B-GGUF" in {row["repository"] for row in reviewed}
+    queues = sorted((ROOT / "verification/local-coverage-foundation").glob("download-queue*.json"))
+    assert queues, "no download queue manifests to check against"
+    queued = {artifact["repository"].lower()
+              for queue in queues for artifact in json.loads(queue.read_text())["artifacts"]}
+    loaded = {name for preset in model_catalog.presets(ROOT / "llama-models.ini").values()
+              for name in model_catalog.artifacts(preset)}
+    problems = []
+    for row in reviewed:
+        accepted = row["license_review"].get("accepted")
+        if not isinstance(accepted, bool):
+            problems.append((row["repository"], "license review does not state acceptance"))
+            continue
+        if accepted:
+            continue
+        if row.get("download_admission") != "blocked":
+            problems.append((row["repository"], "terms unaccepted but download not blocked"))
+        if row["repository"].lower() in queued:
+            problems.append((row["repository"], "named by a download queue"))
+        for name in sorted(set(row.get("selected_gguf_bytes", {})) & loaded):
+            problems.append((row["repository"], f"a router preset loads {name}"))
+    assert problems == [], problems
+
+
+def test_recorded_research_hashes_pair_with_recorded_sizes():
+    """A recorded SHA-256 names exactly the files whose sizes are recorded.
+
+    Swift's publisher ships two checksum files that disagree at the pinned
+    revision: ``SHA256SUMS`` matches the LFS SHA-256 of every GGUF, while
+    ``SHA256SUMS.quants`` still lists three superseded uploads. The record keeps
+    the LFS values. A digest with no size beside it, or a size with no digest, is
+    how a later transfer ends up checking one file against another's hash.
+    """
+    inventory = json.loads((ROOT / "docs/reference/candidate-research-inventory.json").read_text())
+    hashed = [row for row in inventory["additional_research_queue"]["entries"]
+              if "selected_gguf_sha256" in row]
+    assert hashed, "no research record carries pinned hashes"
+    problems = []
+    for row in hashed:
+        hashes, sizes = row["selected_gguf_sha256"], row.get("selected_gguf_bytes", {})
+        if set(hashes) != set(sizes):
+            problems.append((row["repository"], "hashed and sized files differ"))
+        for name, digest in hashes.items():
+            if not re.fullmatch(r"[0-9a-f]{64}", digest):
+                problems.append((row["repository"], name, "not a SHA-256 digest"))
+        for name, size in sizes.items():
+            if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+                problems.append((row["repository"], name, "not a byte count"))
+    assert problems == [], problems
+
+
 def test_coverage_map_contains_all_outer_tracked_files():
     tracked = set(subprocess.check_output(
         ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")) - {"", "upstream/llama.cpp"}

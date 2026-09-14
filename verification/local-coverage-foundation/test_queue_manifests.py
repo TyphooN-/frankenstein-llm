@@ -1,25 +1,27 @@
 """Cross-file consistency for the download queues.
 
-The expected byte totals are repeated in four places: each queue JSON, the
-later-phase runners that refuse to start until the previous stamp matches, and
-the qualification supervisor that refuses to qualify anything until all four do. A
-queue edited without updating those copies produces a stamp mismatch
-that fails a unit *after* the transfer, or -- worse -- a supervisor that waits
-forever for a number nothing will ever write. Cheap to check here; expensive to
+Each queue's expected byte total is written twice: in the queue JSON and in the
+qualification supervisor, which refuses to qualify anything until every
+completion stamp matches it. A queue edited without updating the supervisor
+produces a supervisor that waits forever for a number nothing will ever write.
+The download service must also run exactly the queues the supervisor waits for,
+under the state and stamp names it reads. Cheap to check here; expensive to
 discover at 70 GB.
 
 The later slot-comparison queue is not a supervisor stamp, but it still must
-not collide on destinations or artifact keys with the four transfer phases.
+not collide on destinations or artifact keys with the four maintained queues.
 
-Reads JSON and source text only. No network, no models directory.
+Reads JSON, source text and the download service's file plan. No network, no
+models directory.
 """
 from __future__ import annotations
 
 import ast
 import json
 from pathlib import Path
-import re
 import unittest
+
+import download_service
 
 HERE = Path(__file__).resolve().parent
 MODELS_ROOT = Path("/home/typhoon/git/frankenstein-llm/models")
@@ -75,9 +77,11 @@ class QueueShapeTests(unittest.TestCase):
                 seen[key] = name
 
     def test_destinations_are_unique_across_all_concurrently_running_queues(self):
-        # Each phase has its own process lock and phases 1/2 can run together.
-        # A duplicate across manifests would therefore bypass the in-process
-        # destination guard and give two curl processes the same partial file.
+        # Every queue file has its own process lock. The download service holds
+        # the four maintained ones, but two queues started by hand, or the slot
+        # queue beside the service, still run at the same time. A duplicate
+        # across manifests would therefore bypass the in-process destination
+        # guard and give two curl processes the same partial file.
         seen: dict[str, str] = {}
         for name, path in ALL_QUEUES.items():
             for artifact in json.loads(path.read_text())["artifacts"]:
@@ -103,24 +107,6 @@ class QueueShapeTests(unittest.TestCase):
 class StampConstantTests(unittest.TestCase):
     """The hardcoded byte totals in the gating code must match the queues."""
 
-    def test_phase_two_runner_waits_for_the_real_phase_one_total(self):
-        source = (HERE / "run_download_phase2.py").read_text()
-        match = re.search(r"EXPECTED_PHASE1_BYTES\s*=\s*'(\d+)'", source)
-        self.assertIsNotNone(match, "phase-two runner no longer pins a total")
-        self.assertEqual(str(STAMP_BYTES["phase1"]), match.group(1))
-
-    def test_phase_three_runner_waits_for_both_upstream_totals(self):
-        found = literals(HERE / "run_download_phase3.py")
-        for phase in ("phase1", "phase2"):
-            with self.subTest(phase=phase):
-                self.assertIn(str(STAMP_BYTES[phase]), found)
-
-    def test_phase_four_runner_waits_for_all_prior_totals(self):
-        found = literals(HERE / "run_download_phase4.py")
-        for phase in ("phase1", "phase2", "phase3"):
-            with self.subTest(phase=phase):
-                self.assertIn(str(STAMP_BYTES[phase]), found)
-
     def test_qualification_supervisor_waits_for_all_four_totals(self):
         supervisor = HERE.parent / "qualification-supervisor" / "run_qualification.py"
         found = literals(supervisor)
@@ -128,6 +114,15 @@ class StampConstantTests(unittest.TestCase):
             with self.subTest(phase=phase):
                 self.assertIn(str(total), found,
                               f"{supervisor.name} does not gate on the {phase} total")
+
+    def test_download_service_runs_exactly_the_queues_the_supervisor_waits_for(self):
+        supervisor = literals(HERE.parent / "qualification-supervisor" / "run_qualification.py")
+        plan = download_service.queue_plan(HERE)
+        self.assertEqual(list(QUEUES.values()), [row["queue"] for row in plan])
+        for row in plan:
+            with self.subTest(queue=row["queue"].name):
+                self.assertIn(row["state"].name, supervisor)
+                self.assertIn(row["stamp"].name, supervisor)
 
 
 if __name__ == "__main__":

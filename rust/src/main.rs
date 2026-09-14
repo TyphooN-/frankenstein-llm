@@ -11,9 +11,16 @@ use clap::Parser;
 use frankenctl::cli::{self, Cli, Commands};
 use frankenctl::config::{self, Serving};
 use frankenctl::doctor::Doctor;
+use frankenctl::manifest::QueueManifest;
+use frankenctl::verify::{self, Outcome};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    // `verify` has its own exit statuses and takes an explicit manifest, so it
+    // neither resolves a repository root nor goes through the string reports.
+    if let Commands::Verify(command) = &cli.command {
+        return verify_command(command);
+    }
     let root = cli::resolve_root(cli.root.as_deref());
 
     match run(&cli.command, &root) {
@@ -72,6 +79,99 @@ fn run(cmd: &Commands, root: &std::path::Path) -> std::result::Result<String, St
                 return model_list(root);
             }
             serve_plan(root, alias.as_ref().unwrap(), *port, *execute)
+        }
+        Commands::Verify(_) => unreachable!("verify is dispatched in main"),
+    }
+}
+
+/// `frankenctl verify plan|run`: the plan or report as JSON on stdout, one
+/// line per problem on stderr, and the status from `verify::EXIT_*`.
+fn verify_command(command: &cli::VerifyCmd) -> ExitCode {
+    let (args, execute) = match command {
+        cli::VerifyCmd::Plan(args) => (args, false),
+        cli::VerifyCmd::Run(args) => (args, true),
+    };
+    let manifest = match QueueManifest::load(&args.manifest) {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            eprintln!("frankenctl: {error}");
+            return ExitCode::from(verify::manifest_exit_code(&error));
+        }
+    };
+    let selected = match manifest.select(&args.artifacts) {
+        Ok(selected) => selected,
+        Err(error) => {
+            eprintln!("frankenctl: {error}");
+            return ExitCode::from(verify::EXIT_USAGE);
+        }
+    };
+    if !execute {
+        return emit(&verify::plan(&manifest, &selected), verify::EXIT_OK);
+    }
+    let report = verify::run(&manifest, &selected);
+    for result in &report.results {
+        if let Some(problem) = problem(&result.outcome) {
+            eprintln!(
+                "frankenctl: {} {}: {problem}",
+                result.key, result.destination
+            );
+        }
+    }
+    let s = &report.summary;
+    eprintln!(
+        "frankenctl: {} files: {} sha256 verified, {} size only (no published hash), \
+         {} missing, {} size mismatch, {} sha256 mismatch, {} unreadable, {} unsafe path, \
+         {} changed during read; exit {}",
+        s.files,
+        s.verified_sha256,
+        s.size_only_no_published_hash,
+        s.missing,
+        s.size_mismatch,
+        s.sha256_mismatch,
+        s.unreadable,
+        s.unsafe_path,
+        s.changed_during_read,
+        report.exit_code
+    );
+    emit(&report, report.exit_code)
+}
+
+/// An operator-facing line for an outcome that is not a match.
+fn problem(outcome: &Outcome) -> Option<String> {
+    Some(match outcome {
+        Outcome::VerifiedSha256 { .. } | Outcome::SizeOnlyNoPublishedHash { .. } => return None,
+        Outcome::Missing => "missing".to_string(),
+        Outcome::SizeMismatch { actual_size, .. } => {
+            format!("size mismatch: {actual_size} bytes on disk")
+        }
+        Outcome::Sha256Mismatch { actual_sha256, .. } => {
+            format!("sha256 mismatch: {actual_sha256} on disk")
+        }
+        Outcome::Unreadable { failure } => format!(
+            "unreadable: {} of {}{} failed: {} [{}]",
+            failure.operation,
+            failure.path,
+            failure
+                .offset
+                .map(|offset| format!(" at byte {offset}"))
+                .unwrap_or_default(),
+            failure.error,
+            failure.errno_name.unwrap_or("no errno name")
+        ),
+        Outcome::UnsafePath { reason } => format!("unsafe path: {reason}"),
+        Outcome::ChangedDuringRead { reason } => format!("changed during read: {reason}"),
+    })
+}
+
+fn emit<T: serde::Serialize>(value: &T, code: u8) -> ExitCode {
+    match serde_json::to_string_pretty(value) {
+        Ok(text) => {
+            println!("{text}");
+            ExitCode::from(code)
+        }
+        Err(error) => {
+            eprintln!("frankenctl: cannot encode the report as JSON: {error}");
+            ExitCode::from(70)
         }
     }
 }

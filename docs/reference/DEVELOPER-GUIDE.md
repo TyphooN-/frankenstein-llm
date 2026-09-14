@@ -95,7 +95,8 @@ only after builds and other host pressure have drained.
 | `verification/local-coverage-foundation/test_download_queue_cli.py` | `--help` exits before any lock/log/state side effect; unexpected arguments exit 2 |
 | `.../test_download_parallel.py` | per-file ownership after `realpath`, concurrency, per-artifact state accounting |
 | `.../test_download_resume.py` | short partial resumes, full-size-correct partial promotes, full-size-wrong partial quarantines, transport selection |
-| `.../test_queue_manifests.py` | byte totals agree across queue, phase runner and qualification supervisor |
+| `.../test_download_service.py` | the four queues run in order under every queue's lock; a held lock starts nothing; a failed or unreadable queue does not stop the rest; historical file names; one sandboxed download unit |
+| `.../test_queue_manifests.py` | byte totals agree between each queue and the qualification supervisor; the download service runs exactly the supervisor's queues |
 | `.../test_capability_ledger.py` | absent, unreadable, interrupted, failing and stale evidence; gate-identity binding; tracked mapping |
 | `.../validators/test_gatelib.py` | clean-unload fails when it could not measure; cleanup runs and never raises out of `finally` |
 | `.../rag/test_rag_store.py` | extraction, ingest safety, sync patterns |
@@ -172,10 +173,10 @@ nothing supports.
 3. **Build the queue entry** with `research/build_download_queue.py` or
    `build_candidate_queue.py`. Choose a `capability` string; it is the join key
    the ledger groups by.
-4. **Update every copy of the byte total** — the queue's `total_bytes`, the next
-   phase runner's expectation, the qualification supervisor's `UPSTREAM` tuple — then
-   run `test_queue_manifests.py`.
-5. **Download** through the queue unit.
+4. **Update every copy of the byte total** — the queue's `total_bytes` and the
+   qualification supervisor's `UPSTREAM` tuple — then run `test_queue_manifests.py`.
+5. **Download** through the download service; a new queue is registered as in
+   [adding a download queue](#adding-a-download-queue).
 6. **Serve it**: a router preset, a sidecar env file, a ComfyUI path category, or
    an isolated venv.
 7. **Give it a privilege tier** in `candidate_policy`, plus prerequisites if it
@@ -236,26 +237,19 @@ evidence did not judge these bytes", not as a finding about the model.
 Naming convention, so the mixture already in the tree is not mistaken for
 drift: **prose describes a queue by what it installs** ("the researched-candidate
 queue", "the image-editing queue"), while **on-disk identifiers keep the
-historical `phaseN` spelling**. Queue files, state files, completion stamps, unit
-names and the `SystemExit` strings that quote them all record what was actually
-downloaded and when; renaming them would rewrite evidence rather than clarify it.
-`docs/reference/TROUBLESHOOTING.md` therefore still quotes `phase-one stamp
-mismatch` verbatim, because that is the literal text
-`run_download_phase2.py` raises.
+historical `phaseN` spelling**. Queue files, state files, completion stamps and
+logs record what was actually downloaded and when; renaming them would rewrite
+evidence rather than clarify it. The per-queue `phaseN` units and their waiter
+scripts are gone; the files they wrote kept their names.
 
-1. Generate `download-queue-phaseN.json` from collected metadata, where `N` is
-   the next unused number.
-2. Add `run_download_phaseN.py`, modelled on the image-editing or
-   researched-candidate runner: it waits on every earlier queue's state **and**
-   stamp, then `execve`s `download_queue.py` with the five `HERMES_DOWNLOAD_*`
-   paths set.
-3. Add `local-ai-model-downloads-phaseN.service` with `After=` the previous
-   queue, `ProtectSystem=strict`, `ProtectHome=read-only` and `ReadWritePaths`
-   limited to `models/` and the foundation directory.
-4. Add the queue to `run_qualification.UPSTREAM` with its exact byte total.
-5. Extend `build_capability_ledger.QUEUES`.
-6. Extend `test_queue_manifests.py` so the new copies are reconciled.
-7. Describe it in the operator docs by its contents, not by its number.
+1. Generate the queue JSON from collected metadata. Give a new queue a
+   descriptive suffix, `download-queue-<name>.json`, rather than the next number.
+2. Add it to `download_service.QUEUES`, whose order is the run order. Do not add
+   a unit or a waiter script for it.
+3. Add the queue to `run_qualification.UPSTREAM` with its exact byte total.
+4. Extend `build_capability_ledger.QUEUES`.
+5. Extend `test_queue_manifests.py` so the new copies are reconciled.
+6. Describe it in the operator docs by its contents, not by its number.
 
 ## Admitting a prompt corpus
 

@@ -157,41 +157,97 @@ impl Doctor {
                                 .map(|s| s.to_string())
                         });
                     match commit {
-                        Some(c) => match std::process::Command::new("git")
-                            .args([
-                                "-C",
-                                root.join("upstream/llama.cpp").to_str().unwrap_or("."),
-                                "rev-parse",
-                                "HEAD",
-                            ])
-                            .output()
-                        {
-                            Ok(out) if out.status.success() => {
-                                let head = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                                if head == c {
-                                    Check::pass(
-                                        name,
-                                        true,
-                                        format!("commit {}", &c[..c.len().min(12)]),
-                                    )
-                                } else {
-                                    Check::fail(
-                                        name,
-                                        true,
-                                        format!("lock {c} != submodule HEAD {head}"),
-                                    )
+                        Some(c) => {
+                            // Prefer the recorded gitlink from the parent tree
+                            // (`git ls-tree`), which is authoritative for what
+                            // this checkout pins even when the submodule has
+                            // not been cloned locally. Fall back to the
+                            // submodule working-tree HEAD only when the
+                            // parent tree does not record a gitlink (which
+                            // would be a malformed checkout and should fail).
+                            let recorded = std::process::Command::new("git")
+                                .args([
+                                    "-C",
+                                    root.to_str().unwrap_or("."),
+                                    "ls-tree",
+                                    "HEAD",
+                                    "upstream/llama.cpp",
+                                ])
+                                .output();
+                            let recorded = match recorded {
+                                Ok(out) if out.status.success() => {
+                                    let stdout = String::from_utf8_lossy(&out.stdout);
+                                    // Format: "160000 commit <sha>\tupstream/llama.cpp"
+                                    // The SHA is field 3 (index 2 after split).
+                                    stdout
+                                        .split_whitespace()
+                                        .nth(2)
+                                        .filter(|s| {
+                                            s.len() == 40
+                                                && s.chars().all(|c| c.is_ascii_hexdigit())
+                                        })
+                                        .map(|s| s.to_string())
+                                }
+                                _ => None,
+                            };
+                            match recorded {
+                                Some(rec) if rec == c => Check::pass(
+                                    name,
+                                    true,
+                                    format!("commit {} (gitlink)", &c[..c.len().min(12)]),
+                                ),
+                                Some(rec) => {
+                                    Check::fail(name, true, format!("lock {c} != gitlink {rec}"))
+                                }
+                                None => {
+                                    // No gitlink recorded; fall back to
+                                    // submodule HEAD (may be empty if not
+                                    // cloned).
+                                    let out = std::process::Command::new("git")
+                                        .args([
+                                            "-C",
+                                            root.join("upstream/llama.cpp").to_str().unwrap_or("."),
+                                            "rev-parse",
+                                            "HEAD",
+                                        ])
+                                        .output();
+                                    match out {
+                                        Ok(o) if o.status.success() => {
+                                            let head = String::from_utf8_lossy(&o.stdout)
+                                                .trim()
+                                                .to_string();
+                                            if head == c {
+                                                Check::pass(
+                                                    name,
+                                                    true,
+                                                    format!(
+                                                        "commit {} (submodule HEAD)",
+                                                        &c[..c.len().min(12)]
+                                                    ),
+                                                )
+                                            } else {
+                                                Check::fail(
+                                                    name,
+                                                    true,
+                                                    format!("lock {c} != submodule HEAD {head}"),
+                                                )
+                                            }
+                                        }
+                                        Ok(o) => Check::fail(
+                                            name,
+                                            true,
+                                            format!(
+                                                "git rev-parse failed: {}",
+                                                String::from_utf8_lossy(&o.stderr)
+                                            ),
+                                        ),
+                                        Err(e) => {
+                                            Check::fail(name, true, format!("git rev-parse: {e}"))
+                                        }
+                                    }
                                 }
                             }
-                            Ok(out) => Check::fail(
-                                name,
-                                true,
-                                format!(
-                                    "git rev-parse failed: {}",
-                                    String::from_utf8_lossy(&out.stderr)
-                                ),
-                            ),
-                            Err(e) => Check::fail(name, true, format!("git rev-parse: {e}")),
-                        },
+                        }
                         None => Check::fail(name, true, "lock has no commit field".to_string()),
                     }
                 }

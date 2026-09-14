@@ -298,33 +298,44 @@ scripts/redownload-heretic-after-crash.sh    # same, and clears a bad .partial
 All of them verify a publisher SHA-256 before renaming into place.
 `download-writing-models.sh` additionally holds a `flock` on the partial.
 
-### The chained download queues
+### The download service
 
-The four queues are the supported path for everything else, one systemd unit
-each, each waiting for its predecessors' stamps. They are listed by content;
-their unit and file names retain the original `phaseN` spelling because the
-completion stamps that record what was downloaded use it, and renaming them would
-rewrite evidence rather than clarify it.
+The four queues are the supported path for everything else. One unit,
+`local-ai-model-downloads.service`, runs `download_service.py`, which processes
+them one after another and holds all four queue locks for the whole run. Their
+queue, state, lock, stamp and log files keep the `phaseN` spelling from when each
+queue had its own unit, because the completion stamps that record what was
+downloaded use it, and renaming them would rewrite evidence rather than clarify
+it.
 
-| Queue unit | Installs |
-|---|---|
-| `local-ai-model-downloads.service` | core capabilities: embeddings, reranker, OCR, ASR, TTS, music, image, FIM |
-| `local-ai-model-downloads-phase2.service` | computer-use grounding: UI-TARS |
-| `local-ai-model-downloads-phase3.service` | image editing: Qwen Image Edit set |
-| `local-ai-model-downloads-phase4.service` | researched candidates: Qwen3-Coder-Next, Gemma-4 Heretic, UI-Mate, WeMM, FLUX.2 Klein |
+| Order | Queue file | Installs |
+|---|---|---|
+| 1 | `download-queue.json` | core capabilities: embeddings, reranker, OCR, ASR, TTS, music, image, FIM |
+| 2 | `download-queue-phase2.json` | computer-use grounding: UI-TARS |
+| 3 | `download-queue-phase3.json` | image editing: Qwen Image Edit set |
+| 4 | `download-queue-phase4.json` | researched candidates: Qwen3-Coder-Next, Gemma-4 Heretic, UI-Mate, WeMM, FLUX.2 Klein |
 
-All four completed on this host; starting one revalidates rather than refetches.
+All four completed on this host; starting the service revalidates rather than
+refetches. A queue that fails does not stop the queues after it, and the service
+exits 1 when any of them failed. If another writer already holds one of the four
+locks, the service exits 75 without starting anything. The slot queue
+(`download-queue-slot-uncensored-27b.json`) is not part of the service.
 
 ```bash
 systemctl --user start local-ai-model-downloads.service
-systemctl --user start local-ai-model-downloads-phase2.service
-systemctl --user start local-ai-model-downloads-phase3.service
-systemctl --user start local-ai-model-downloads-phase4.service
 
 journalctl --user -u local-ai-model-downloads.service -f
 ```
 
-To run one by hand, set the environment rather than passing arguments — the
+To inspect the ordered queue paths without starting the service, use
+`python3 verification/local-coverage-foundation/download_service.py --plan`.
+It emits JSON with `plan_only: true` and the queue, state, lock, stamp and log
+paths. It does not read manifests or weights, take locks, write evidence, or
+change signal handlers. This is a path plan, not artifact validation or a
+download-completion report. Extra arguments are rejected.
+
+To run one queue by hand, stop the service first — it holds every queue's lock
+while it runs — and set the environment rather than passing arguments; the
 program takes none:
 
 ```bash
@@ -339,6 +350,75 @@ python3 verification/local-coverage-foundation/download_queue.py
 Interrupting is safe. The queue resumes into `.partial` siblings, promotes only
 after an exact size and digest match, and revalidates finished files on the next
 run. Progress is in `downloads*.log` and `download-state*.json`.
+
+**Retiring the phase units on an installed host.** Installed units are copies, so
+a host set up before the service still has `local-ai-model-downloads-phase2`,
+`-phase3` and `-phase4` enabled. They start at every boot, and once their waiter
+scripts are gone from the checkout each one fails and restarts every minute.
+Replace them while every download unit is inactive. Nothing under `models/` or
+`verification/local-coverage-foundation/` moves; the service reads the same
+state and stamps.
+
+```bash
+systemctl --user list-units --all 'local-ai-model-downloads*'   # every one inactive
+systemctl --user disable local-ai-model-downloads-phase2.service local-ai-model-downloads-phase3.service local-ai-model-downloads-phase4.service
+mkdir -p ~/.config/systemd/retired-units
+mv ~/.config/systemd/user/local-ai-model-downloads-phase{2,3,4}.service ~/.config/systemd/retired-units/
+install -Dm644 services/systemd/local-ai-model-downloads.service ~/.config/systemd/user/local-ai-model-downloads.service
+install -Dm644 services/systemd/local-ai-qualification.service ~/.config/systemd/user/local-ai-qualification.service
+systemctl --user daemon-reload
+```
+
+### Verifying artifacts with frankenctl
+
+`frankenctl verify` checks local files against one download-queue manifest
+(`hermes-hf-artifact-queue/1`), read-only. **Status: the verification core is
+implemented and offline-tested; service integration is pending.** There is no
+verification unit yet, the command takes none of the download queues' locks, and
+it reads only the manifest named on its command line. The GLM shard manifest, the
+projector manifest and the download scripts' pinned files are not covered, and
+`glm53flash-reverify.service` has not been replaced.
+
+```bash
+cargo build --offline --manifest-path rust/Cargo.toml
+F=verification/local-coverage-foundation
+rust/target/debug/frankenctl verify plan --manifest $F/download-queue-phase3.json
+rust/target/debug/frankenctl verify run --manifest $F/download-queue-phase3.json \
+  --artifact image-edit-qwen-vae
+```
+
+`plan` reads the manifest and nothing else. `run` checks each file of the selected
+artifacts (every artifact when no `--artifact` is given): exact size always, and
+SHA-256 when the queue records a publisher digest, hashed through one 8 MiB
+buffer. It never downloads, repairs, deletes, renames or promotes a file, never
+reads a completion stamp, and admits or qualifies nothing. The JSON report on
+stdout keeps each file's artifact key, repository, revision, `repo_path` and
+destination, with one outcome:
+
+| Outcome | Meaning |
+|---|---|
+| `verified-sha256` | exact size, and the publisher SHA-256 matched every byte |
+| `size-only-no-published-hash` | exact size; the queue records no digest, so the content was not read. Not a content check |
+| `missing` | nothing at the destination |
+| `size-mismatch` | wrong size; not read |
+| `sha256-mismatch` | right size, different content |
+| `unreadable` | an I/O error, kept with its operation, path, errno and offset |
+| `unsafe-path` | a symlink, a symlinked parent directory, or not a regular file; not read |
+| `changed-during-read` | the file grew, shrank, was rewritten or was replaced while it was read; no verdict |
+
+The whole manifest is validated first. An invalid digest, an unsafe or duplicate
+destination, a byte total that disagrees with its files, or any other schema
+problem exits 65 before any artifact is examined, rather than checking a smaller
+set. Exit 0 means every selected file matched, 1 an integrity problem, 2 bad
+usage (including an unknown `--artifact`), 66 an absent manifest, and 74 an I/O
+error. Exit 74 outranks 1, and an I/O error is never reported as a mismatch or a
+missing file.
+
+Until the lock integration lands, run it only while nothing writes the same
+destinations: `local-ai-model-downloads.service` inactive, and no hand-started
+queue or download script running. A `run` reads every selected digest-bearing
+file in full, so while the storage pool reports errors prefer `plan` or a narrow
+`--artifact` selection.
 
 ### Read-only reconciliation
 
@@ -518,7 +598,13 @@ python3 -m pytest verification/qualification-supervisor/   # supervisor contract
 python3 -m pytest verification/docs/                 # documentation map and links
 python3 verification/generative-media/preflight.py   # static media preflight
 python3 verification/local-coverage-foundation/build_capability_ledger.py --print-only
+cargo test --offline -j4 --manifest-path rust/Cargo.toml   # frankenctl, including the artifact verifier
 ```
+
+`frankenctl`'s `doctor_pin_matches_this_checkout` compares the lock with the
+`upstream/llama.cpp` submodule's HEAD, so it fails in a linked worktree whose
+submodule was never initialized: there the lookup falls through to the outer
+checkout's commit.
 
 The live repository-agent gate creates private Linux namespaces through Bubblewrap; unit tests may mock subprocess boundaries. Broad tests can still invoke host probes reading /proc/<pid>/cmdline, a known hang hazard under kernel pressure.
 Run the complete suite only after builds and other host pressure have drained; a
@@ -620,8 +706,8 @@ for the full path. The short operational version:
 
 1. Collect exact metadata (`research/collect_hf_metadata.py`) and build a queue
    entry from it. Never hand-type a size or digest.
-2. Update the queue's `total_bytes` **and** every copy of it — the phase runner
-   and the qualification supervisor — then run `test_queue_manifests.py`.
+2. Update the queue's `total_bytes` **and** its copy in the qualification
+   supervisor, then run `test_queue_manifests.py`.
 3. Download through the queue.
 4. Add the router preset or sidecar env file.
 5. Give it a privilege tier in `candidate_policy`, or the router gate will fail
@@ -658,11 +744,14 @@ decision rather than blind deletion.
 | Code | Meaning | Where |
 |---|---|---|
 | 0 | pass / complete | all |
-| 1 | failure with a verdict | gates, downloader, ledger (`problems` non-empty) |
-| 2 | bad usage, or a refused precondition | `download_queue.py`; `build-llama-cpp.sh` lock/worktree refusals |
+| 1 | failure with a verdict | gates, downloader, ledger (`problems` non-empty), `frankenctl verify` (an integrity problem) |
+| 2 | bad usage, or a refused precondition | `download_queue.py`; `build-llama-cpp.sh` lock/worktree refusals; `frankenctl verify` |
 | 3 | another instance already running | `gate_computer_use.py`; `post_reboot_gate.py` uses 3 for "not ready" |
 | 4 | interrupted by a handled signal | `gate_computer_use.py` |
 | 5 | ran but produced no usable artifact | `run_when_idle.sh` (`EXIT_NO_ARTIFACT`) |
+| 65 | malformed input; nothing was examined | `frankenctl verify` (the manifest fails the queue schema or size bound) |
+| 66 | input absent | `frankenctl verify` (no manifest at the path) |
+| 74 | an I/O error prevented a check; the report keeps its operation, path, errno and offset | `frankenctl verify` |
 | 75 | another writer holds the lock, or the host is no longer idle | `download_queue.py`, qualification supervisor, serialized runners |
 | 128+N | terminated by signal N | qualification supervisor |
 

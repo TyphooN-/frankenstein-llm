@@ -48,7 +48,7 @@ and something checks them against each other.
 | Which model file backs an alias | `llama-models.ini` | prose in `docs/local-hermes-models.md`; prose is descriptive |
 | Sidecar model, port, flags | `services/sidecar-*.env` | none — the unit template substitutes them |
 | Pinned artifact, revision, size, digest | `verification/local-coverage-foundation/download-queue*.json` | generated from `research/hf/`; consumed by policy and ledger without restatement |
-| Phase byte totals | the queue's `total_bytes` | the phase stamp, the next phase runner, the qualification supervisor; reconciled by `test_queue_manifests.py` |
+| Queue byte totals | the queue's `total_bytes` | the queue's completion stamp and the qualification supervisor; reconciled by `test_queue_manifests.py` |
 | Candidate privilege and prerequisites | `verification/candidate-qualification/candidate_policy.py` | none — the router gate derives its check list from it |
 | Approved remote-code digests | `wemm_remote_code_review.py` (`REVIEWED_FILES`) | `WEMM-REMOTE-CODE-REVIEW.md` table |
 | Which artifact proves which capability | `build_capability_ledger.py` (`CAPABILITY_EVIDENCE`) | [capability matrix](CAPABILITY-MATRIX.md) prose |
@@ -237,10 +237,7 @@ Tracked copies of user units. They are **not** installed by cloning; see
 | `llama-router.service` | simple, restart on-failure | yes | the router on `:8080` |
 | `llama-sidecar@.service` | simple template, restart on-failure | yes | one sidecar per env file |
 | `llama-ridge.service` | simple | yes | single-model rollback; conflicts with the router |
-| `local-ai-model-downloads.service` | simple, restart on-failure | yes | phase-one queue |
-| `local-ai-model-downloads-phase2.service` | simple | yes | UI-TARS |
-| `local-ai-model-downloads-phase3.service` | simple | yes | Qwen Image Edit |
-| `local-ai-model-downloads-phase4.service` | simple | yes | researched candidates |
+| `local-ai-model-downloads.service` | simple, restart on-failure | yes | `download_service.py`: the four download queues, in order |
 | `obliterated-mmproj-download.service` | oneshot | yes | one projector download |
 | `glm53flash-reverify.service` | oneshot | yes | force publisher-hash reverify of GLM shards |
 | `local-ai-qualification.service` | oneshot | yes | the serialized qualification |
@@ -249,9 +246,9 @@ Tracked copies of user units. They are **not** installed by cloning; see
 | `local-ai-repo-agent-gate.service` | oneshot | no | repository-agent A/B |
 | `local-ai-media-schema-gate.service` | oneshot | no | live ComfyUI schema discovery |
 
-Notable hardening: the download phases run `ProtectSystem=strict`,
+Notable hardening: the download service runs `ProtectSystem=strict`,
 `ProtectHome=read-only`, `NoNewPrivileges=true` with `ReadWritePaths` limited to
-`models/` and their own foundation directory. The qualification unit keeps that
+`models/` and its own foundation directory. The qualification unit keeps that
 sandbox, but must also write `/tmp`, `/var/tmp`, `venvs/`, `tools/`, and
 `verification/tmp` (`TMPDIR`): `ProtectSystem=strict` otherwise remounts `/tmp`
 read-only and torch dies at import with `No usable temporary directory`. It
@@ -304,11 +301,12 @@ All loopback-only. Nothing here may be exposed to a LAN or the Internet.
 The queue takes **no command-line arguments** — every path comes from the
 environment so a unit and an operator shell cannot disagree about them. `-h` and
 `--help` print usage and exit 0 before any lock, log or state write; any other
-argument exits 2 the same way. Phase runners set these variables and `execve`
-into the queue.
+argument exits 2 the same way. `download_service.py` takes no arguments either:
+it points the downloader at each maintained queue's five paths in turn, in
+process, and leaves workers and connections to these variables.
 
-Service policy: phase one and two use budget 32; phases three and four use 64.
-All four use 16 workers.
+Service policy: the download service sets 16 workers and a connection budget of
+32, used by one queue at a time.
 
 ### Qualification supervisor
 

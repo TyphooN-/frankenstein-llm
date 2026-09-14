@@ -351,12 +351,21 @@ def run_downloads(queue: dict, state: dict[str, object], workers: int,
 
 def main() -> int:
     LOCK.parent.mkdir(parents=True, exist_ok=True)
-    lock_handle = LOCK.open("a+")
-    try:
-        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        log("another queue writer owns the lock; exiting")
-        return 75
+    with LOCK.open("a+") as lock_handle:
+        try:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            log("another queue writer owns the lock; exiting")
+            return 75
+        return process_queue()
+
+
+def process_queue() -> int:
+    """Process the configured queue. The caller must already hold ``LOCK``.
+
+    ``download_service.py`` takes every maintained queue's lock before its first
+    queue and calls this once per queue, so taking the lock stays in ``main``.
+    """
     queue = json.loads(QUEUE.read_text(encoding="utf-8"))
     state: dict[str, object] = {
         "schema": "hermes-hf-download-state/1",
@@ -379,9 +388,9 @@ def main() -> int:
         state["status"] = "complete"
         state["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         atomic_json(STATE, state)
-        # Downstream phases and the qualification supervisor compare this stamp against
-        # an exact byte total, so a torn write is not a retryable state: it reads
-        # as a permanent mismatch against a queue that is in fact complete.
+        # The qualification supervisor compares this stamp against an exact byte
+        # total, so a torn write is not a retryable state: it reads as a permanent
+        # mismatch against a queue that is in fact complete.
         atomic_text(STAMP, str(queue["total_bytes"]) + "\n")
         log(f"queue complete artifacts={len(queue['artifacts'])} bytes={queue['total_bytes']}")
         return 0
