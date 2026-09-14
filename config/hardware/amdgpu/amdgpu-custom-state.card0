@@ -9,7 +9,8 @@ OD_MCLK:
 1: 1000Mhz
 
 OD_VDDGFX_OFFSET:
--65mV
+#50mv dmesg fault
+-45mV
 
 OD_RANGE:
 SCLK:     500Mhz     3000Mhz

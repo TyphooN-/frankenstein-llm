@@ -8,9 +8,8 @@ OD_MCLK:
 1: 1000MHz
 
 OD_VDDGFX_OFFSET:
-#-90mV crash
-#-85mV potential crash heat soak
--80mV
+#-89mV crash
+-88mV
 
 OD_RANGE:
 SCLK:     500Mhz     3000Mhz
