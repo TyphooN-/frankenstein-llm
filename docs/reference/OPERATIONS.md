@@ -668,7 +668,8 @@ an untracked second production checkout as a rollback mechanism — that is the
 failure ADR 0005 exists to prevent.
 
 The 2026-09-13 installation kept the previous binaries on disk.
-`upstream/llama.cpp/build/bin` is a symlink to the externally built `790cf51a`
+`upstream/llama.cpp/build/bin` is the built `9f31776c` (b10988) bundle from
+`scripts/build-llama-cpp.sh`. The outer repository stays pinned to `9f31776c` until the
 bundle, and `upstream/llama.cpp/build/bin.rollback-8ea290247` holds the
 `8ea29024` build. Pointing `build/bin` back at that directory is a binary
 rollback without a rebuild. It needs a router restart, which is a separate

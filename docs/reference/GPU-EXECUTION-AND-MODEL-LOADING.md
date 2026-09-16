@@ -367,7 +367,7 @@ loop can all point at `127.0.0.1:8080` at once. What they get depends entirely o
 whether they name the *same preset*.
 
 All line references are into llama.cpp `v0.4.0` (commit `5266f24da`), the
-submodule pin when they were taken. The pin has since moved to `790cf51a`
+submodule pin when they were taken. The pin has since moved to `9f31776c` (b10988)
 (`upstream/llama-cpp.lock.json`, whose staged gitlink
 `verification/upstream-pin/test_llama_cpp_pin.py` checks), so line numbers may
 have shifted.

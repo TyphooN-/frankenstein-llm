@@ -61,19 +61,20 @@ A checkout is restored with:
 
     git submodule update --init --recursive upstream/llama.cpp
 
-## Installed runtime (2026-09-13)
+## Installed runtime (2026-09-15)
 
-- Source: `790cf51aabd61763486050dec7451d9147cb7c61` (`master`, 2026-09-12),
-  19 commits after the previous pin `8ea29024`. The outer gitlink, the submodule
-  worktree and `upstream/llama-cpp.lock.json` all record it. Its tree
-  (`97726d37`) is identical to the clean source the binaries were compiled from.
-- Build: compiled by the qualification supervisor outside this tree, from a clean
-  shallow clone under `~/.hermes/checkpoints/llama-master-790cf51a/`, with this
-  ADR's configuration: ROCm/HIP `gfx1030`, Release, Ninja, native CPU tuning,
-  `GGML_LTO`, HIP graphs, Flash Attention and CPU repack, 44 jobs (`nproc` on
-  this host). Build exit 0. The binary reports
-  `0.4.0-dev (build 219, commit 790cf51aa)`; the build number counts commits in
-  that shallow clone and is not comparable with earlier build numbers.
+- Source: `9f31776c3773cf03f98535c19b7e6d394af374b4` (`master` b10988, 2026-09-15),
+  52 commits after the previous pin `790cf51a`. The outer gitlink, the submodule
+  worktree and `upstream/llama-cpp.lock.json` all record it. Key changes in range:
+  HIP fattn-mma fp32 accumulation on MFMA devices (#28576, gfx1030-relevant),
+  gfx1103 added to ubuntu rocm release build (#28423), models get_key_or_arr fix
+  (#28868), mimo2 swa pattern load fix (#28865), Maple 20B-A1B ternary MoE arch
+  (#27000), nemotron-h expert FFN zero-divisor guard (#28779), ggml bumped to
+  0.24.0, opencl MoE expert matmul by batch size (#27637).
+- Build: compiled in `upstream/llama.cpp/build/` via `scripts/build-llama-cpp.sh`,
+  ROCm/HIP `gfx1030`, Release, Ninja, native CPU tuning, 44 jobs. Build exit 0.
+  The binary reports `0.4.1-dev (build 271, commit 9f31776c3)` and detects
+  ROCm0/1/2 (6900XT 16G, V620 32G, 6900XT 16G).
 - Installation: `upstream/llama.cpp/build/bin` is a symlink to that build's
   `bin/`, and the previous binaries remain in
   `upstream/llama.cpp/build/bin.rollback-8ea290247/`. The router runs from the

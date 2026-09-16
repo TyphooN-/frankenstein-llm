@@ -2,7 +2,7 @@
 
 Production source: `/home/typhoon/git/frankenstein-llm/upstream/llama.cpp`
 
-Production revision: `master` at `790cf51aabd61763486050dec7451d9147cb7c61`, the commit in `upstream/llama-cpp.lock.json`.
+Production revision: `master` at `9f31776c3773cf03f98535c19b7e6d394af374b4` (b10988), the commit in `upstream/llama-cpp.lock.json`.
 
 The former external PR #27773 worktree no longer exists. That revision has no `glm5next` architecture identifier, so GLM qualification is blocked until a still-required experimental revision is reviewed and recreated as an isolated worktree below `upstream/llama.cpp/.worktrees/`. It must not modify the production submodule gitlink or build directory.
 
