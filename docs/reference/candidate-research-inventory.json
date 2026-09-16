@@ -1,8 +1,64 @@
 {
   "additional_research_queue": {
     "integrity": "User-submitted identifiers. An entry marked investigated carries its recorded research; entries researched in an intake batch cite the revision they were read at, with no weight download or remote code execution. Integrated entries name the router alias that loads them. An entry with a license_review stays download_admission blocked until that review records acceptance. No entry is qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 27,
+    "unique_repository_count": 29,
     "intake_batches": [
+      {
+        "batch": "2026-09-14-swift",
+        "recorded_at": "2026-09-14",
+        "integrity": "Repeated exact URL recorded as an explicit investigation/research/download request. Reuses the existing pinned assessment without claiming fresh publisher retrieval, license acceptance, transfer admission or qualification.",
+        "requested_actions": ["investigate", "research", "download"],
+        "submitted_url_count": 1,
+        "unique_repository_count": 1,
+        "newly_queued_count": 0,
+        "already_queued_count": 1,
+        "already_assessed_count": 0,
+        "qualified_count": 0,
+        "entries": [
+          {
+            "url": "https://huggingface.co/ukisai/Swift-Qwen3.8-27B-GGUF",
+            "repository": "ukisai/Swift-Qwen3.8-27B-GGUF",
+            "disposition": "already-queued",
+            "record": "additional_research_queue",
+            "pinned_revision": "b12fc8f44af7bdf31a3c3309891acb345d3106a2"
+          }
+        ]
+      },
+      {
+        "batch": "2026-09-14",
+        "recorded_at": "2026-09-14",
+        "integrity": "Unauthenticated pinned Hub metadata, complete trees and model cards checked. Publisher sizes and LFS SHA-256 are provenance, not downloaded integrity. Research/download requests are recorded separately from transfer admission; no weights downloaded, remote code run, license accepted or serving configuration changed.",
+        "requested_actions": ["research", "investigate", "download"],
+        "submitted_url_count": 3,
+        "unique_repository_count": 3,
+        "newly_queued_count": 2,
+        "already_queued_count": 1,
+        "already_assessed_count": 0,
+        "qualified_count": 0,
+        "entries": [
+          {
+            "url": "https://huggingface.co/dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
+            "repository": "dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
+            "disposition": "already-queued",
+            "record": "additional_research_queue",
+            "pinned_revision": "d61c59ea5e514e25d305b5850e8a432f7a9969f2"
+          },
+          {
+            "url": "https://huggingface.co/jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF",
+            "repository": "jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "106de92ae1081a361003770e6bd0eae13056cefa"
+          },
+          {
+            "url": "https://huggingface.co/LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF",
+            "repository": "LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "aa1d107a320a1990d684b091f66dfccc4ed5f979"
+          }
+        ]
+      },
       {
         "batch": "2026-09-12",
         "recorded_at": "2026-09-12T23:34:47-0400",
@@ -502,6 +558,19 @@
         "url": "https://huggingface.co/dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
         "repository": "dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8",
         "state": "investigated",
+        "download_request": {
+          "requested_at": "2026-09-14",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Pinned safetensors total 510296708312 bytes, exceeding this host even with RAM offload.",
+            "No verified local Radeon runtime for these FP8/FP4 safetensors.",
+            "Storage integrity remains unresolved; automatic transfers are paused."
+          ],
+          "artifact_candidates": []
+        },
         "investigated": true,
         "qualified": false,
         "submitted": "2026-09-12",
@@ -610,6 +679,19 @@
         "url": "https://huggingface.co/ukisai/Swift-Qwen3.8-27B-GGUF",
         "repository": "ukisai/Swift-Qwen3.8-27B-GGUF",
         "state": "investigated",
+        "download_request": {
+          "requested_at": "2026-09-14",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Existing license_review remains pending-operator-review and accepted=false; a request to queue the model is not acceptance of unread license terms.",
+            "Post-outage storage verification is incomplete; the current scrub is still running.",
+            "After license and storage gates: revalidate the publisher revision and select one exact quant with authoritative hashes before executable transfer admission."
+          ],
+          "artifact_candidates": []
+        },
         "investigated": true,
         "qualified": false,
         "submitted": "2026-09-13",
@@ -657,6 +739,74 @@
         "disposition": "license review first; only then a candidate for the best-fit 27B comparison against signal and the router's current Qwen 27B presets; not a new capability",
         "next_gate": "operator reviews the Swift Open License v1.0 and the ThinkingCap-derived component and records the decision in license_review; only after acceptance: re-pin, choose one tier, download in a separately authorized lane verified against the pinned LFS sha256, serialized qualification against signal",
         "notes": "Publisher claims (58.3% fewer thinking tokens, under 1% loss, x1.95 speed-up) are not local evidence: the card says its results come from the BF16 and INT4 checkpoints, not these GGUFs, and for this release reports only a finite-tensor check and a CPU text-generation smoke test, with multimodal generation not re-evaluated. The card's own table shows AIME 2026 falling from 98.67% to 94.00% and HMMT from 99.33% to 96.00%, and 58.3% is the GPQA-Diamond median reduction (mean reductions 24.3% to 50.6%). SHA256SUMS at the pin matches the LFS sha256 of all 28 GGUFs. SHA256SUMS.quants was last changed at feda19f40b49686ac426223b439b21cf0e1e3c9e (2026-09-11) and, per paths-info at that commit, lists that commit's Q4_K_M, Q5_K_M and Q6_K uploads; all three were replaced on 2026-09-12 by files with different sizes and sha256, so verify only against the pinned LFS sha256. Do not use the card's curl | sh installer or llama-server -hf auto-fetch: -hf bypasses both this license review and pinned-hash verification. The publisher added tiers on 2026-09-13 (lastModified 2026-09-13T11:23:21.000Z), so re-pin before any download."
+      },
+      {
+        "url": "https://huggingface.co/jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF",
+        "repository": "jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-14",
+        "revision": "106de92ae1081a361003770e6bd0eae13056cefa",
+        "checked_at": "2026-09-14",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata; no separate license acceptance performed)",
+        "architecture": "Publisher describes Qwen3.6 MoE, 35B total and about 3B active; NVFP4 GGUF conversion of LuffyTheFox's Genesis-Hermes derivative.",
+        "resource_class": "runtime-unverified",
+        "resource_basis": "Recommended v4 file is 21474646144 bytes; separate projector is 899283072 bytes. These are declared disk sizes, not measured RAM/VRAM residency.",
+        "runtime_route": "Publisher claims llama.cpp/LM Studio/Pelican compatibility for v4 inline scales and describes NVIDIA optimization. Exact-format support in the installed Radeon runtime is unverified, not inferred from the GGUF suffix.",
+        "disposition": "conditional investigation; retain v4 as the only weight candidate, excluding publisher-deprecated v1 and v2",
+        "next_gate": "Verify the exact v4 format against the pinned Radeon runtime; recover storage integrity before promoting the candidate to a pinned transfer manifest, then perform isolated functional and unload gates.",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-14",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": ["Exact NVFP4 v4 Radeon runtime compatibility is unverified.", "Storage integrity remains unresolved; automatic transfers are paused."],
+          "artifact_candidates": [
+            {
+              "path": "Hermes3.6-35B-A3B-Uncensored-Genesis-Final-NVFP4-v4.gguf",
+              "size": 21474646144,
+              "sha256": "e48293822c6644bd654b4108127fc6cd8b605807171bfcde9f81b288f912ab2a"
+            },
+            {
+              "path": "mmproj-Hermes3.6-35B-A3B-Uncensored-Genesis-Final-F16.gguf",
+              "size": 899283072,
+              "sha256": "5129bb5eb19e4346c0f2071f1ce8e1b0a076e0ab08d57a77d6033ce01235252c",
+              "optional_for": "vision; text-first qualification does not require the projector"
+            }
+          ]
+        },
+        "notes": "Publisher claims about Genesis, retained knowledge and refusals are not local quality evidence. Do not execute the model card's scripts or modify active-expert counts as a substitute for qualification."
+      },
+      {
+        "url": "https://huggingface.co/LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF",
+        "repository": "LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-14",
+        "revision": "aa1d107a320a1990d684b091f66dfccc4ed5f979",
+        "checked_at": "2026-09-14",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata; no separate license acceptance performed)",
+        "resource_class": "artifact-unavailable",
+        "runtime_route": "The exact pinned tree contains 10 files but no GGUF or safetensors weights. Templates, prompts and scripts are not a downloadable model.",
+        "disposition": "retain research/download request, blocked on an exact artifact; do not silently substitute a sibling or derivative",
+        "next_gate": "Resolve a publisher-linked exact release with immutable filename, revision and authoritative checksum, then evaluate backend and capacity before transfer admission.",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-14",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": ["No weight file exists in the complete exact-repository tree at the recorded pin.", "Storage integrity remains unresolved; automatic transfers are paused."],
+          "artifact_candidates": []
+        },
+        "notes": "The card describes HauhauCS base weights and transferred data from DJLougen's Hermes finetune. Those are lineage, not replacement artifacts for this identifier. Jan1k's explicitly submitted NVFP4 derivative has its own independent record."
       }
     ]
   },

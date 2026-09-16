@@ -8,6 +8,49 @@ and the provisional ranking in
 [MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md). Those files retain
 useful header and pagination notes; they are not the current verdicts.
 
+## Swift request follow-up — 2026-09-14-swift
+
+The repeated `ukisai/Swift-Qwen3.8-27B-GGUF` URL is recorded as an explicit
+investigation/research/download request on its existing inventory entry. This
+adds no duplicate repository: the additional queue remains at 29 unique entries.
+The earlier pinned assessment and its retrieval timestamp are retained, not
+represented as a new publisher check. Its `license_review` remains pending and
+`accepted=false`; the request does not accept unread terms. Download admission
+also waits for completion of post-outage storage verification and selection of
+one revalidated, pinned quant. No transfer or qualification was started.
+
+## Submitted research and download intake — 2026-09-14
+
+Three submitted URLs resolve to three records: two new, one already queued.
+The additional research queue now contains 29 unique repositories. Each of the
+three records has a `download_request`; requesting a download is separate from
+admitting an artifact to an executable transfer manifest. No weights were
+downloaded, license accepted, publisher code executed or runtime changed.
+Storage integrity remains unresolved, so all three transfer requests are blocked.
+
+| Exact repository | Pinned investigation | Download disposition |
+|---|---|---|
+| `dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8` | Existing record, unchanged pin `d61c59ea5e514e25d305b5850e8a432f7a9969f2`; declared safetensors total 510,296,708,312 bytes.[2] | Request retained, but the exact checkpoint exceeds this host even with RAM offload. The publisher's SGLang/CUDA recipe is not local Radeon execution proof.[3] |
+| `jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF` | New record at `106de92ae1081a361003770e6bd0eae13056cefa`; recommended v4 weighs 21,474,646,144 bytes, optional F16 projector 899,283,072 bytes.[6][7] | Conditional candidate only. The publisher deprecates v1/v2; v4 uses inline scales. Exact-format support on the installed Radeon runtime remains unverified. NVIDIA optimization claims neither establish AMD support nor prove it impossible.[7] |
+| `LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF` | New record at `aa1d107a320a1990d684b091f66dfccc4ed5f979`; the complete tree has 10 files but no GGUF or safetensors weights.[9] | Retain the request pending an exact publisher artifact. Templates, prompts and scripts are not weights; Jan1k's submitted derivative remains a separate record, not a silent substitution.[9][10] |
+
+The cards declare Apache-2.0 for both Qwen derivatives; this is metadata, not a
+new license acceptance or validation of the publisher's quality claims.[5][8]
+The inventory preserves exact candidate sizes and authoritative LFS SHA-256
+for Jan1k v4 and its projector. Those hashes have not been checked against
+downloaded local bytes.[6] Research is not runtime qualification.
+
+### Sources for the 2026-09-14 intake
+
+[2] https://huggingface.co/api/models/dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8/tree/d61c59ea5e514e25d305b5850e8a432f7a9969f2?recursive=true&expand=false&limit=1000
+[3] https://huggingface.co/dealignai/DeepSeek-V4.1-Flash-UNCENSORED-FP8/resolve/d61c59ea5e514e25d305b5850e8a432f7a9969f2/README.md
+[5] https://huggingface.co/api/models/jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF
+[6] https://huggingface.co/api/models/jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF/tree/106de92ae1081a361003770e6bd0eae13056cefa?recursive=true&expand=false&limit=1000
+[7] https://huggingface.co/jan1k/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-NVFP4-GGUF/resolve/106de92ae1081a361003770e6bd0eae13056cefa/README.md
+[8] https://huggingface.co/api/models/LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF
+[9] https://huggingface.co/api/models/LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF/tree/aa1d107a320a1990d684b091f66dfccc4ed5f979?recursive=true&expand=false&limit=1000
+[10] https://huggingface.co/LuffyTheFox/Qwen3.6-35B-A3B-Uncensored-Genesis-Hermes-Final-GGUF/resolve/aa1d107a320a1990d684b091f66dfccc4ed5f979/README.md
+
 ## Submitted candidate intake — 2026-09-13
 
 One submitted URL, one identifier, compared case-insensitively against every

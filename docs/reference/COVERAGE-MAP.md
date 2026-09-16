@@ -303,5 +303,10 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`rust/src/verify.rs`](../../rust/src/verify.rs) | [Reference](OPERATIONS.md#verifying-artifacts-with-frankenctl) |
 | [`rust/tests/serve_parity.rs`](../../rust/tests/serve_parity.rs) | [Reference](CONFIGURATION.md) |
 | [`rust/tests/verify_cli.rs`](../../rust/tests/verify_cli.rs) | [Reference](OPERATIONS.md#verifying-artifacts-with-frankenctl) |
+| [`ignore/FRANKENSTEIN_LLM_X99_ROCM_STABILITY_POSTMORTEM.md`](../../ignore/FRANKENSTEIN_LLM_X99_ROCM_STABILITY_POSTMORTEM.md) | [Reference](TROUBLESHOOTING.md) |
+| [`ignore/HERMES_RUST_FIRST_HYBRID_MIGRATION.md`](../../ignore/HERMES_RUST_FIRST_HYBRID_MIGRATION.md) | [Reference](ARCHITECTURE.md) |
+| [`ignore/strip-ai-attrib.py`](../../ignore/strip-ai-attrib.py) | [Reference](DEVELOPER-GUIDE.md) |
+| [`scripts/heretictokens.sh`](../../scripts/heretictokens.sh) | [Reference](OPERATIONS.md) |
+| [`workspace_files.json`](../../workspace_files.json) | [Reference](CONFIGURATION.md) |
 
-Inventory entries: 296, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 301, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).

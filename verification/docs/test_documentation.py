@@ -370,6 +370,38 @@ def test_documentation_audit_inventory_and_disposition_counts():
     assert counts == audit["disposition_counts"]
 
 
+def test_agent_worktrees_are_ignored_and_not_tracked():
+    tracked = subprocess.check_output(
+        ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")
+    assert not any(path.startswith(".claude/worktrees/") for path in tracked)
+    probe = ".claude/worktrees/documentation-ignore-probe/README.md"
+    ignored = subprocess.run(
+        ["git", "check-ignore", "--no-index", probe], cwd=ROOT,
+        capture_output=True, text=True, check=False)
+    assert ignored.returncode == 0, ignored.stderr
+    assert ignored.stdout.strip() == probe
+
+
+def test_download_intake_does_not_claim_transfer_admission():
+    inventory = json.loads((ROOT / "docs/reference/candidate-research-inventory.json").read_text())
+    queue = inventory["additional_research_queue"]
+    batch = next(row for row in queue["intake_batches"] if row["batch"] == "2026-09-14")
+    records = {row["repository"]: row for row in queue["entries"]}
+    assert batch["requested_actions"] == ["research", "investigate", "download"]
+    assert len(batch["entries"]) == 3
+    for submitted in batch["entries"]:
+        record = records[submitted["repository"]]
+        request = record["download_request"]
+        assert request["requested"] is True
+        assert request["state"] == "blocked" and request["blockers"]
+        assert request["downloaded"] is False and request["admitted"] is False
+        assert record["qualified"] is False
+        for artifact in request["artifact_candidates"]:
+            assert artifact["size"] > 0
+            assert re.fullmatch(r"[0-9a-f]{64}", artifact["sha256"])
+            assert not artifact["path"].endswith("-v2.gguf")
+
+
 def test_gate_output_directories_are_not_tracked():
     """Gate output is evidence about one run, not repository state.
 
