@@ -13,6 +13,11 @@
 //! informational and ignored. Each file carries exactly `repo_path`,
 //! `destination`, `size` and `sha256`, where `sha256` is `null` when the queue
 //! records no publisher digest for that file.
+//!
+//! The validation helpers here are shared with [`crate::inventory`], which reads
+//! the repository's two other manifest formats into the same [`QueueManifest`]
+//! shape, so a digest, a size or a destination is held to one rule whichever
+//! file recorded it.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -74,6 +79,9 @@ pub fn to_hex(bytes: &[u8]) -> String {
 pub struct QueueManifest {
     /// The path the manifest was read from, as given.
     pub path: PathBuf,
+    /// The format it was read as: [`QUEUE_SCHEMA`], or one of the formats
+    /// [`crate::inventory`] reads.
+    pub format: &'static str,
     /// Size of the manifest in bytes.
     pub bytes: u64,
     /// SHA-256 of the exact manifest bytes that were parsed.
@@ -172,27 +180,13 @@ impl std::error::Error for SelectionError {}
 impl QueueManifest {
     /// Read and validate a manifest, reading at most [`MAX_MANIFEST_BYTES`] + 1.
     pub fn load(path: &Path) -> Result<Self, ManifestError> {
-        let read = |error| ManifestError::Read {
-            path: path.to_path_buf(),
-            error,
-        };
-        let file = std::fs::File::open(path).map_err(read)?;
-        let mut bytes = Vec::new();
-        file.take(MAX_MANIFEST_BYTES + 1)
-            .read_to_end(&mut bytes)
-            .map_err(read)?;
-        if bytes.len() as u64 > MAX_MANIFEST_BYTES {
-            return Err(ManifestError::TooLarge {
-                path: path.to_path_buf(),
-                limit: MAX_MANIFEST_BYTES,
-            });
-        }
+        let bytes = read_bounded(path, MAX_MANIFEST_BYTES)?;
         Self::parse(path, &bytes)
     }
 
     /// Validate manifest bytes. `path` is used for identity and error messages only.
     pub fn parse(path: &Path, bytes: &[u8]) -> Result<Self, ManifestError> {
-        let p = Parse { path };
+        let p = Parse::new(path);
         let root: Value = serde_json::from_slice(bytes)
             .map_err(|e| p.error("$", format!("not valid JSON: {e}")))?;
         let top = p.object(&root, "$")?;
@@ -228,23 +222,9 @@ impl QueueManifest {
             }
             let capability = p.text(object, "capability", &at)?;
             let repository = p.text(object, "repository", &at)?;
-            let parts: Vec<&str> = repository.split('/').collect();
-            if parts.len() != 2
-                || parts.iter().any(|part| part.is_empty())
-                || repository.chars().any(char::is_whitespace)
-            {
-                return Err(p.error(
-                    &format!("{at}.repository"),
-                    format!("expected owner/name, got {repository:?}"),
-                ));
-            }
+            check_repository(&repository).map_err(|m| p.error(&format!("{at}.repository"), m))?;
             let revision = p.text(object, "revision", &at)?;
-            if revision.chars().any(char::is_whitespace) {
-                return Err(p.error(
-                    &format!("{at}.revision"),
-                    format!("must not contain whitespace, got {revision:?}"),
-                ));
-            }
+            check_revision(&revision).map_err(|m| p.error(&format!("{at}.revision"), m))?;
             let rows = p.array(object, "files", &at, MAX_FILES)?;
             let mut files = Vec::with_capacity(rows.len());
             let mut artifact_sum = 0u64;
@@ -337,6 +317,7 @@ impl QueueManifest {
         }
         Ok(Self {
             path: path.to_path_buf(),
+            format: QUEUE_SCHEMA,
             bytes: bytes.len() as u64,
             sha256: Sha256Hex::of(bytes),
             built_at,
@@ -377,13 +358,92 @@ impl QueueManifest {
     }
 }
 
+/// Read at most `limit` bytes of `path`, refusing a longer file unparsed.
+pub(crate) fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>, ManifestError> {
+    let read = |error| ManifestError::Read {
+        path: path.to_path_buf(),
+        error,
+    };
+    let file = std::fs::File::open(path).map_err(read)?;
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes).map_err(read)?;
+    if bytes.len() as u64 > limit {
+        return Err(ManifestError::TooLarge {
+            path: path.to_path_buf(),
+            limit,
+        });
+    }
+    Ok(bytes)
+}
+
+/// A manifest of another format, already parsed into artifacts, held to the
+/// rules [`QueueManifest::parse`] applies across entries: at least one
+/// artifact, each with at least one file, unique artifact keys, one owner per
+/// destination, and a byte total that does not overflow.
+pub(crate) fn assemble(
+    path: &Path,
+    bytes: &[u8],
+    format: &'static str,
+    built_at: Option<String>,
+    artifacts: Vec<Artifact>,
+) -> Result<QueueManifest, ManifestError> {
+    let p = Parse::new(path);
+    if artifacts.is_empty() {
+        return Err(p.error("$", "declares no artifact"));
+    }
+    let mut total_bytes = 0u64;
+    {
+        let mut keys = BTreeSet::new();
+        let mut owners: BTreeMap<&Path, String> = BTreeMap::new();
+        for artifact in &artifacts {
+            if !keys.insert(artifact.key.as_str()) {
+                return Err(p.error(
+                    "$",
+                    format!("artifact key {:?} appears more than once", artifact.key),
+                ));
+            }
+            if artifact.files.is_empty() {
+                return Err(p.error("$", format!("artifact {:?} lists no file", artifact.key)));
+            }
+            for file in &artifact.files {
+                let owner = format!("{}/{}", artifact.key, file.repo_path);
+                if let Some(previous) = owners.insert(file.destination.as_path(), owner.clone()) {
+                    return Err(p.error(
+                        "$",
+                        format!(
+                            "{} is claimed by both {previous} and {owner}",
+                            file.destination.display()
+                        ),
+                    ));
+                }
+                total_bytes = total_bytes
+                    .checked_add(file.size)
+                    .ok_or_else(|| p.error("$", "the byte total overflows"))?;
+            }
+        }
+    }
+    Ok(QueueManifest {
+        path: path.to_path_buf(),
+        format,
+        bytes: bytes.len() as u64,
+        sha256: Sha256Hex::of(bytes),
+        built_at,
+        total_bytes,
+        artifacts,
+    })
+}
+
 /// Field extraction that reports the JSON location of the first problem.
-struct Parse<'a> {
+pub(crate) struct Parse<'a> {
     path: &'a Path,
 }
 
-impl Parse<'_> {
-    fn error(&self, location: &str, message: impl Into<String>) -> ManifestError {
+impl<'a> Parse<'a> {
+    pub(crate) fn new(path: &'a Path) -> Self {
+        Self { path }
+    }
+
+    pub(crate) fn error(&self, location: &str, message: impl Into<String>) -> ManifestError {
         ManifestError::Malformed {
             path: self.path.to_path_buf(),
             location: location.to_string(),
@@ -391,7 +451,7 @@ impl Parse<'_> {
         }
     }
 
-    fn object<'v>(
+    pub(crate) fn object<'v>(
         &self,
         value: &'v Value,
         location: &str,
@@ -401,7 +461,7 @@ impl Parse<'_> {
             .ok_or_else(|| self.error(location, "expected a JSON object"))
     }
 
-    fn text(
+    pub(crate) fn text(
         &self,
         object: &Map<String, Value>,
         key: &str,
@@ -421,7 +481,7 @@ impl Parse<'_> {
         }
     }
 
-    fn count(
+    pub(crate) fn count(
         &self,
         object: &Map<String, Value>,
         key: &str,
@@ -436,7 +496,7 @@ impl Parse<'_> {
             .ok_or_else(|| self.error(&at, format!("expected a non-negative integer, got {value}")))
     }
 
-    fn array<'v>(
+    pub(crate) fn array<'v>(
         &self,
         object: &'v Map<String, Value>,
         key: &str,
@@ -457,10 +517,50 @@ impl Parse<'_> {
             Some(other) => Err(self.error(&at, format!("expected an array, got {other}"))),
         }
     }
+
+    /// `object` must carry exactly `expected`, in any order.
+    pub(crate) fn keys(
+        &self,
+        object: &Map<String, Value>,
+        location: &str,
+        expected: &[&str],
+    ) -> Result<(), ManifestError> {
+        let mut present: Vec<&str> = object.keys().map(String::as_str).collect();
+        present.sort_unstable();
+        let mut wanted = expected.to_vec();
+        wanted.sort_unstable();
+        if present != wanted {
+            return Err(self.error(
+                location,
+                format!("expected exactly the keys {wanted:?}, got {present:?}"),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A repository is `owner/name`, both parts non-empty, with no whitespace.
+pub(crate) fn check_repository(text: &str) -> Result<(), String> {
+    let parts: Vec<&str> = text.split('/').collect();
+    if parts.len() != 2
+        || parts.iter().any(|part| part.is_empty())
+        || text.chars().any(char::is_whitespace)
+    {
+        return Err(format!("expected owner/name, got {text:?}"));
+    }
+    Ok(())
+}
+
+/// A revision carries no whitespace.
+pub(crate) fn check_revision(text: &str) -> Result<(), String> {
+    if text.chars().any(char::is_whitespace) {
+        return Err(format!("must not contain whitespace, got {text:?}"));
+    }
+    Ok(())
 }
 
 /// A repository path is relative, with no empty, `.` or `..` component.
-fn check_repo_path(text: &str) -> Result<(), String> {
+pub(crate) fn check_repo_path(text: &str) -> Result<(), String> {
     if text.contains('\0') {
         return Err("contains a NUL byte".to_string());
     }
@@ -479,7 +579,7 @@ fn check_repo_path(text: &str) -> Result<(), String> {
 /// A destination is absolute and already in lexical normal form: no empty,
 /// `.` or `..` component and no trailing `/`. Normal form is required, not
 /// computed, so two spellings of one path cannot pass as two destinations.
-fn check_destination(text: &str) -> Result<(), String> {
+pub(crate) fn check_destination(text: &str) -> Result<(), String> {
     if text.contains('\0') {
         return Err("contains a NUL byte".to_string());
     }

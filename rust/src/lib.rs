@@ -8,7 +8,11 @@
 pub mod cli;
 pub mod config;
 pub mod doctor;
+pub mod downloads;
 pub mod error;
 pub mod gpu;
+pub mod inventory;
 pub mod manifest;
+pub mod report;
+pub mod verification;
 pub mod verify;

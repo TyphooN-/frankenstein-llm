@@ -1,58 +1,54 @@
-//! Read-only verification of local artifacts against a download-queue manifest.
+//! Read-only verification of one artifact file against its recorded identity.
 //!
-//! This is the verification core only. It checks the files a validated
-//! [`QueueManifest`] names: exact size always, and SHA-256 when the queue
-//! records a publisher digest. It never downloads, repairs, deletes, renames or
-//! promotes a file, never admits a model or grants qualification, and never
-//! reads a completion stamp: every run judges the bytes on disk at that moment.
-//!
-//! It also does not take the download queues' locks yet. Coordinating with a
-//! running downloader is the service integration's job, so the caller must make
-//! sure nothing writes these destinations during a run. A file that changes
-//! while it is read is still caught, and reported as such, rather than scored.
+//! This is the per-file core of `frankenctl verify`: exact size always, and
+//! SHA-256 when a publisher digest is recorded. It never downloads, repairs,
+//! deletes, renames or promotes a file, never admits a model or grants
+//! qualification, and never reads a completion stamp: every check judges the
+//! bytes on disk at that moment. Writer locks, selection, cancellation and the
+//! published report belong to [`crate::verification`].
 //!
 //! Content is hashed through one fixed buffer of [`HASH_BUFFER_BYTES`], so
 //! memory does not grow with file size. An I/O error keeps its operation, path,
 //! OS error number and offset, and makes the run exit 74; it is never folded
-//! into a mismatch or a missing file.
+//! into a mismatch or a missing file. A cancellation seen while a file is read
+//! ends that check with no verdict.
 
 use std::fs::{File, Metadata};
 use std::io::{self, Read};
 use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt};
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use crate::manifest::{to_hex, Artifact, ArtifactFile, ManifestError, QueueManifest, QUEUE_SCHEMA};
+use crate::manifest::{to_hex, ArtifactFile, ManifestError};
 
 /// Size of the single read buffer used to hash a file.
 pub const HASH_BUFFER_BYTES: usize = 8 * 1024 * 1024;
 
 /// Every selected file matched: SHA-256 and size, or size where no digest is published.
 pub const EXIT_OK: u8 = 0;
-/// A file is missing, the wrong size, the wrong digest, unsafe to open, or changed while read.
+/// A file is missing, the wrong size, the wrong digest, unsafe to open, or
+/// changed while read; or a model file a preset or sidecar loads is unaccounted.
 pub const EXIT_INTEGRITY: u8 = 1;
-/// Bad command line, including an `--artifact` key the manifest does not have.
+/// Bad command line, including a `--source` or `--artifact` that does not exist.
 pub const EXIT_USAGE: u8 = 2;
-/// The manifest is malformed or too large; no artifact was touched.
+/// The manifest or inventory is malformed or too large; no artifact was touched.
 pub const EXIT_DATA: u8 = 65;
-/// The manifest does not exist.
+/// The manifest or inventory does not exist.
 pub const EXIT_NO_INPUT: u8 = 66;
+/// An internal failure, such as signal handlers that could not be installed.
+pub const EXIT_SOFTWARE: u8 = 70;
+/// The report could not be published durably; stdout still carries it.
+pub const EXIT_CANT_CREATE: u8 = 73;
 /// An I/O error prevented a check; the report keeps the causal error.
 pub const EXIT_IO: u8 = 74;
+/// A writer lock is held by another process; no artifact was examined.
+pub const EXIT_LOCKED: u8 = 75;
+/// Added to the number of the signal that interrupted a run.
+pub const EXIT_SIGNAL_BASE: u8 = 128;
 
-/// What a run did not do, stated in every run report.
-pub const NOT_PERFORMED: &[&str] = &[
-    "download",
-    "repair, deletion, rename or promotion of any file",
-    "model admission or functional qualification",
-    "completion-stamp lookup",
-    "download-lock coordination: no queue lock is taken, so no downloader may write these destinations during a run",
-];
-
-/// The exit status for a manifest that could not be accepted.
+/// The exit status for a manifest or inventory that could not be accepted.
 pub fn manifest_exit_code(error: &ManifestError) -> u8 {
     match error {
         ManifestError::Read { error, .. } if error.kind() == io::ErrorKind::NotFound => {
@@ -111,7 +107,7 @@ pub enum Outcome {
         identity: FileIdentity,
         bytes_hashed: u64,
     },
-    /// Exact size. The queue publishes no digest, so the content was not read.
+    /// Exact size. No digest is recorded, so the content was not read.
     SizeOnlyNoPublishedHash { identity: FileIdentity },
     /// Nothing exists at the destination.
     Missing,
@@ -130,9 +126,11 @@ pub enum Outcome {
     /// The destination is a symlink, sits under a symlinked directory, or is
     /// not a regular file. It was not read.
     UnsafePath { reason: String },
-    /// The file changed, grew, shrank or was replaced during the check, so no
-    /// verdict about its content is given.
+    /// The file changed, grew, shrank or was replaced during the check or
+    /// before the verification window closed, so no verdict is given.
     ChangedDuringRead { reason: String },
+    /// The run was cancelled before or while this file was read: no verdict.
+    NotChecked { reason: String },
 }
 
 /// Counts by outcome for one run.
@@ -147,6 +145,7 @@ pub struct Summary {
     pub unreadable: usize,
     pub unsafe_path: usize,
     pub changed_during_read: usize,
+    pub not_checked: usize,
 }
 
 impl Summary {
@@ -161,11 +160,15 @@ impl Summary {
             Outcome::Unreadable { .. } => &mut self.unreadable,
             Outcome::UnsafePath { .. } => &mut self.unsafe_path,
             Outcome::ChangedDuringRead { .. } => &mut self.changed_during_read,
+            Outcome::NotChecked { .. } => &mut self.not_checked,
         };
         *slot += 1;
     }
 
     /// 74 when any check hit an I/O error, else 1 for any integrity problem, else 0.
+    ///
+    /// Files not checked do not count here: only a cancelled run leaves them,
+    /// and its exit status is the signal's.
     pub fn exit_code(&self) -> u8 {
         if self.unreadable > 0 {
             EXIT_IO
@@ -183,208 +186,15 @@ impl Summary {
     }
 }
 
-/// Where a manifest came from and what it declares.
-#[derive(Debug, Clone, Serialize)]
-pub struct ManifestSummary {
-    pub path: String,
-    pub bytes: u64,
-    pub sha256: String,
-    pub schema: &'static str,
-    pub built_at: Option<String>,
-    pub total_bytes: u64,
-    pub artifacts: usize,
-    pub files: usize,
-}
-
-impl ManifestSummary {
-    pub fn of(manifest: &QueueManifest) -> Self {
-        Self {
-            path: manifest.path.to_string_lossy().into_owned(),
-            bytes: manifest.bytes,
-            sha256: manifest.sha256.as_str().to_string(),
-            schema: QUEUE_SCHEMA,
-            built_at: manifest.built_at.clone(),
-            total_bytes: manifest.total_bytes,
-            artifacts: manifest.artifacts.len(),
-            files: manifest.file_count(),
-        }
-    }
-}
-
-/// The selected artifacts and what checking them involves.
-#[derive(Debug, Clone, Serialize)]
-pub struct Selection {
-    pub all_artifacts: bool,
-    pub artifact_keys: Vec<String>,
-    pub files: usize,
-    pub bytes: u64,
-    pub publisher_sha256_files: usize,
-    pub size_only_files: usize,
-}
-
-impl Selection {
-    pub fn of(manifest: &QueueManifest, selected: &[&Artifact]) -> Self {
-        let files = || selected.iter().flat_map(|artifact| artifact.files.iter());
-        let hashed = files().filter(|file| file.sha256.is_some()).count();
-        let total = files().count();
-        Self {
-            all_artifacts: selected.len() == manifest.artifacts.len(),
-            artifact_keys: selected.iter().map(|a| a.key.clone()).collect(),
-            files: total,
-            bytes: files().map(|file| file.size).sum(),
-            publisher_sha256_files: hashed,
-            size_only_files: total - hashed,
-        }
-    }
-}
-
-/// A metadata-only plan. Building it reads nothing but the manifest.
-#[derive(Debug, Clone, Serialize)]
-pub struct Plan {
-    pub schema: &'static str,
-    pub mode: &'static str,
-    pub artifact_access: &'static str,
-    pub manifest: ManifestSummary,
-    pub selection: Selection,
-    pub artifacts: Vec<PlannedArtifact>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct PlannedArtifact {
-    pub key: String,
-    pub capability: String,
-    pub repository: String,
-    pub revision: String,
-    pub files: Vec<PlannedFile>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct PlannedFile {
-    pub repo_path: String,
-    pub destination: String,
-    pub size: u64,
-    pub sha256: Option<String>,
-    /// `sha256-and-size` or `size-only-no-published-hash`.
-    pub check: &'static str,
-}
-
-/// Describe what a run over `selected` would check, without touching any artifact.
-pub fn plan(manifest: &QueueManifest, selected: &[&Artifact]) -> Plan {
-    Plan {
-        schema: "frankenctl-artifact-verification-plan/1",
-        mode: "plan",
-        artifact_access: "none: only the manifest was read; no artifact path was examined",
-        manifest: ManifestSummary::of(manifest),
-        selection: Selection::of(manifest, selected),
-        artifacts: selected
-            .iter()
-            .map(|artifact| PlannedArtifact {
-                key: artifact.key.clone(),
-                capability: artifact.capability.clone(),
-                repository: artifact.repository.clone(),
-                revision: artifact.revision.clone(),
-                files: artifact
-                    .files
-                    .iter()
-                    .map(|file| PlannedFile {
-                        repo_path: file.repo_path.clone(),
-                        destination: file.destination.to_string_lossy().into_owned(),
-                        size: file.size,
-                        sha256: file.sha256.as_ref().map(|d| d.as_str().to_string()),
-                        check: if file.sha256.is_some() {
-                            "sha256-and-size"
-                        } else {
-                            "size-only-no-published-hash"
-                        },
-                    })
-                    .collect(),
-            })
-            .collect(),
-    }
-}
-
-/// One file's identity from the manifest and what the check found.
-#[derive(Debug, Clone, Serialize)]
-pub struct FileResult {
-    pub key: String,
-    pub capability: String,
-    pub repository: String,
-    pub revision: String,
-    pub repo_path: String,
-    pub destination: String,
-    pub expected_size: u64,
-    pub expected_sha256: Option<String>,
-    #[serde(flatten)]
-    pub outcome: Outcome,
-}
-
-/// The report of one run.
-#[derive(Debug, Clone, Serialize)]
-pub struct RunReport {
-    pub schema: &'static str,
-    pub mode: &'static str,
-    pub manifest: ManifestSummary,
-    pub selection: Selection,
-    pub boot_id: Option<String>,
-    pub started_at_unix: u64,
-    pub finished_at_unix: u64,
-    pub hash_buffer_bytes: usize,
-    pub not_performed: &'static [&'static str],
-    pub results: Vec<FileResult>,
-    pub summary: Summary,
-    pub exit_code: u8,
-}
-
-/// Check every file of the selected artifacts, in manifest order.
-pub fn run(manifest: &QueueManifest, selected: &[&Artifact]) -> RunReport {
-    let started_at_unix = unix_now();
-    let mut buffer = vec![0u8; HASH_BUFFER_BYTES];
-    let mut summary = Summary::default();
-    let mut results = Vec::new();
-    for artifact in selected {
-        for file in &artifact.files {
-            let outcome = verify_file_with(file, &mut buffer, &mut |_| {});
-            summary.record(&outcome);
-            results.push(FileResult {
-                key: artifact.key.clone(),
-                capability: artifact.capability.clone(),
-                repository: artifact.repository.clone(),
-                revision: artifact.revision.clone(),
-                repo_path: file.repo_path.clone(),
-                destination: file.destination.to_string_lossy().into_owned(),
-                expected_size: file.size,
-                expected_sha256: file.sha256.as_ref().map(|d| d.as_str().to_string()),
-                outcome,
-            });
-        }
-    }
-    RunReport {
-        schema: "frankenctl-artifact-verification-run/1",
-        mode: "run",
-        manifest: ManifestSummary::of(manifest),
-        selection: Selection::of(manifest, selected),
-        boot_id: std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
-            .ok()
-            .map(|id| id.trim().to_string()),
-        started_at_unix,
-        finished_at_unix: unix_now(),
-        hash_buffer_bytes: HASH_BUFFER_BYTES,
-        not_performed: NOT_PERFORMED,
-        exit_code: summary.exit_code(),
-        results,
-        summary,
-    }
-}
-
-/// Check one file with a fresh buffer.
+/// Check one file with a fresh buffer and no cancellation.
 pub fn verify_file(file: &ArtifactFile) -> Outcome {
     let mut buffer = vec![0u8; HASH_BUFFER_BYTES];
-    verify_file_with(file, &mut buffer, &mut |_| {})
+    verify_file_with(file, &mut buffer, &mut |_| {}, &|| None)
 }
 
 /// Check one file, hashing through `buffer`. `after_chunk` is called with the
-/// running byte count after each chunk is hashed; production passes a no-op,
-/// tests use it to change the file mid-read.
+/// running byte count after each chunk is hashed; `cancelled` is asked before
+/// every read and returns the number of a signal that should stop the check.
 ///
 /// The file is examined with `lstat`, then opened without following a final
 /// symlink, and its `fstat` identity must match the `lstat` one. After the last
@@ -395,6 +205,7 @@ pub fn verify_file_with(
     file: &ArtifactFile,
     buffer: &mut [u8],
     after_chunk: &mut dyn FnMut(u64),
+    cancelled: &dyn Fn() -> Option<i32>,
 ) -> Outcome {
     let path = file.destination.as_path();
     let linked = match std::fs::symlink_metadata(path) {
@@ -471,7 +282,7 @@ pub fn verify_file_with(
             reason: "the path was replaced or modified between lstat and open".to_string(),
         };
     }
-    let digest = match hash_stream(&mut handle, file.size, buffer, after_chunk) {
+    let digest = match hash_stream(&mut handle, file.size, buffer, after_chunk, cancelled) {
         Ok(digest) => digest,
         Err(StreamError::Io { offset, error }) => {
             return unreadable("read", path, &error, Some(offset))
@@ -480,6 +291,14 @@ pub fn verify_file_with(
             return Outcome::ChangedDuringRead {
                 reason: format!(
                     "read {read} bytes, more than the {} the file had when it was opened",
+                    file.size
+                ),
+            }
+        }
+        Err(StreamError::Cancelled { signal, read }) => {
+            return Outcome::NotChecked {
+                reason: format!(
+                    "interrupted by signal {signal} after {read} of {} bytes were read",
                     file.size
                 ),
             }
@@ -529,6 +348,51 @@ pub fn verify_file_with(
     }
 }
 
+/// Confirm, as the verification window closes, that `file`'s destination still
+/// names the file `outcome` describes.
+///
+/// A verdict is about the bytes that were read. Writers that honour the locks
+/// cannot change them during a run, but anything else could, and a report that
+/// says `verified-sha256` for a path that names different bytes by the time the
+/// report is published would be a false statement. So every outcome that
+/// carries an identity is compared with a fresh `lstat`, and a missing file must
+/// still be missing. Anything else becomes [`Outcome::ChangedDuringRead`].
+pub fn confirm_at_window_close(file: &ArtifactFile, outcome: Outcome) -> Outcome {
+    let identity = match &outcome {
+        Outcome::VerifiedSha256 { identity, .. }
+        | Outcome::SizeOnlyNoPublishedHash { identity }
+        | Outcome::SizeMismatch { identity, .. }
+        | Outcome::Sha256Mismatch { identity, .. } => Some(*identity),
+        Outcome::Missing => None,
+        _ => return outcome,
+    };
+    let path = file.destination.as_path();
+    let absent = |error: &io::Error| {
+        matches!(
+            error.kind(),
+            io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+        )
+    };
+    match (std::fs::symlink_metadata(path), identity) {
+        (Ok(now), Some(then)) if now.file_type().is_file() && FileIdentity::of(&now) == then => {
+            outcome
+        }
+        (Ok(_), Some(_)) => Outcome::ChangedDuringRead {
+            reason: "when the verification window closed, the path named a different or modified file"
+                .to_string(),
+        },
+        (Err(error), Some(_)) if absent(&error) => Outcome::ChangedDuringRead {
+            reason: "the file was removed before the verification window closed".to_string(),
+        },
+        (Err(error), None) if absent(&error) => outcome,
+        (Ok(_), None) => Outcome::ChangedDuringRead {
+            reason: "a file appeared at the destination before the verification window closed"
+                .to_string(),
+        },
+        (Err(error), _) => unreadable("lstat", path, &error, None),
+    }
+}
+
 /// The digest and length of a completely read stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StreamDigest {
@@ -544,23 +408,34 @@ pub enum StreamError {
     /// The stream produced more than the expected number of bytes; reading
     /// stopped at the first chunk past the limit.
     LongerThanExpected { read: u64 },
+    /// `cancelled` reported `signal` after `read` bytes.
+    Cancelled { signal: i32, read: u64 },
 }
 
 /// Hash `reader` to EOF through `buffer`, the only memory the read uses.
 ///
-/// Interrupted reads are retried. Any other error ends the hash and is
-/// returned with its offset. Reading stops as soon as more than `expected_len`
-/// bytes have arrived, so a growing file cannot make the read unbounded.
+/// `cancelled` is asked before every read, including a retry after an
+/// interrupted one, so a signal stops the hash within one chunk. Interrupted
+/// reads are otherwise retried. Any other error ends the hash and is returned
+/// with its offset. Reading stops as soon as more than `expected_len` bytes have
+/// arrived, so a growing file cannot make the read unbounded.
 pub fn hash_stream<R: Read + ?Sized>(
     reader: &mut R,
     expected_len: u64,
     buffer: &mut [u8],
     after_chunk: &mut dyn FnMut(u64),
+    cancelled: &dyn Fn() -> Option<i32>,
 ) -> Result<StreamDigest, StreamError> {
     assert!(!buffer.is_empty(), "the hash buffer must not be empty");
     let mut hasher = Sha256::new();
     let mut total = 0u64;
     loop {
+        if let Some(signal) = cancelled() {
+            return Err(StreamError::Cancelled {
+                signal,
+                read: total,
+            });
+        }
         let read = match reader.read(buffer) {
             Ok(0) => break,
             Ok(read) => read,
@@ -626,45 +501,52 @@ fn file_kind(metadata: &Metadata) -> &'static str {
     }
 }
 
-fn errno_name(code: i32) -> Option<&'static str> {
+/// The symbolic name of an errno value this verifier can meet.
+pub fn errno_name(code: i32) -> Option<&'static str> {
     Some(match code {
         libc::EPERM => "EPERM",
         libc::ENOENT => "ENOENT",
+        libc::EINTR => "EINTR",
         libc::EIO => "EIO",
         libc::ENXIO => "ENXIO",
         libc::EBADF => "EBADF",
+        libc::EAGAIN => "EAGAIN",
         libc::ENOMEM => "ENOMEM",
         libc::EACCES => "EACCES",
+        libc::EEXIST => "EEXIST",
         libc::ENODEV => "ENODEV",
         libc::ENOTDIR => "ENOTDIR",
         libc::EISDIR => "EISDIR",
         libc::EINVAL => "EINVAL",
         libc::EFBIG => "EFBIG",
+        libc::ENOSPC => "ENOSPC",
+        libc::EROFS => "EROFS",
         libc::ELOOP => "ELOOP",
+        libc::ENOTEMPTY => "ENOTEMPTY",
         libc::EBADE => "EBADE",
         libc::EOVERFLOW => "EOVERFLOW",
         libc::ETIMEDOUT => "ETIMEDOUT",
         libc::ESTALE => "ESTALE",
         libc::EUCLEAN => "EUCLEAN",
+        libc::EDQUOT => "EDQUOT",
         _ => return None,
     })
-}
-
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs())
-        .unwrap_or(0)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::manifest::Sha256Hex;
+    use std::cell::Cell;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::SystemTime;
+
+    fn never() -> Option<i32> {
+        None
+    }
 
     /// A disposable directory under a canonical temp root, removed on drop.
     struct Scratch(PathBuf);
@@ -739,12 +621,12 @@ mod tests {
     fn hash_stream_matches_published_sha256_vectors() {
         let mut none = |_| {};
         let mut one = [0u8; 1];
-        let abc = hash_stream(&mut &b"abc"[..], 3, &mut one, &mut none).unwrap();
+        let abc = hash_stream(&mut &b"abc"[..], 3, &mut one, &mut none, &never).unwrap();
         assert_eq!(
             abc.sha256,
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
-        let empty = hash_stream(&mut &b""[..], 0, &mut one, &mut none).unwrap();
+        let empty = hash_stream(&mut &b""[..], 0, &mut one, &mut none, &never).unwrap();
         assert_eq!(
             empty.sha256,
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -755,7 +637,8 @@ mod tests {
             largest_request: 0,
         };
         let mut buffer = vec![0u8; 4096];
-        let digest = hash_stream(&mut million, 1_000_000, &mut buffer, &mut none).unwrap();
+        let digest =
+            hash_stream(&mut million, 1_000_000, &mut buffer, &mut none, &never).unwrap();
         assert_eq!(
             digest.sha256,
             "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
@@ -773,8 +656,14 @@ mod tests {
         };
         let mut buffer = vec![0u8; 4096];
         let mut chunks = Vec::new();
-        let digest =
-            hash_stream(&mut source, length, &mut buffer, &mut |n| chunks.push(n)).unwrap();
+        let digest = hash_stream(
+            &mut source,
+            length,
+            &mut buffer,
+            &mut |n| chunks.push(n),
+            &never,
+        )
+        .unwrap();
         assert_eq!(digest.bytes, length);
         assert_eq!(source.largest_request, 4096);
         assert_eq!(chunks, [4096, 8192, 12288, 12305]);
@@ -799,7 +688,7 @@ mod tests {
             }
         }
         let mut buffer = [0u8; 8];
-        match hash_stream(&mut FailsAfter(2), 64, &mut buffer, &mut |_| {}) {
+        match hash_stream(&mut FailsAfter(2), 64, &mut buffer, &mut |_| {}, &never) {
             Err(StreamError::Io { offset, error }) => {
                 assert_eq!(offset, 16);
                 assert_eq!(error.raw_os_error(), Some(libc::EIO));
@@ -826,6 +715,7 @@ mod tests {
             3,
             &mut buffer,
             &mut |_| {},
+            &never,
         )
         .unwrap();
         assert_eq!(digest.sha256, Sha256Hex::of(b"abc").as_str());
@@ -839,11 +729,69 @@ mod tests {
             largest_request: 0,
         };
         let mut buffer = [0u8; 4];
-        match hash_stream(&mut source, 10, &mut buffer, &mut |_| {}) {
+        match hash_stream(&mut source, 10, &mut buffer, &mut |_| {}, &never) {
             Err(StreamError::LongerThanExpected { read }) => assert_eq!(read, 12),
             other => panic!("{other:?}"),
         }
         assert_eq!(source.remaining, (1 << 30) - 12);
+    }
+
+    #[test]
+    fn hash_stream_stops_within_one_chunk_of_a_cancellation() {
+        let mut source = Repeat {
+            byte: 0,
+            remaining: 1 << 30,
+            largest_request: 0,
+        };
+        let mut buffer = [0u8; 4];
+        let signalled = Cell::new(None);
+        let result = hash_stream(
+            &mut source,
+            1 << 30,
+            &mut buffer,
+            &mut |n| {
+                if n == 8 {
+                    signalled.set(Some(libc::SIGTERM));
+                }
+            },
+            &|| signalled.get(),
+        );
+        match result {
+            Err(StreamError::Cancelled { signal, read }) => {
+                assert_eq!(signal, libc::SIGTERM);
+                assert_eq!(read, 8);
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(source.remaining, (1 << 30) - 8);
+    }
+
+    #[test]
+    fn hash_stream_checks_cancellation_after_an_interrupted_read() {
+        struct AlwaysInterrupted;
+        impl Read for AlwaysInterrupted {
+            fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+                Err(io::Error::from(io::ErrorKind::Interrupted))
+            }
+        }
+        let asked = Cell::new(0);
+        let result = hash_stream(
+            &mut AlwaysInterrupted,
+            4,
+            &mut [0u8; 4],
+            &mut |_| {},
+            &|| {
+                asked.set(asked.get() + 1);
+                (asked.get() == 3).then_some(libc::SIGINT)
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(StreamError::Cancelled {
+                signal: libc::SIGINT,
+                read: 0
+            })
+        ));
     }
 
     #[test]
@@ -980,12 +928,17 @@ mod tests {
         let digest = Some(Sha256Hex::of(&[1u8; 16]));
         let mut buffer = [0u8; 4];
         let target = path.clone();
-        let outcome = verify_file_with(&entry(&path, 16, digest), &mut buffer, &mut |n| {
-            if n == 4 {
-                let mut f = File::options().append(true).open(&target).unwrap();
-                f.write_all(&[2u8; 4]).unwrap();
-            }
-        });
+        let outcome = verify_file_with(
+            &entry(&path, 16, digest),
+            &mut buffer,
+            &mut |n| {
+                if n == 4 {
+                    let mut f = File::options().append(true).open(&target).unwrap();
+                    f.write_all(&[2u8; 4]).unwrap();
+                }
+            },
+            &never,
+        );
         assert!(
             matches!(outcome, Outcome::ChangedDuringRead { .. }),
             "{outcome:?}"
@@ -1001,12 +954,17 @@ mod tests {
         let target = path.clone();
         // Rewrites bytes that were already hashed, so the digest of what was
         // read still matches; only the metadata check can catch it.
-        let outcome = verify_file_with(&entry(&path, 16, digest), &mut buffer, &mut |n| {
-            if n == 8 {
-                let mut f = File::options().write(true).open(&target).unwrap();
-                f.write_all(&[9u8; 4]).unwrap();
-            }
-        });
+        let outcome = verify_file_with(
+            &entry(&path, 16, digest),
+            &mut buffer,
+            &mut |n| {
+                if n == 8 {
+                    let mut f = File::options().write(true).open(&target).unwrap();
+                    f.write_all(&[9u8; 4]).unwrap();
+                }
+            },
+            &never,
+        );
         match outcome {
             Outcome::ChangedDuringRead { reason } => {
                 assert!(reason.contains("changed while it was read"), "{reason}")
@@ -1025,11 +983,16 @@ mod tests {
         let (from, to) = (other.clone(), path.clone());
         // What a downloader's promotion does. Unlinking the original bumps its
         // ctime, so either identity check may be the one that fires.
-        let outcome = verify_file_with(&entry(&path, 16, digest), &mut buffer, &mut |n| {
-            if n == 4 {
-                std::fs::rename(&from, &to).unwrap();
-            }
-        });
+        let outcome = verify_file_with(
+            &entry(&path, 16, digest),
+            &mut buffer,
+            &mut |n| {
+                if n == 4 {
+                    std::fs::rename(&from, &to).unwrap();
+                }
+            },
+            &never,
+        );
         assert!(
             matches!(outcome, Outcome::ChangedDuringRead { .. }),
             "{outcome:?}"
@@ -1051,18 +1014,88 @@ mod tests {
         let (current_dir, incoming_dir) = (current.clone(), incoming.clone());
         // The inode being read is untouched, so its descriptor shows no change;
         // only the fresh lstat after the read sees that the path moved on.
-        let outcome = verify_file_with(&entry(&path, 16, digest), &mut buffer, &mut |n| {
-            if n == 4 {
-                std::fs::rename(&current_dir, &retired).unwrap();
-                std::fs::rename(&incoming_dir, &current_dir).unwrap();
-            }
-        });
+        let outcome = verify_file_with(
+            &entry(&path, 16, digest),
+            &mut buffer,
+            &mut |n| {
+                if n == 4 {
+                    std::fs::rename(&current_dir, &retired).unwrap();
+                    std::fs::rename(&incoming_dir, &current_dir).unwrap();
+                }
+            },
+            &never,
+        );
         match outcome {
             Outcome::ChangedDuringRead { reason } => {
                 assert!(reason.contains("different or modified file"), "{reason}")
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn a_cancelled_read_gets_no_verdict_and_names_the_signal() {
+        let scratch = Scratch::new("cancel");
+        let path = scratch.artifact("cancel.bin", &[3u8; 16]);
+        let mut buffer = [0u8; 4];
+        let signalled = Cell::new(None);
+        let outcome = verify_file_with(
+            &entry(&path, 16, Some(Sha256Hex::of(&[3u8; 16]))),
+            &mut buffer,
+            &mut |n| {
+                if n == 4 {
+                    signalled.set(Some(libc::SIGTERM));
+                }
+            },
+            &|| signalled.get(),
+        );
+        match outcome {
+            Outcome::NotChecked { reason } => {
+                assert!(reason.contains("signal 15 after 4 of 16"), "{reason}")
+            }
+            other => panic!("{other:?}"),
+        }
+        let mut summary = Summary::default();
+        summary.record(&Outcome::NotChecked {
+            reason: String::new(),
+        });
+        assert_eq!((summary.not_checked, summary.exit_code()), (1, EXIT_OK));
+    }
+
+    #[test]
+    fn the_window_close_check_catches_a_file_changed_after_its_verdict() {
+        let scratch = Scratch::new("window");
+        let path = scratch.artifact("weights.bin", b"abc");
+        let file = entry(&path, 3, Some(Sha256Hex::of(b"abc")));
+        let verified = verify_file(&file);
+        assert!(matches!(verified, Outcome::VerifiedSha256 { .. }));
+        assert_eq!(confirm_at_window_close(&file, verified.clone()), verified);
+
+        // Same size, same bytes, new inode: only identity can tell.
+        let replacement = scratch.artifact("replacement.bin", b"abc");
+        std::fs::rename(&replacement, &path).unwrap();
+        match confirm_at_window_close(&file, verified.clone()) {
+            Outcome::ChangedDuringRead { reason } => {
+                assert!(reason.contains("window closed"), "{reason}")
+            }
+            other => panic!("{other:?}"),
+        }
+
+        std::fs::remove_file(&path).unwrap();
+        assert!(matches!(
+            confirm_at_window_close(&file, verified),
+            Outcome::ChangedDuringRead { .. }
+        ));
+        assert_eq!(confirm_at_window_close(&file, Outcome::Missing), Outcome::Missing);
+        scratch.artifact("weights.bin", b"abc");
+        assert!(matches!(
+            confirm_at_window_close(&file, Outcome::Missing),
+            Outcome::ChangedDuringRead { .. }
+        ));
+        let unsafe_path = Outcome::UnsafePath {
+            reason: "kept".to_string(),
+        };
+        assert_eq!(confirm_at_window_close(&file, unsafe_path.clone()), unsafe_path);
     }
 
     #[test]
@@ -1094,5 +1127,19 @@ mod tests {
         });
         assert_eq!(summary.exit_code(), EXIT_IO);
         assert_eq!(summary.files, 3);
+    }
+
+    #[test]
+    fn storage_errnos_have_names() {
+        for (code, name) in [
+            (libc::EIO, "EIO"),
+            (libc::EROFS, "EROFS"),
+            (libc::ENOSPC, "ENOSPC"),
+            (libc::EDQUOT, "EDQUOT"),
+            (libc::EUCLEAN, "EUCLEAN"),
+        ] {
+            assert_eq!(errno_name(code), Some(name));
+        }
+        assert_eq!(errno_name(99_999), None);
     }
 }

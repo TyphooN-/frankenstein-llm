@@ -1,0 +1,132 @@
+{
+  "schema": "frankenctl-artifact-inventory/1",
+  "integrity": "Every tracked manifest that records exact artifact identity, and the writer lock each manifest's writers hold. frankenctl verify run takes all of these locks before examining any artifact and checks exact size always and SHA-256 where a digest is recorded; a size-only file is never reported as SHA-verified. The uncovered list names every model file a router preset or sidecar loads that no manifest records, with the reason it cannot be verified; those files are listed and never read. Research candidates, including download requests that are recorded but not admitted, have no source format here and appear in no executable manifest. Nothing in this file or in a verification report downloads, repairs, promotes, admits or qualifies a model.",
+  "sources": [
+    {
+      "id": "core-capabilities",
+      "format": "hermes-hf-artifact-queue/1",
+      "manifest": "verification/local-coverage-foundation/download-queue.json",
+      "writer_lock": "verification/local-coverage-foundation/download-queue.lock",
+      "writers": [
+        "verification/local-coverage-foundation/download_service.py",
+        "verification/local-coverage-foundation/download_queue.py"
+      ]
+    },
+    {
+      "id": "computer-use-grounding",
+      "format": "hermes-hf-artifact-queue/1",
+      "manifest": "verification/local-coverage-foundation/download-queue-phase2.json",
+      "writer_lock": "verification/local-coverage-foundation/download-queue-phase2.lock",
+      "writers": [
+        "verification/local-coverage-foundation/download_service.py",
+        "verification/local-coverage-foundation/download_queue.py"
+      ]
+    },
+    {
+      "id": "image-editing",
+      "format": "hermes-hf-artifact-queue/1",
+      "manifest": "verification/local-coverage-foundation/download-queue-phase3.json",
+      "writer_lock": "verification/local-coverage-foundation/download-queue-phase3.lock",
+      "writers": [
+        "verification/local-coverage-foundation/download_service.py",
+        "verification/local-coverage-foundation/download_queue.py"
+      ]
+    },
+    {
+      "id": "researched-candidates",
+      "format": "hermes-hf-artifact-queue/1",
+      "manifest": "verification/local-coverage-foundation/download-queue-phase4.json",
+      "writer_lock": "verification/local-coverage-foundation/download-queue-phase4.lock",
+      "writers": [
+        "verification/local-coverage-foundation/download_service.py",
+        "verification/local-coverage-foundation/download_queue.py"
+      ]
+    },
+    {
+      "id": "slot-uncensored-27b",
+      "format": "hermes-hf-artifact-queue/1",
+      "manifest": "verification/local-coverage-foundation/download-queue-slot-uncensored-27b.json",
+      "writer_lock": "verification/local-coverage-foundation/download-queue-slot-uncensored-27b.lock",
+      "writers": [
+        "verification/local-coverage-foundation/download_queue.py"
+      ]
+    },
+    {
+      "id": "glm53flash-iq3xxs",
+      "format": "sha256-size-name-tsv/1",
+      "manifest": "verification/glm53flash-local/manifest.tsv",
+      "writer_lock": "verification/glm53flash-local/manifest.lock",
+      "writers": [
+        "verification/glm53flash-local/download_and_verify.py"
+      ],
+      "artifact": {
+        "key": "glm53flash-iq3xxs",
+        "capability": "glm-5.3-flash-isolated-runtime",
+        "repository": "6block/GLM-5.3-Flash-GGUF",
+        "revision": "main",
+        "destination_directory": "/home/typhoon/git/frankenstein-llm/models/glm53flash-regular-iq3xxs",
+        "expected_rows": 15
+      }
+    },
+    {
+      "id": "obliterated-mmproj",
+      "format": "hf-single-file-manifest/1",
+      "manifest": "verification/obliterated-mmproj-manifest.json",
+      "writer_lock": "verification/obliterated-mmproj-manifest.lock",
+      "writers": [
+        "verification/download_obliterated_mmproj.py"
+      ],
+      "artifact": {
+        "key": "obliterated-mmproj-bf16",
+        "capability": "obliterated-vision-projector"
+      }
+    }
+  ],
+  "uncovered": [
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-Ridge-3.7bpw.gguf",
+      "class": "no-recorded-identity",
+      "reason": "scripts/download-ridge.sh follows the repository's main branch and records neither a SHA-256 nor a size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/RVN-Q6_K-multilingual-mtp.gguf",
+      "class": "digest-without-recorded-size",
+      "reason": "scripts/download-uncensored-models.sh, download-heretic-clean.sh and redownload-heretic-after-crash.sh pin SHA-256 1344d07425d73f0d1b8f36213910eae8fec21061b1a90835927e8485238f93a4, but no tracked record states its exact size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-OBLITERATED-Q6_K.gguf",
+      "class": "digest-without-recorded-size",
+      "reason": "scripts/download-uncensored-models.sh pins SHA-256 3535d4a15b75840fb391138ce04e6c73fde709320c6f5fe788cdbd586ee08e3a, but no tracked record states its exact size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP-Q6_K.gguf",
+      "class": "digest-without-recorded-size",
+      "reason": "scripts/download-writing-models.sh pins SHA-256 c394c7c0dcbd32e04f4695ad5d4dad8f2f5b7286b366d165815ac0cdc5ccf4aa for a file it fetches from main, but no tracked record states its exact size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/Phr00tyMix-v4-32B-imat-Q6_K.gguf",
+      "class": "digest-without-recorded-size",
+      "reason": "scripts/download-writing-models.sh pins SHA-256 056fc85cb1f0873e90ddae4f6f747fbc4ce3ebf41fad15bfdc2a7e66e2af1700 for a file it fetches from main, but no tracked record states its exact size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/signal-3.8-27b/AP-Q6_K/Signal-3.8-27B-AP-Q6_K.gguf",
+      "class": "no-recorded-identity",
+      "reason": "Integrated into the router from a download outside every tracked manifest; no tracked record states its SHA-256 or size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/qwopus3.8-27b-flash/Qwopus3.8-27B-Flash-MTP-Q5_K_M.gguf",
+      "class": "no-recorded-identity",
+      "reason": "Integrated into the router from a download outside every tracked manifest; no tracked record states its SHA-256 or size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/nex-n2.5-mini/Nex-N2.5-mini.i1-Q6_K.gguf",
+      "class": "no-recorded-identity",
+      "reason": "Integrated into the router from a download outside every tracked manifest; no tracked record states its SHA-256 or size."
+    },
+    {
+      "path": "/home/typhoon/git/frankenstein-llm/models/reranker/Qwen3-Reranker-8B-Q6_K.gguf",
+      "class": "local-conversion",
+      "reason": "Built on this host by verification/local-coverage-foundation/scripts/convert_qwen3_reranker_gguf.sh from the reranker-qwen3-8b-source queue artifact, whose files are verified; converted bytes have no publisher digest."
+    }
+  ]
+}
