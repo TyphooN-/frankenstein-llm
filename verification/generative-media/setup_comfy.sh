@@ -23,7 +23,20 @@ fi
 # Install ComfyUI deps EXCEPT torch (system ROCm torch 2.13.0 is reused via --system-site-packages).
 grep -viE '^(torch|torchvision|torchaudio)([=<>~!].*)?$' requirements.txt > /tmp/comfy-reqs.txt
 echo "--- requirements (torch excluded) ---"; cat /tmp/comfy-reqs.txt
-"$VENV/bin/python" -m pip install -r /tmp/comfy-reqs.txt
+# Excluding the lines is not enough: torchsde, kornia and spandrel still require
+# torch/torchvision, and with no system torchvision pip once resolved a PyPI
+# torchvision plus the CUDA torch it pins. Constrain every torch package to the
+# exact host version so a mismatch fails the install instead of shadowing ROCm.
+/usr/bin/python3 - > /tmp/comfy-torch-constraints.txt <<'PY' || exit 12
+import importlib.metadata as md
+for dist in ("torch", "torchvision"):
+    try:
+        print(f"{dist}=={md.version(dist)}")
+    except md.PackageNotFoundError:
+        raise SystemExit(f"host {dist} missing: pacman -S python-pytorch-opt-rocm python-torchvision")
+PY
+echo "--- torch constraints (host) ---"; cat /tmp/comfy-torch-constraints.txt
+"$VENV/bin/python" -m pip install -r /tmp/comfy-reqs.txt -c /tmp/comfy-torch-constraints.txt
 rc=$?
 echo "pip rc=$rc"
 echo "--- import check ---"

@@ -12,6 +12,16 @@ echo "=== tts setup start $(date -Is) ==="
 # pin torch out of the resolver's reach: the system ROCm build must win.
 "$VENV/bin/python" -m pip install qwen-tts soundfile librosa 2>&1 | tail -20
 rc=$?
+# qwen-tts pulls torchaudio from PyPI, whose newest release (2.11, frozen upstream)
+# ships C++ ops compiled against torch 2.11; against the host torch 2.13 they fail
+# to load and `import torchaudio` raises. qwen_tts only uses the pure-Python
+# torchaudio.compliance.kaldi, and torchaudio runs without its extension when the
+# library files are absent (only forced alignment needs them), so drop them.
+if ! "$VENV/bin/python" -c 'import torchaudio' 2>/dev/null; then
+  TA_LIB=$("$VENV/bin/python" -c 'import importlib.util as u, pathlib; print(pathlib.Path(u.find_spec("torchaudio").origin).parent / "lib")')
+  echo "--- torchaudio C++ ops incompatible with host torch; removing $TA_LIB/*.so ---"
+  rm -f "$TA_LIB"/*.so
+fi
 echo "--- verifying system ROCm torch survived ---"
 "$VENV/bin/python" - <<'PY'
 import torch
