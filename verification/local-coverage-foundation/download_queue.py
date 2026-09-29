@@ -176,7 +176,10 @@ def transfer_command(url: str, partial: Path, connections: int) -> list[str]:
     """
     aria_managed = aria_control_path(partial).exists()
     fresh = not partial.exists() or partial.stat().st_size == 0
-    if connections > 1 and shutil.which("aria2c") and (fresh or aria_managed):
+    # An aria2 control file means the partial is sparse: only its piece map knows
+    # which ranges are written, so it resumes through aria2 whatever the
+    # connection budget. curl would "resume" from EOF and leave the holes.
+    if shutil.which("aria2c") and (aria_managed or (connections > 1 and fresh)):
         return [
             "aria2c", "--continue=true", "--file-allocation=none",
             "--auto-file-renaming=false", "--allow-overwrite=true",
@@ -208,7 +211,19 @@ def download(repository: str, revision: str, repo_path: str, destination: Path, 
     if partial.exists() and partial.stat().st_size > size:
         quarantine = quarantine_partial(partial, f".bad-{int(time.time())}")
         log(f"quarantined oversized partial {partial} -> {quarantine}")
-    if partial.exists() and partial.stat().st_size == size:
+    control = aria_control_path(partial)
+    if control.exists() and not shutil.which("aria2c"):
+        # Only aria2 can resume its own sparse file. Without it the bytes are
+        # unusable but not bad: restart from zero instead of quarantining them.
+        partial.unlink(missing_ok=True)
+        control.unlink()
+        log(f"discarded aria2-managed partial {partial}: aria2c unavailable to resume it")
+    if partial.exists() and partial.stat().st_size == size and not control.exists():
+        # aria2 writes the last segment early, so with its control file present a
+        # full-size partial is merely sparse; it is resumed below, never hashed.
+        # On 2026-09-29 stopping the queues mid-transfer made the restart hash
+        # two such files, quarantine them as "wrong sha256" and refetch 32 GiB.
+        #
         # A death between "curl finished" and "os.replace" leaves a partial that
         # is already the whole file. Resuming it asks for a byte range starting
         # at EOF; the server answers 416 and --fail turns that into a non-zero

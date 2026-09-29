@@ -89,6 +89,51 @@ class TransferStateTests(unittest.TestCase):
         self.assertEqual(b"bad-ranges", quarantined.read_bytes())
         self.assertEqual(b"piece-map", Path(str(quarantined) + ".aria2").read_bytes())
 
+    def transfer(self, expected_sha=None):
+        """Call download() expecting a transfer; record argv, then stop the run."""
+        recorded = []
+
+        def fake_run(command, **_kwargs):
+            recorded.append(command)
+            raise RuntimeError("stop after recording the transfer")
+
+        with mock.patch.object(dq.subprocess, "run", side_effect=fake_run):
+            with self.assertRaisesRegex(RuntimeError, "stop after recording"):
+                dq.download("owner/repo", "main", "artifact.gguf", self.destination,
+                            len(self.payload), expected_sha)
+        return recorded
+
+    def test_full_size_aria2_partial_resumes_instead_of_being_hashed(self):
+        # aria2 writes the last segment early, so an interrupted multi-connection
+        # transfer leaves a full-size but sparse partial. Its control file is the
+        # only record of the holes: hashing it quarantines good progress.
+        self.partial.write_bytes(b"\0" * len(self.payload))
+        control = dq.aria_control_path(self.partial)
+        control.write_bytes(b"piece-map")
+        with mock.patch.object(dq.shutil, "which", return_value="/usr/bin/aria2c"), \
+                mock.patch.object(dq, "sha256", side_effect=AssertionError("hashed")):
+            recorded = self.transfer(self.digest)
+        self.assertEqual("aria2c", recorded[0][0])
+        self.assertTrue(self.partial.exists())
+        self.assertEqual([], list(self.sandbox.glob("*.bad-*")))
+
+    def test_aria2_control_file_selects_aria2_even_with_one_connection(self):
+        self.partial.write_bytes(self.payload[:5])
+        dq.aria_control_path(self.partial).write_bytes(b"piece-map")
+        with mock.patch.object(dq.shutil, "which", return_value="/usr/bin/aria2c"):
+            command = dq.transfer_command("https://example.invalid/x", self.partial, 1)
+        self.assertEqual("aria2c", command[0])
+
+    def test_aria2_partial_without_aria2_restarts_from_zero_not_quarantine(self):
+        self.partial.write_bytes(b"\0" * len(self.payload))
+        control = dq.aria_control_path(self.partial)
+        control.write_bytes(b"piece-map")
+        with mock.patch.object(dq.shutil, "which", return_value=None):
+            recorded = self.transfer(self.digest)
+        self.assertEqual("curl", recorded[0][0])
+        self.assertFalse(control.exists())
+        self.assertEqual([], list(self.sandbox.glob("*.bad-*")))
+
     def test_valid_destination_short_circuits(self):
         self.destination.write_bytes(self.payload)
         self.assertEqual([], self.fetch(self.digest))
