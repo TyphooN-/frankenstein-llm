@@ -45,7 +45,13 @@ GPU_TARGETS="${META[3]}"
     exit 2
 }
 
-HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
+# Exported, not prefixed onto the configure line: the HIP clang resolves its own
+# install root while compiling, and ROCm 7.2's rocm-llvm guesses /opt/rocm/lib
+# from its binary path, missing hip/hip_fp16.h. A login shell masks this via
+# /etc/profile.d/rocm.sh (ROCM_PATH); a shell older than the ROCm install does not.
+export HIP_PATH="$(hipconfig -R)"
+
+HIPCXX="$(hipconfig -l)/clang" \
 cmake -S "$SRC" -B "$BUILD" -G Ninja \
     -DGGML_HIP=ON \
     -DGGML_NATIVE=ON \

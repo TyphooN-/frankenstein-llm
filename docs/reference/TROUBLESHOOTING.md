@@ -196,7 +196,14 @@ All of these exit 2 with a one-line reason:
 | `nproc did not return a positive integer` | the environment cannot report a CPU count |
 
 If CMake itself fails, check that `hipconfig` is on `PATH` — the script derives
-`HIPCXX` and `HIP_PATH` from it.
+`HIPCXX` and `HIP_PATH` from it. A shell started before ROCm was installed lacks
+`/opt/rocm/bin` on `PATH`; use `PATH=/opt/rocm/bin:$PATH` or log in again.
+
+If every HIP object fails with `'hip/hip_fp16.h' file not found`, the compiler
+guessed the wrong ROCm root (ROCm 7.2's clang reports `Found HIP installation:
+/opt/rocm/lib`). The script exports `HIP_PATH` for the whole build to prevent
+this; an older copy that set it only on the configure line needs `HIP_PATH` or
+`ROCM_PATH=/opt/rocm` in the environment.
 
 Do not run this concurrently with another optimized build. It uses every logical
 CPU.
