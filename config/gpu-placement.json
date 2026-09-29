@@ -42,6 +42,13 @@
       "measured_at": "2026-09-07",
       "method": "loaded alone on ROCm0 at ctx 32768 with flash-attn on and q4_0 KV; card0 mem_info_vram_used 10632601600 less its 27836416 idle baseline; unloaded back to baseline",
       "note": "Gemma 4's 1024-token sliding window is why the 14.88 GiB full-context bound overstates this by about 5 GiB. The measured figure fits ROCm0's 13.98 GiB of working headroom, so rule 1 applies and the preset serves 1,0,0."
+    },
+    "qwen38-coder": {
+      "bytes": 34048353239,
+      "context": 65536,
+      "measured_at": "2026-09-29",
+      "method": "loaded through llama-router at ctx 65536 with override-tensor per_layer_token_embd=CPU, f16 KV and split 9,5,8; whole-card mem_info_vram_used 12.86/7.59/12.21 GiB less idle baselines 0.02/0.02/0.91 GiB read after unload; unloaded back to baseline",
+      "note": "qwen4exp keeps its 26.82 GiB per-layer n-gram table on CPU, which the planner cannot see from override-tensor, so its weight figure counts both shards (54.40 GiB). Only the transformer and KV are GPU-resident."
     }
   }
 }

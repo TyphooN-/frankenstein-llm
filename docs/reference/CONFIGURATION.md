@@ -104,7 +104,7 @@ with that path.
 | `qwen3-coder-next` | `models/repository-agent/Qwen3-Coder-Next-Q4_K_M/Qwen3-Coder-Next-Q4_K_M-00001-of-00004.gguf` | `ctx=65536`, `tensor-split=5,8,4`, `temp=0.2`, `repeat-penalty=1.05` | tool-using |
 | `gemma4-heretic` | `models/gemma4-heretic/Gemma-4-12B-it-heretic-Q6_K.gguf` | `ctx=32768`, `tensor-split=1,0,0`, `temp=0.7` | low |
 | `gemma4-heretic-vision` | same GGUF | adds `mmproj=mmproj-Gemma-4-12B-it-BF16.gguf`, `mmproj-device=ROCm0`, `ctx=16384`, `tensor-split=1,0,0`, `temp=0.7` | low |
-| `qwen38-coder` | `models/qwen38-flash-next-coder/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf` | `ctx-size=65536`, `override-tensor=per_layer_token_embd=CPU`, `cache-type-k/v=f16`, `tensor-split=9,5,8`, `temp=1.0`, `top-p=0.95`, `top-k=20`, `min-p=0` | tool-using |
+| `qwen38-coder` | `models/qwen38-flash-next-coder/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf` | `ctx-size=65536`, `override-tensor=per_layer_token_embd=CPU`, `cache-type-k/v=f16`, `tensor-split=1,1,1`, `temp=1.0`, `top-p=0.95`, `top-k=20`, `min-p=0` | tool-using |
 | `mindmeld-27b` | `models/candidates/mindmeld-27b/Qwen3.8-27B-MindMeld.i1-Q6_K.gguf` | `ctx-size=65536`, `tensor-split=28,0,23`, `spec-type=draft-mtp`, `temp=0.7`, `top-p=0.95`, `top-k=20`, `min-p=0` | low |
 | `cyber-ornith-9b` | `models/candidates/cyber-ornith-9b/Cyber-Ornith-1.5-9B-OBLITERATED.i1-Q6_K.gguf` | `ctx-size=32768`, `tensor-split=1,0,0`, `temp=0.7`, `top-p=0.95`, `top-k=20`, `min-p=0` | low |
 | `swift15-27b` | `models/candidates/swift15-27b/Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf` | `ctx-size=65536`, `tensor-split=1,0,1`, `spec-type=draft-mtp`, `temp=1.0`, `top-p=0.95`, `top-k=20`, `min-p=0` | low |
