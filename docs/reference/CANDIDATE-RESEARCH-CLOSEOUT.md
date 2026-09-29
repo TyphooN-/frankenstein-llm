@@ -8,6 +8,93 @@ and the provisional ranking in
 [MODEL-UPGRADE-SHORTLIST.md](MODEL-UPGRADE-SHORTLIST.md). Those files retain
 useful header and pagination notes; they are not the current verdicts.
 
+## Submitted research, implementation and download intake — 2026-09-29
+
+Three submissions on the day of the host reinstall resolve to 38 Hugging Face
+records, all new: the ISTA Coder link, a 24-URL list (21 model repositories, the
+`XiaomiMiMo/mimo-v26` collection recorded as its five members, and two GitHub
+repositories kept outside the queue), and a 12-URL list whose ISTA link was
+already queued. The research queue now holds 67 unique repositories.
+
+Every selected GGUF had its tensor types read from the remote header and
+compared with the pinned ggml type enum; that is how the Bonsai `PTQ1_0`/`PQ2_0`
+files and Penjing's `IQ*_KT` trellis files were excluded while their standard
+siblings were kept. The operator authorized downloads of every fitting
+candidate, including the license-restricted ones, whose terms were accepted for
+private local use and are recorded as `license_review.accepted=true`. Downloaded
+is not qualified: only `qwen38-coder` has so much as a smoke load, and no record
+claims a gate verdict.
+
+### Downloaded or in transfer (candidate LLMs)
+
+| Exact repository | Pin | Verdict | Next gate |
+|---|---|---|---|
+| `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF` | `5348543e` | integrated as candidate router preset qwen38-coder; downloaded and SHA-256 verified. qwen4exp is in the pinned llama.cpp. | router-models gate for qwen38-coder |
+| `PollardWeights/Penjing-27B-Pollard` | `43c245b3` | download Q6_K + projector. IQ1_KT/IQ2_KT files use ggml type id 153 (trellis, ik_llama.cpp) which the pinned runtime lacks; Q6_K uses standard types only and is selected with the BF16 projector.. | router-models gate as a candidate preset |
+| `agentionai/Qwen3.8-27B-AP-GGUF` | `021f5494` | download Q4_K_XL + BF16 projector. qwen35 with MTP; AP-Q4_K_XL (the largest tier; no Q6) uses standard types. | router-models gate as a candidate preset |
+| `LuffyTheFox/Qwen3.8-27B-Uncensored-Genesis-MTP-GGUF` | `02502fd6` | download Q8_K_P + BF16 projector. qwen35 with MTP. | router-models gate as a candidate preset |
+| `IsValorum/Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1-Abliterated-GGUF` | `0497b501` | download main + MTP Q8_0 + projector. qwen35moe, 256 experts, APEX mixed standard types (13.65 GiB) with separate Q8_0 MTP head and Q8_0 projector. | router-models gate; watch for long-output repetition |
+| `bottlecapai/ThinkingCap-Qwen3.8-27B-GGUF` | `108ff8f2` | download Q6_K + f16 projector. qwen35 with in-file MTP head; Q6_K. | router-models gate as a candidate preset |
+| `IsValorum/Occamy-1.0-APEX-I-MiniPlus-V2.1-GGUF` | `1d329c47` | download main + projector. qwen35moe APEX mixed standard types (13.74 GiB) + Q8_0 projector. | router-models gate as a candidate preset |
+| `mradermacher/Qwopus3.8-27B-Flash-V2-i1-GGUF` | `7c554831` | download i1-Q6_K. qwen35 with in-file MTP head; V2 successor to the integrated qwopus preset. | router-models gate; A/B against qwopus |
+| `mradermacher/Qwen3.8-27B-MindMeld-i1-GGUF` | `bdb89aba` | download i1-Q6_K. qwen35 with in-file MTP head; i1-Q6_K. | router-models gate as a candidate preset |
+| `mradermacher/Cyber-Ornith-1.5-9B-OBLITERATED-i1-GGUF` | `5936e88f` | download i1-Q6_K. qwen35 9B; i1-Q6_K (6.85 GiB) fits one RX 6900 XT. | router-models gate as a candidate preset |
+| `ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF` | `d74895bb` | download IQ3_S-mtp. qwen35 GSQ-RCO mixed-precision tiers; IQ3_S-mtp (highest tier, MTP head) uses standard types. | router-models gate; A/B against the Swift 1.0 record |
+| `lukey03/Qwen3.5-9B-abliterated-GGUF` | `dac35c63` | download Q4_K_M. qwen35 9B; text-only Q4_K_M selected. | router-models gate as a candidate preset |
+| `freakyskittle/CYBER-FROST-3.8-GGUF` | `75ab9999` | download Q2_K_S. qwen4exp ~180B (512 experts). | placement evaluation, then router-models gate with f16 KV |
+| `Thaurock/Qwen2.5-Coder-32B-abliterated-GGUF` | `573a3554` | download Q6_K. qwen2 32B, 32K context; Q6_K (25.04 GiB). | router-models gate as a candidate preset |
+
+### Downloaded or in transfer (media: image and video)
+
+| Exact repository | Pin | Verdict | Next gate |
+|---|---|---|---|
+| `abenzerps/Qwen-Image-2.1-Uncensored-GGUF` | `8d0887da` | media candidate; Q8_0 + text encoder + VAE downloaded. qwen_image21 GGUF is a diffusion transformer, not a llama.cpp model: it needs ComfyUI-GGUF or stable-diffusion.cpp. | install a Qwen-Image-2.1-capable ComfyUI/GGUF loader, then a pinned text-to-image workflow gate |
+| `pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-GGUF` | `23813717` | media candidate; BF16 safetensors downloaded. Abliterated Qwen3-VL-8B text encoder for Qwen-Image-2.1; the BF16 safetensors is the ComfyUI-native form.. | A/B against the stock encoder inside the Qwen-Image-2.1 workflow gate |
+| `Viggle/Qwen-Image-2.1-viggle-turbo` | `bb26a0f3` | media candidate; LoRA downloaded. Few-step distillation LoRA for Qwen-Image-2.1; publisher's recommended v0.2.1 6-step r256 adapter selected. | Qwen-Image-2.1 workflow gate with 6-step sigmas |
+| `WarmBloodAban/Qwen-Image-2.1-LoRAs` | `c4ab5473` | media candidate; both LoRAs downloaded. Two small style LoRAs for Qwen-Image-2.1.. | Qwen-Image-2.1 workflow gate |
+| `Kijai/QwenImage_experimental` | `04987755` | media candidate; controlnet patch downloaded. Submitted as the model_patches/ folder: Qwen-Image-2.1 Fun ControlNet Union patch; bf16 variant selected. | Qwen-Image-2.1 workflow gate with control input |
+| `Cseti/MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1` | `94dc2a07` | media candidate; LoRA downloaded. MiniMax-H3 video LoRA (0.56 GiB); MiniMax-H3 community license accepted by the operator for private local use.. | a MiniMax-H3 base install and video workflow gate |
+| `akatz-ai/MiniMax-H3-Character-Swap-LoRA` | `62407e0c` | media candidate; LoRA downloaded. MiniMax-H3 video-to-video LoRA (0.14 GiB); community license accepted by the operator.. | a MiniMax-H3 base install and video workflow gate |
+| `NSFW-API/NSFW_Wan_1.3b` | `4d8db253` | media candidate; exp_e14 downloaded. Wan2.1-T2V-1.3B finetune epochs; the publisher-recommended wan_1.3B_exp_e14 checkpoint selected (2.64 GiB). | Wan2.1 1.3B VAE/text-encoder install and a video workflow gate |
+
+### Research only: runtime or format blocks this host
+
+| Exact repository | Pin | Verdict | Next gate |
+|---|---|---|---|
+| `sudoingx/Ternary-Bonsai-2-27B-PTQ1_0-MTP-GGUF` | `f04a3bd2` | research only; not downloaded. Both files carry ggml type id 143 (PTQ1_0) on 402 tensors; the pinned ggml enum has no such type, so the pinned llama.cpp cannot load them. | a pinned llama.cpp revision that defines PTQ1_0 |
+| `yandex/AliceAI-Foundation-80B-A3B-Base` | `84105ba3` | research only; not downloaded. 151.4 GiB BF16 safetensors of a base (not instruct) 80B-A3B MoE. | ADR 0007 conditional custom quantization (proposed) and converter support for its architecture |
+| `XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B` | `2367e865` | research only; not downloaded. 17.5 GiB BF16 safetensors distilled onto Qwen3.5-9B (qwen35 arch, convertible). | a published GGUF or accepted local conversion (ADR 0007) |
+| `Hikari07jp/Ternary-Bonsai-2-27B-Abliterated-GGUF` | `e7f6daf9` | research only; not downloaded. The only file carries ggml type id 142 (PQ2_0) on 402 tensors; not in the pinned enum.. | a pinned llama.cpp revision that defines PQ2_0 |
+| `orcarouter/OrcaSAQ-2-27B` | `15d20d7e` | research only; not downloaded. vLLM-format SAQ quantized safetensors (11.43 GiB); not GGUF, and this host has no vLLM lane.. | a GGUF release or an accepted ROCm vLLM lane |
+| `ToastyPigeon/Gemma-4-Test-GGUFs` | `49b8c313` | research only; not downloaded. Ten experimental Gemma-4-12B finetunes, all Q8_0 (11.8 GiB), gemma4 arch supported. | operator selects a variant and the license question is resolved |
+| `huihui-ai/GLM-5.3-Flash-abliterated-GGUF` | `dce786aa` | research only; not downloaded. glm5next is not in the pinned llama.cpp (same blocker as the existing GLM-5.3-Flash record); smallest quant UD-IQ1_S is 86.7 GiB.. | a pinned runtime with glm5next support (see glm53flash-local runbook) |
+
+### Research only: exceeds this host
+
+| Exact repository | Pin | Verdict | Next gate |
+|---|---|---|---|
+| `XiaomiMiMo/MiMo-V2.6-Pro-RL` | `73875d00` | research only; not downloaded. ~1.02T-parameter MoE, 534.1 GiB FP8 safetensors in pipeline/expert shards. | none on this host |
+| `XiaomiMiMo/MiMo-V2.6-Flash-RL` | `5711b268` | research only; not downloaded. ~311B-parameter MoE, 165.6 GiB FP8 safetensors in pipeline/expert shards; no GGUF. | a published GGUF small enough for VRAM + RAM offload |
+| `XiaomiMiMo/MiMo-V2.6-Pro-MOPD` | `adea8e2c` | research only; not downloaded. Same ~1.02T MoE shape as Pro-RL, 534.1 GiB.. | none on this host |
+| `XiaomiMiMo/MiMo-V2.6-Flash-MOPD` | `2479e2d0` | research only; not downloaded. ~311B MoE like Flash-RL, 165.6 GiB safetensors; no GGUF.. | a published GGUF small enough for VRAM + RAM offload |
+| `huihui-ai/Huihui-MiMo-V2.5-abliterated-GGUF` | `9091615b` | research only; not downloaded. mimo2 is in the pinned llama.cpp, but the only quant is Q4_K at 173.8 GiB (21 shards).. | a quant under ~110 GiB |
+| `drowzeys/MiMo-V2.6-Flash-RL-Abliterated` | `16d73a40` | research only; not downloaded. ~311B MoE safetensors (165.6 GiB); Hub reports gated=auto.. | a published GGUF small enough for this host |
+| `MorinoNushi/MiMo-V2.6-Flash-RL-Uncensored-Heretic-LoRA-GGUF` | `0ecc6864` | research only; not downloaded. A 67 MiB GGUF LoRA for MiMo-V2.6-Flash-RL, whose base exceeds this host.. | a runnable base model |
+| `Blackfrost-AI/CYBER-FROST-3.8-BF16` | `7fc56ac4` | research only; not downloaded. 335.3 GiB BF16 safetensors of a ~180B qwen4exp model; the runnable form is the freakyskittle GGUF.. | none; use freakyskittle/CYBER-FROST-3.8-GGUF |
+| `Blackfrost-AI/MiMo-v2.6-Flash-RL-Derisked` | `d29cb1d3` | research only; not downloaded. ~311B MoE safetensors (165.6 GiB); also ships pickle .pt intervention tensors that must never be torch.load-ed without review.. | a published GGUF small enough for this host |
+
+### GitHub submissions (not queue records)
+
+- `TheAwaken1/ComfyUI-SongLRC` at `0a8bdf97` (MIT): Turn generated song lyrics into a timed .lrc file that matches the saved audio. Works with YuE2 and MiniMax Music 3. Publisher ComfyUI node code; recorded only, not installed without review.
+- `leejet/stable-diffusion.cpp` at `3f8527a4` (MIT): Diffusion model(SD,Flux,Wan,Qwen Image,Z-Image,...) inference in pure C/C++ A C/C++ diffusion runtime that loads `qwen_image21` GGUF and Wan models and can be built for HIP; recorded as the candidate runtime for the Qwen-Image-2.1 GGUF, not built.
+
+Pins, sizes and LFS SHA-256 for every selected file are in
+[candidate-research-inventory.json](candidate-research-inventory.json) and the
+`download-queue-candidates-*-2026-09-29.json` manifests. Two publishers moved
+after the first read; `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF` (README
+only) and `agentionai/Qwen3.8-27B-AP-GGUF` (3-bit tiers rebuilt) were repinned
+after confirming the selected files are byte-identical at the new heads.
+
 ## Swift request follow-up — 2026-09-14-swift
 
 The repeated `ukisai/Swift-Qwen3.8-27B-GGUF` URL is recorded as an explicit

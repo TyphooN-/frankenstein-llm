@@ -1,13 +1,380 @@
 {
   "additional_research_queue": {
     "integrity": "User-submitted identifiers. An entry marked investigated carries its recorded research; entries researched in an intake batch cite the revision they were read at, with no weight download or remote code execution. Integrated entries name the router alias that loads them. An entry with a license_review stays download_admission blocked until that review records acceptance. No entry is qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 29,
+    "unique_repository_count": 67,
     "intake_batches": [
+      {
+        "batch": "2026-09-29-ista",
+        "recorded_at": "2026-09-29",
+        "integrity": "Unauthenticated pinned Hub metadata, complete trees and model cards checked; GGUF tensor types read from remote headers and compared with the pinned ggml type enum. Publisher sizes and LFS SHA-256 are provenance; files marked downloaded were additionally verified locally. Downloaded is not qualified.",
+        "requested_actions": [
+          "qualify",
+          "download",
+          "research"
+        ],
+        "submitted_url_count": 1,
+        "unique_repository_count": 1,
+        "newly_queued_count": 1,
+        "already_queued_count": 0,
+        "already_assessed_count": 0,
+        "qualified_count": 0,
+        "entries": [
+          {
+            "url": "https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+            "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "5348543e0147355ac9cbcb031184a3546350988e"
+          }
+        ]
+      },
+      {
+        "batch": "2026-09-29-a",
+        "recorded_at": "2026-09-29",
+        "integrity": "Unauthenticated pinned Hub metadata, complete trees and model cards checked; GGUF tensor types read from remote headers and compared with the pinned ggml type enum. Publisher sizes and LFS SHA-256 are provenance; files marked downloaded were additionally verified locally. Downloaded is not qualified.",
+        "requested_actions": [
+          "research",
+          "implement"
+        ],
+        "submitted_url_count": 26,
+        "unique_repository_count": 26,
+        "newly_queued_count": 26,
+        "already_queued_count": 0,
+        "already_assessed_count": 0,
+        "qualified_count": 0,
+        "entries": [
+          {
+            "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF",
+            "repository": "abenzerps/Qwen-Image-2.1-Uncensored-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "8d0887daa8af483d79cdd2f0d7da85e59cff19fd"
+          },
+          {
+            "url": "https://huggingface.co/sudoingx/Ternary-Bonsai-2-27B-PTQ1_0-MTP-GGUF",
+            "repository": "sudoingx/Ternary-Bonsai-2-27B-PTQ1_0-MTP-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "f04a3bd22b7b482675663e99efaba6719347b419"
+          },
+          {
+            "url": "https://huggingface.co/yandex/AliceAI-Foundation-80B-A3B-Base",
+            "repository": "yandex/AliceAI-Foundation-80B-A3B-Base",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "84105ba3dc09f9e8141e69b74761af9a4d848f48"
+          },
+          {
+            "url": "https://huggingface.co/huihui-ai/Huihui-MiMo-V2.5-abliterated-GGUF",
+            "repository": "huihui-ai/Huihui-MiMo-V2.5-abliterated-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "9091615bce81d1efc671222ddfaa0ca08d037df3"
+          },
+          {
+            "url": "https://huggingface.co/PollardWeights/Penjing-27B-Pollard",
+            "repository": "PollardWeights/Penjing-27B-Pollard",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "43c245b3c709aaac66dd7f60716c7996f6916115"
+          },
+          {
+            "url": "https://huggingface.co/pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-GGUF",
+            "repository": "pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "23813717f7f9282b372c23c7207468a7a168fa68"
+          },
+          {
+            "url": "https://huggingface.co/Hikari07jp/Ternary-Bonsai-2-27B-Abliterated-GGUF",
+            "repository": "Hikari07jp/Ternary-Bonsai-2-27B-Abliterated-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "e7f6daf95ab820ef8de7d8f5e883d95d546ab02c"
+          },
+          {
+            "url": "https://huggingface.co/agentionai/Qwen3.8-27B-AP-GGUF",
+            "repository": "agentionai/Qwen3.8-27B-AP-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "021f5494ab708fc1c28e38c89ac57acdabc8ba1f"
+          },
+          {
+            "url": "https://huggingface.co/LuffyTheFox/Qwen3.8-27B-Uncensored-Genesis-MTP-GGUF",
+            "repository": "LuffyTheFox/Qwen3.8-27B-Uncensored-Genesis-MTP-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "02502fd6d7303381311a0ddaa9f3b74d1daa7094"
+          },
+          {
+            "url": "https://huggingface.co/IsValorum/Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1-Abliterated-GGUF",
+            "repository": "IsValorum/Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1-Abliterated-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "0497b501688a588737ec3a875a87bdb533237aa9"
+          },
+          {
+            "url": "https://huggingface.co/bottlecapai/ThinkingCap-Qwen3.8-27B-GGUF",
+            "repository": "bottlecapai/ThinkingCap-Qwen3.8-27B-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "108ff8f24ce8e9335fbf308844cd3c59c13380a4"
+          },
+          {
+            "url": "https://huggingface.co/drowzeys/MiMo-V2.6-Flash-RL-Abliterated",
+            "repository": "drowzeys/MiMo-V2.6-Flash-RL-Abliterated",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "16d73a4047db9a376001a424cc4e5191f150a421"
+          },
+          {
+            "url": "https://huggingface.co/IsValorum/Occamy-1.0-APEX-I-MiniPlus-V2.1-GGUF",
+            "repository": "IsValorum/Occamy-1.0-APEX-I-MiniPlus-V2.1-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "1d329c47cc26615bfb371a399275834f47e0cbf1"
+          },
+          {
+            "url": "https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo",
+            "repository": "Viggle/Qwen-Image-2.1-viggle-turbo",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "bb26a0f38e5fe6c124aaccc9187a87eed5d9ed13"
+          },
+          {
+            "url": "https://huggingface.co/WarmBloodAban/Qwen-Image-2.1-LoRAs",
+            "repository": "WarmBloodAban/Qwen-Image-2.1-LoRAs",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "c4ab5473bfdf585fc19cfd1e280f79d2b0c79947"
+          },
+          {
+            "url": "https://huggingface.co/orcarouter/OrcaSAQ-2-27B",
+            "repository": "orcarouter/OrcaSAQ-2-27B",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "15d20d7e9ae4fd89d1a47878f69381760169445b"
+          },
+          {
+            "url": "https://huggingface.co/MorinoNushi/MiMo-V2.6-Flash-RL-Uncensored-Heretic-LoRA-GGUF",
+            "repository": "MorinoNushi/MiMo-V2.6-Flash-RL-Uncensored-Heretic-LoRA-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "0ecc6864d187d4117d3348c85379bfe9298f49e3"
+          },
+          {
+            "url": "https://huggingface.co/mradermacher/Qwopus3.8-27B-Flash-V2-i1-GGUF",
+            "repository": "mradermacher/Qwopus3.8-27B-Flash-V2-i1-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "7c5548319070e7e6f832a94e04354dc13b0c8b3c"
+          },
+          {
+            "url": "https://huggingface.co/ToastyPigeon/Gemma-4-Test-GGUFs",
+            "repository": "ToastyPigeon/Gemma-4-Test-GGUFs",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "49b8c313c9e3eca74754f639c320682c7b4fc8e8"
+          },
+          {
+            "url": "https://huggingface.co/Kijai/QwenImage_experimental",
+            "repository": "Kijai/QwenImage_experimental",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "04987755e10002ff33e4ea307a811487dddd79d9"
+          },
+          {
+            "url": "https://huggingface.co/Cseti/MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1",
+            "repository": "Cseti/MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "94dc2a07c5a3f7e10b7c1d053cc700762d15c35d"
+          },
+          {
+            "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Pro-RL",
+            "repository": "XiaomiMiMo/MiMo-V2.6-Pro-RL",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "73875d00b30a89ef8cc353a0b60b0e9f9561952d"
+          },
+          {
+            "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL",
+            "repository": "XiaomiMiMo/MiMo-V2.6-Flash-RL",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "5711b268169967567844e1e560e8a3966da959b1"
+          },
+          {
+            "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B",
+            "repository": "XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "2367e865d009c13ac81713a2878291d33ab28177"
+          },
+          {
+            "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Pro-MOPD",
+            "repository": "XiaomiMiMo/MiMo-V2.6-Pro-MOPD",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "adea8e2c5373181e5a973fa1ecb343cb31af214b"
+          },
+          {
+            "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-MOPD",
+            "repository": "XiaomiMiMo/MiMo-V2.6-Flash-MOPD",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "2479e2d0029eca9a34cc7e7f55a121925f81908e"
+          }
+        ],
+        "operator_submitted_url_count": 24,
+        "collection_expansion": {
+          "url": "https://huggingface.co/collections/XiaomiMiMo/mimo-v26",
+          "members": [
+            "XiaomiMiMo/MiMo-V2.6-Pro-RL",
+            "XiaomiMiMo/MiMo-V2.6-Flash-RL",
+            "XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B",
+            "XiaomiMiMo/MiMo-V2.6-Pro-MOPD",
+            "XiaomiMiMo/MiMo-V2.6-Flash-MOPD"
+          ],
+          "note": "The collection URL is recorded as its five member repositories."
+        },
+        "normalized_urls": [
+          {
+            "submitted": "https://huggingface.co/Kijai/QwenImage_experimental/tree/main/model_patches",
+            "repository": "Kijai/QwenImage_experimental",
+            "scope": "model_patches/"
+          }
+        ],
+        "non_huggingface": [
+          {
+            "url": "https://github.com/TheAwaken1/ComfyUI-SongLRC",
+            "repository": "TheAwaken1/ComfyUI-SongLRC",
+            "commit": "0a8bdf971c9907970c74cb0a54707a4a2f956f6f",
+            "license": "MIT",
+            "description": "Turn generated song lyrics into a timed .lrc file that matches the saved audio. Works with YuE2 and MiniMax Music 3.",
+            "disposition": "research only; publisher code, not installed"
+          },
+          {
+            "url": "https://github.com/leejet/stable-diffusion.cpp",
+            "repository": "leejet/stable-diffusion.cpp",
+            "commit": "3f8527a46c54ecf4cb4ed6003da8e8982283c73c",
+            "license": "MIT",
+            "description": "Diffusion model(SD,Flux,Wan,Qwen Image,Z-Image,...) inference in pure C/C++",
+            "disposition": "research only; candidate runtime for qwen_image21 GGUF (HIP build possible), not built"
+          }
+        ]
+      },
+      {
+        "batch": "2026-09-29-b",
+        "recorded_at": "2026-09-29",
+        "integrity": "Unauthenticated pinned Hub metadata, complete trees and model cards checked; GGUF tensor types read from remote headers and compared with the pinned ggml type enum. Publisher sizes and LFS SHA-256 are provenance; files marked downloaded were additionally verified locally. Downloaded is not qualified.",
+        "requested_actions": [
+          "research",
+          "implement",
+          "download"
+        ],
+        "submitted_url_count": 12,
+        "unique_repository_count": 12,
+        "newly_queued_count": 11,
+        "already_queued_count": 1,
+        "already_assessed_count": 0,
+        "qualified_count": 0,
+        "entries": [
+          {
+            "url": "https://huggingface.co/huihui-ai/GLM-5.3-Flash-abliterated-GGUF",
+            "repository": "huihui-ai/GLM-5.3-Flash-abliterated-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "dce786aada4a883d5ce0c8967e7a425103f5caaa"
+          },
+          {
+            "url": "https://huggingface.co/mradermacher/Qwen3.8-27B-MindMeld-i1-GGUF",
+            "repository": "mradermacher/Qwen3.8-27B-MindMeld-i1-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "bdb89abaf809c3d8e175ec795e9d24dc6047853c"
+          },
+          {
+            "url": "https://huggingface.co/mradermacher/Cyber-Ornith-1.5-9B-OBLITERATED-i1-GGUF",
+            "repository": "mradermacher/Cyber-Ornith-1.5-9B-OBLITERATED-i1-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "5936e88f1885b856b54520c372f2cd41e71819fd"
+          },
+          {
+            "url": "https://huggingface.co/ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF",
+            "repository": "ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "d74895bbe5db4bec1e0024e7cc87d59c02d7631a"
+          },
+          {
+            "url": "https://huggingface.co/Blackfrost-AI/CYBER-FROST-3.8-BF16",
+            "repository": "Blackfrost-AI/CYBER-FROST-3.8-BF16",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "7fc56ac4ecb6a61d50cfb192158b813f926d4466"
+          },
+          {
+            "url": "https://huggingface.co/akatz-ai/MiniMax-H3-Character-Swap-LoRA",
+            "repository": "akatz-ai/MiniMax-H3-Character-Swap-LoRA",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "62407e0cc8089c363abd9ce4b0b27662abb237af"
+          },
+          {
+            "url": "https://huggingface.co/NSFW-API/NSFW_Wan_1.3b",
+            "repository": "NSFW-API/NSFW_Wan_1.3b",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "4d8db25317335b4a0cfbefad9877b893f08dbc67"
+          },
+          {
+            "url": "https://huggingface.co/Blackfrost-AI/MiMo-v2.6-Flash-RL-Derisked",
+            "repository": "Blackfrost-AI/MiMo-v2.6-Flash-RL-Derisked",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "d29cb1d300cd4b6f2eb6a6c7c60624210ddf7865"
+          },
+          {
+            "url": "https://huggingface.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
+            "repository": "lukey03/Qwen3.5-9B-abliterated-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "dac35c6385d79a6a9fe113d7a3b730348791d37f"
+          },
+          {
+            "url": "https://huggingface.co/freakyskittle/CYBER-FROST-3.8-GGUF",
+            "repository": "freakyskittle/CYBER-FROST-3.8-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "75ab99995d6f106f4aaf52d4e5cd376d6f746459"
+          },
+          {
+            "url": "https://huggingface.co/Thaurock/Qwen2.5-Coder-32B-abliterated-GGUF",
+            "repository": "Thaurock/Qwen2.5-Coder-32B-abliterated-GGUF",
+            "disposition": "new",
+            "record": "additional_research_queue",
+            "pinned_revision": "573a35541895148b9808ad23ca0c07d1625b1c68"
+          },
+          {
+            "url": "https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+            "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+            "disposition": "already-queued",
+            "record": "additional_research_queue",
+            "pinned_revision": "5348543e0147355ac9cbcb031184a3546350988e"
+          }
+        ]
+      },
       {
         "batch": "2026-09-14-swift",
         "recorded_at": "2026-09-14",
         "integrity": "Repeated exact URL recorded as an explicit investigation/research/download request. Reuses the existing pinned assessment without claiming fresh publisher retrieval, license acceptance, transfer admission or qualification.",
-        "requested_actions": ["investigate", "research", "download"],
+        "requested_actions": [
+          "investigate",
+          "research",
+          "download"
+        ],
         "submitted_url_count": 1,
         "unique_repository_count": 1,
         "newly_queued_count": 0,
@@ -28,7 +395,11 @@
         "batch": "2026-09-14",
         "recorded_at": "2026-09-14",
         "integrity": "Unauthenticated pinned Hub metadata, complete trees and model cards checked. Publisher sizes and LFS SHA-256 are provenance, not downloaded integrity. Research/download requests are recorded separately from transfer admission; no weights downloaded, remote code run, license accepted or serving configuration changed.",
-        "requested_actions": ["research", "investigate", "download"],
+        "requested_actions": [
+          "research",
+          "investigate",
+          "download"
+        ],
         "submitted_url_count": 3,
         "unique_repository_count": 3,
         "newly_queued_count": 2,
@@ -764,7 +1135,10 @@
           "state": "blocked",
           "downloaded": false,
           "admitted": false,
-          "blockers": ["Exact NVFP4 v4 Radeon runtime compatibility is unverified.", "Storage integrity remains unresolved; automatic transfers are paused."],
+          "blockers": [
+            "Exact NVFP4 v4 Radeon runtime compatibility is unverified.",
+            "Storage integrity remains unresolved; automatic transfers are paused."
+          ],
           "artifact_candidates": [
             {
               "path": "Hermes3.6-35B-A3B-Uncensored-Genesis-Final-NVFP4-v4.gguf",
@@ -803,10 +1177,1349 @@
           "state": "blocked",
           "downloaded": false,
           "admitted": false,
-          "blockers": ["No weight file exists in the complete exact-repository tree at the recorded pin.", "Storage integrity remains unresolved; automatic transfers are paused."],
+          "blockers": [
+            "No weight file exists in the complete exact-repository tree at the recorded pin.",
+            "Storage integrity remains unresolved; automatic transfers are paused."
+          ],
           "artifact_candidates": []
         },
         "notes": "The card describes HauhauCS base weights and transferred data from DJLougen's Hermes finetune. Those are lineage, not replacement artifacts for this identifier. Jan1k's explicitly submitted NVFP4 derivative has its own independent record."
+      },
+      {
+        "url": "https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+        "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "5348543e0147355ac9cbcb031184a3546350988e",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen4exp",
+        "resource_class": "fits-with-cpu-ngram-table",
+        "runtime_route": "qwen4exp is in the pinned llama.cpp. Shard 2 is a per-layer n-gram lookup table kept on CPU via override-tensor; the 27.58 GiB transformer splits 9,5,8. Smoke-loaded 2026-09-29: correct code output, 12.86/7.59/12.21 GiB resident at 65,536 context, clean unload. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "integrated as candidate router preset qwen38-coder; downloaded and SHA-256 verified",
+        "next_gate": "router-models gate for qwen38-coder",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf",
+              "size": 29608446496,
+              "sha256": "e11083ba855e7666b48ea3f2db6a9c3a20c18751a012cc24f948de91b7087fad"
+            },
+            {
+              "path": "IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf",
+              "size": 28800138432,
+              "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113"
+            },
+            {
+              "path": "mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+              "size": 907543008,
+              "sha256": "b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF",
+        "repository": "abenzerps/Qwen-Image-2.1-Uncensored-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "8d0887daa8af483d79cdd2f0d7da85e59cff19fd",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (qwen-research) (Hub card metadata)",
+        "architecture": "qwen_image21",
+        "resource_class": "media-fits-v620",
+        "runtime_route": "qwen_image21 GGUF is a diffusion transformer, not a llama.cpp model: it needs ComfyUI-GGUF or stable-diffusion.cpp. Q8_0 transformer, Qwen3-VL-8B text encoder and VAE are staged.",
+        "disposition": "media candidate; Q8_0 + text encoder + VAE downloaded",
+        "next_gate": "install a Qwen-Image-2.1-capable ComfyUI/GGUF loader, then a pinned text-to-image workflow gate",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "qwen-image-2.1-UC-Q8_0.gguf",
+              "size": 7591557920,
+              "sha256": "cde456c72ea3ecebfc1be783300e972711d875e0c5f1bed33d42b66b156affa8"
+            },
+            {
+              "path": "text_encoders/qwen3vl_8b_bf16.safetensors",
+              "size": 17534334616,
+              "sha256": "68bdc82bc1b66851162ae656225e7e2068166b603db19bd5d5a3b90eb12669a9"
+            },
+            {
+              "path": "vae/qwen_image_2.1_vae_bf16.safetensors",
+              "size": 675509688,
+              "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "No installed runtime loads qwen_image21 yet."
+        ],
+        "license_review": {
+          "license": "other (qwen-research) (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/sudoingx/Ternary-Bonsai-2-27B-PTQ1_0-MTP-GGUF",
+        "repository": "sudoingx/Ternary-Bonsai-2-27B-PTQ1_0-MTP-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "f04a3bd22b7b482675663e99efaba6719347b419",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "runtime-unsupported",
+        "runtime_route": "Both files carry ggml type id 143 (PTQ1_0) on 402 tensors; the pinned ggml enum has no such type, so the pinned llama.cpp cannot load them. Requires the publisher's fork.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a pinned llama.cpp revision that defines PTQ1_0",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Tensor type PTQ1_0 (id 143) is not in the pinned runtime."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/yandex/AliceAI-Foundation-80B-A3B-Base",
+        "repository": "yandex/AliceAI-Foundation-80B-A3B-Base",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "84105ba3dc09f9e8141e69b74761af9a4d848f48",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "needs-conversion",
+        "runtime_route": "151.4 GiB BF16 safetensors of a base (not instruct) 80B-A3B MoE. No GGUF published; a local convert+quantize would fit at Q4 (~45 GiB).",
+        "disposition": "research only; not downloaded",
+        "next_gate": "ADR 0007 conditional custom quantization (proposed) and converter support for its architecture",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No GGUF; local conversion is not an accepted workflow yet.",
+            "Base model, not instruction tuned."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Pro-RL",
+        "repository": "XiaomiMiMo/MiMo-V2.6-Pro-RL",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "73875d00b30a89ef8cc353a0b60b0e9f9561952d",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "exceeds-host",
+        "runtime_route": "~1.02T-parameter MoE, 534.1 GiB FP8 safetensors in pipeline/expert shards. Beyond 64 GiB VRAM + 94 GiB RAM at any quant.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "none on this host",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Exceeds host memory at any quantization."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL",
+        "repository": "XiaomiMiMo/MiMo-V2.6-Flash-RL",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "5711b268169967567844e1e560e8a3966da959b1",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "exceeds-host",
+        "runtime_route": "~311B-parameter MoE, 165.6 GiB FP8 safetensors in pipeline/expert shards; no GGUF. Even ~2-bit exceeds the GPU pool and most of RAM.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a published GGUF small enough for VRAM + RAM offload",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No GGUF; exceeds host at usable quants."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B",
+        "repository": "XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "2367e865d009c13ac81713a2878291d33ab28177",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "image-text-to-text",
+        "resource_class": "needs-conversion",
+        "runtime_route": "17.5 GiB BF16 safetensors distilled onto Qwen3.5-9B (qwen35 arch, convertible). Fits trivially once converted.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a published GGUF or accepted local conversion (ADR 0007)",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No GGUF published."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Pro-MOPD",
+        "repository": "XiaomiMiMo/MiMo-V2.6-Pro-MOPD",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "adea8e2c5373181e5a973fa1ecb343cb31af214b",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "exceeds-host",
+        "runtime_route": "Same ~1.02T MoE shape as Pro-RL, 534.1 GiB.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "none on this host",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Exceeds host memory at any quantization."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-MOPD",
+        "repository": "XiaomiMiMo/MiMo-V2.6-Flash-MOPD",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "2479e2d0029eca9a34cc7e7f55a121925f81908e",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "exceeds-host",
+        "runtime_route": "~311B MoE like Flash-RL, 165.6 GiB safetensors; no GGUF.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a published GGUF small enough for VRAM + RAM offload",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No GGUF; exceeds host at usable quants."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/huihui-ai/Huihui-MiMo-V2.5-abliterated-GGUF",
+        "repository": "huihui-ai/Huihui-MiMo-V2.5-abliterated-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "9091615bce81d1efc671222ddfaa0ca08d037df3",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "mimo2",
+        "resource_class": "exceeds-host",
+        "runtime_route": "mimo2 is in the pinned llama.cpp, but the only quant is Q4_K at 173.8 GiB (21 shards).",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a quant under ~110 GiB",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Smallest quant 173.8 GiB exceeds VRAM + usable RAM."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/PollardWeights/Penjing-27B-Pollard",
+        "repository": "PollardWeights/Penjing-27B-Pollard",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "43c245b3c709aaac66dd7f60716c7996f6916115",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "IQ1_KT/IQ2_KT files use ggml type id 153 (trellis, ik_llama.cpp) which the pinned runtime lacks; Q6_K uses standard types only and is selected with the BF16 projector.",
+        "disposition": "download Q6_K + projector",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Penjing-27B-Q6_K.gguf",
+              "size": 22431000000,
+              "sha256": "ad45e0e3306fc0e4bd390b7c6a46d2a44458e13dcc2043565822f3dd82f4d7d4"
+            },
+            {
+              "path": "mmproj-Penjing-27B-bf16.gguf",
+              "size": 931145952,
+              "sha256": "e43a597863a21bfa48b0fbd4553a771ae4117e25bb172e66f1dbc3fc6d037131"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-GGUF",
+        "repository": "pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "23813717f7f9282b372c23c7207468a7a168fa68",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen3vl",
+        "resource_class": "media-fits",
+        "runtime_route": "Abliterated Qwen3-VL-8B text encoder for Qwen-Image-2.1; the BF16 safetensors is the ComfyUI-native form.",
+        "disposition": "media candidate; BF16 safetensors downloaded",
+        "next_gate": "A/B against the stock encoder inside the Qwen-Image-2.1 workflow gate",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "qwen3vl_8b_bf16_heretic.safetensors",
+              "size": 17534334584,
+              "sha256": "b1f17ffe6e043c0e1da49ba75fd537d3ea3074fee83b4c9de377bb54689774b1"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "Depends on a Qwen-Image-2.1 runtime."
+        ]
+      },
+      {
+        "url": "https://huggingface.co/Hikari07jp/Ternary-Bonsai-2-27B-Abliterated-GGUF",
+        "repository": "Hikari07jp/Ternary-Bonsai-2-27B-Abliterated-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "e7f6daf95ab820ef8de7d8f5e883d95d546ab02c",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "runtime-unsupported",
+        "runtime_route": "The only file carries ggml type id 142 (PQ2_0) on 402 tensors; not in the pinned enum.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a pinned llama.cpp revision that defines PQ2_0",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Tensor type PQ2_0 (id 142) is not in the pinned runtime."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/agentionai/Qwen3.8-27B-AP-GGUF",
+        "repository": "agentionai/Qwen3.8-27B-AP-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "021f5494ab708fc1c28e38c89ac57acdabc8ba1f",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 with MTP; AP-Q4_K_XL (the largest tier; no Q6) uses standard types. Repinned 2026-09-29 to 021f5494 after verifying the selected files are byte-identical; that commit only rebuilt the 3-bit tiers. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download Q4_K_XL + BF16 projector",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen3.8-27B-AP-Q4_K_XL.gguf",
+              "size": 17559177120,
+              "sha256": "5490390fa01335062247d4f43190a6659117e3c388b26260b81285531edc3dfc"
+            },
+            {
+              "path": "mmproj-BF16.gguf",
+              "size": 931146432,
+              "sha256": "83ee4f4f205fa514161778c41df1ea14144faa0f713510893b63c2395f5c2d53"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/LuffyTheFox/Qwen3.8-27B-Uncensored-Genesis-MTP-GGUF",
+        "repository": "LuffyTheFox/Qwen3.8-27B-Uncensored-Genesis-MTP-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "02502fd6d7303381311a0ddaa9f3b74d1daa7094",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 with MTP. Q8_K_P is a mixed standard-type file (nearest tier at or above Q6); NVFP4 file also loads on the pinned enum. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download Q8_K_P + BF16 projector",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen3.8-27B-Uncensored-Genesis-Q8_K_P.gguf",
+              "size": 31457990784,
+              "sha256": "3907e4a0008b1157f5b883e7b778ba7b18020c8fca0412bf99bda416786455bd"
+            },
+            {
+              "path": "mmproj-Qwen3.8-27B-Uncensored-Genesis-BF16.gguf",
+              "size": 931146624,
+              "sha256": "ea98c7ec706439c1e71b70a9f45bb7527a930cd1f60fe203432ba595ba35fe70"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/IsValorum/Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1-Abliterated-GGUF",
+        "repository": "IsValorum/Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1-Abliterated-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "0497b501688a588737ec3a875a87bdb533237aa9",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35moe",
+        "resource_class": "fits",
+        "runtime_route": "qwen35moe, 256 experts, APEX mixed standard types (13.65 GiB) with separate Q8_0 MTP head and Q8_0 projector. Publisher warns of upstream long-generation repetition. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download main + MTP Q8_0 + projector",
+        "next_gate": "router-models gate; watch for long-output repetition",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen3.8-35B-A3B-Distill.APEX-I-MiniPlus-V2.1-Abliterated.gguf",
+              "size": 14658690144,
+              "sha256": "0dae47840f8115d894e74c5cd1a6aca27e01feaa4f07890a50bdcf7db4c56227"
+            },
+            {
+              "path": "mtp-Qwen3.8-35B-A3B-Distill-Q8_0.gguf",
+              "size": 1990650112,
+              "sha256": "6dc07405819c36492fc32ce40a2c709f647e0d2284facbbb6cca72b929e25021"
+            },
+            {
+              "path": "mmproj-Q8_0.gguf",
+              "size": 614194720,
+              "sha256": "d526b0a3910992e2af1cf56aae8785f7f38942e7a875e60590f7049b5c7112ca"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/bottlecapai/ThinkingCap-Qwen3.8-27B-GGUF",
+        "repository": "bottlecapai/ThinkingCap-Qwen3.8-27B-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "108ff8f24ce8e9335fbf308844cd3c59c13380a4",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (polyform-small-business-1.0.0) (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 with in-file MTP head; Q6_K. License PolyForm Small Business 1.0.0, accepted by the operator for private local use. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download Q6_K + f16 projector",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "ThinkingCap-Qwen3.8-27B-Q6_K.gguf",
+              "size": 23860566112,
+              "sha256": "36ab5032dc4725f8acdb237070f9e5574171e0e29cd583fcc417a6c8ef87f557"
+            },
+            {
+              "path": "mmproj-ThinkingCap-Qwen3.8-27B-f16.gguf",
+              "size": 931146272,
+              "sha256": "98fa9aad59b42449786a16bbce96bcd92204d03cac0aee0cdccca711c2adefd1"
+            }
+          ]
+        },
+        "license_review": {
+          "license": "other (polyform-small-business-1.0.0) (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/drowzeys/MiMo-V2.6-Flash-RL-Abliterated",
+        "repository": "drowzeys/MiMo-V2.6-Flash-RL-Abliterated",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "16d73a4047db9a376001a424cc4e5191f150a421",
+        "checked_at": "2026-09-29",
+        "gated": "auto",
+        "license": "mit (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "exceeds-host",
+        "runtime_route": "~311B MoE safetensors (165.6 GiB); Hub reports gated=auto.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a published GGUF small enough for this host",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No GGUF; exceeds host at usable quants.",
+            "Gated repository."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/IsValorum/Occamy-1.0-APEX-I-MiniPlus-V2.1-GGUF",
+        "repository": "IsValorum/Occamy-1.0-APEX-I-MiniPlus-V2.1-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "1d329c47cc26615bfb371a399275834f47e0cbf1",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35moe",
+        "resource_class": "fits",
+        "runtime_route": "qwen35moe APEX mixed standard types (13.74 GiB) + Q8_0 projector. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download main + projector",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Occamy-1.0.APEX-I-MiniPlus-V2.1.gguf",
+              "size": 14751300704,
+              "sha256": "5fa88e7a3e7ea4833d6e45bb3dcaf34aa5a8ebaf85cebe3794c4a94f4d4cb303"
+            },
+            {
+              "path": "mmproj-Accio-Lab_occamy-1.0-Q8_0.gguf",
+              "size": 614194528,
+              "sha256": "17c9213e22ccf9b1b68c64eb7a4abd4ef5166d6164b7d9720d34e06c309fcd82"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo",
+        "repository": "Viggle/Qwen-Image-2.1-viggle-turbo",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "bb26a0f38e5fe6c124aaccc9187a87eed5d9ed13",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (qwen-research) (Hub card metadata)",
+        "architecture": "text-to-image",
+        "resource_class": "media-fits",
+        "runtime_route": "Few-step distillation LoRA for Qwen-Image-2.1; publisher's recommended v0.2.1 6-step r256 adapter selected. Its ComfyUI nodes are publisher code, not installed.",
+        "disposition": "media candidate; LoRA downloaded",
+        "next_gate": "Qwen-Image-2.1 workflow gate with 6-step sigmas",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r256.safetensors",
+              "size": 1359147904,
+              "sha256": "2a0148f5c73abbed5f97da5ea356e439318aadb281d01fce4af39cdf43728803"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "Depends on a Qwen-Image-2.1 runtime.",
+          "Publisher ComfyUI nodes need review before any install."
+        ],
+        "license_review": {
+          "license": "other (qwen-research) (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/WarmBloodAban/Qwen-Image-2.1-LoRAs",
+        "repository": "WarmBloodAban/Qwen-Image-2.1-LoRAs",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "c4ab5473bfdf585fc19cfd1e280f79d2b0c79947",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "text-to-image",
+        "resource_class": "media-fits",
+        "runtime_route": "Two small style LoRAs for Qwen-Image-2.1.",
+        "disposition": "media candidate; both LoRAs downloaded",
+        "next_gate": "Qwen-Image-2.1 workflow gate",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen2.1_Anime_consistency.safetensors",
+              "size": 167830408,
+              "sha256": "0c171eb802ea8051b511f2d93c1743eeadd030316255aa98fa65d40809366752"
+            },
+            {
+              "path": "Qwen2.1_Anything2RealCharacters.safetensors",
+              "size": 318820200,
+              "sha256": "5db4dd2376e6017812bf1189b2fc46e52aaa2c0b7e688faac75e83e1c4dce849"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "Depends on a Qwen-Image-2.1 runtime."
+        ]
+      },
+      {
+        "url": "https://huggingface.co/orcarouter/OrcaSAQ-2-27B",
+        "repository": "orcarouter/OrcaSAQ-2-27B",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "15d20d7e9ae4fd89d1a47878f69381760169445b",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "runtime-unsupported",
+        "runtime_route": "vLLM-format SAQ quantized safetensors (11.43 GiB); not GGUF, and this host has no vLLM lane.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a GGUF release or an accepted ROCm vLLM lane",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No llama.cpp-loadable artifact."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/MorinoNushi/MiMo-V2.6-Flash-RL-Uncensored-Heretic-LoRA-GGUF",
+        "repository": "MorinoNushi/MiMo-V2.6-Flash-RL-Uncensored-Heretic-LoRA-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "0ecc6864d187d4117d3348c85379bfe9298f49e3",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "mimo2",
+        "resource_class": "exceeds-host",
+        "runtime_route": "A 67 MiB GGUF LoRA for MiMo-V2.6-Flash-RL, whose base exceeds this host.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a runnable base model",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Base model does not fit this host."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/mradermacher/Qwopus3.8-27B-Flash-V2-i1-GGUF",
+        "repository": "mradermacher/Qwopus3.8-27B-Flash-V2-i1-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "7c5548319070e7e6f832a94e04354dc13b0c8b3c",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 with in-file MTP head; V2 successor to the integrated qwopus preset. i1-Q6_K selected. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download i1-Q6_K",
+        "next_gate": "router-models gate; A/B against qwopus",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwopus3.8-27B-Flash-V2.i1-Q6_K.gguf",
+              "size": 22431000640,
+              "sha256": "77071a70aaa71096c3f4c980175772cad7bcd1301a67d96d49ecbb82ebaca973"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/ToastyPigeon/Gemma-4-Test-GGUFs",
+        "repository": "ToastyPigeon/Gemma-4-Test-GGUFs",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "49b8c313c9e3eca74754f639c320682c7b4fc8e8",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "none declared (Hub card metadata)",
+        "architecture": "gemma4",
+        "resource_class": "fits-but-unselected",
+        "runtime_route": "Ten experimental Gemma-4-12B finetunes, all Q8_0 (11.8 GiB), gemma4 arch supported. No license declared and no indication which variant is intended.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "operator selects a variant and the license question is resolved",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No license metadata.",
+            "Ten test variants; no selection given."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/Kijai/QwenImage_experimental",
+        "repository": "Kijai/QwenImage_experimental",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "04987755e10002ff33e4ea307a811487dddd79d9",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "none declared (Hub card metadata)",
+        "architecture": null,
+        "resource_class": "media-fits",
+        "runtime_route": "Submitted as the model_patches/ folder: Qwen-Image-2.1 Fun ControlNet Union patch; bf16 variant selected. Repository declares no license.",
+        "disposition": "media candidate; controlnet patch downloaded",
+        "next_gate": "Qwen-Image-2.1 workflow gate with control input",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "model_patches/qwen_image_2.1_fun_controlnet_union_bf16.safetensors",
+              "size": 7550977992,
+              "sha256": "1f9dea8384ba167084f39f624908f1dbf2ea8a223bb4a8108a77dafa9b55bfe1"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "Depends on a Qwen-Image-2.1 runtime.",
+          "No license metadata; downloaded on the operator's explicit link."
+        ]
+      },
+      {
+        "url": "https://huggingface.co/Cseti/MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1",
+        "repository": "Cseti/MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "94dc2a07c5a3f7e10b7c1d053cc700762d15c35d",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (minimax-h3-community-license) (Hub card metadata)",
+        "architecture": null,
+        "resource_class": "media-staged",
+        "runtime_route": "MiniMax-H3 video LoRA (0.56 GiB); MiniMax-H3 community license accepted by the operator for private local use.",
+        "disposition": "media candidate; LoRA downloaded",
+        "next_gate": "a MiniMax-H3 base install and video workflow gate",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1_3500.safetensors",
+              "size": 596452584,
+              "sha256": "aab492964261f6611ced672c70866ce9d64bab66fbd28fd39d26bcd09c852f91"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "MiniMax-H3 base is not installed."
+        ],
+        "license_review": {
+          "license": "other (minimax-h3-community-license) (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/huihui-ai/GLM-5.3-Flash-abliterated-GGUF",
+        "repository": "huihui-ai/GLM-5.3-Flash-abliterated-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "dce786aada4a883d5ce0c8967e7a425103f5caaa",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "glm5next",
+        "resource_class": "runtime-unsupported",
+        "runtime_route": "glm5next is not in the pinned llama.cpp (same blocker as the existing GLM-5.3-Flash record); smallest quant UD-IQ1_S is 86.7 GiB.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a pinned runtime with glm5next support (see glm53flash-local runbook)",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "Architecture glm5next is not in the pinned runtime."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/mradermacher/Qwen3.8-27B-MindMeld-i1-GGUF",
+        "repository": "mradermacher/Qwen3.8-27B-MindMeld-i1-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "bdb89abaf809c3d8e175ec795e9d24dc6047853c",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 with in-file MTP head; i1-Q6_K. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download i1-Q6_K",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen3.8-27B-MindMeld.i1-Q6_K.gguf",
+              "size": 22431002528,
+              "sha256": "b3f5d7d205d702e9ad98633af1bdfe0df79e13d910f7447b83a39ac5c6bfaf02"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/mradermacher/Cyber-Ornith-1.5-9B-OBLITERATED-i1-GGUF",
+        "repository": "mradermacher/Cyber-Ornith-1.5-9B-OBLITERATED-i1-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "5936e88f1885b856b54520c372f2cd41e71819fd",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 9B; i1-Q6_K (6.85 GiB) fits one RX 6900 XT. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download i1-Q6_K",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Cyber-Ornith-1.5-9B-OBLITERATED.i1-Q6_K.gguf",
+              "size": 7359262272,
+              "sha256": "0a43704d7b18c2eb62fdc6d67b4cf32d5fd4d7a147e1bf0b00d3dc75d88822fd"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF",
+        "repository": "ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "d74895bbe5db4bec1e0024e7cc87d59c02d7631a",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (swift-open-license-1.0) (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 GSQ-RCO mixed-precision tiers; IQ3_S-mtp (highest tier, MTP head) uses standard types. Swift Open License 1.0 accepted by the operator for private local use. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download IQ3_S-mtp",
+        "next_gate": "router-models gate; A/B against the Swift 1.0 record",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf",
+              "size": 12120016896,
+              "sha256": "9aecf1cd41b2cb2f32a74e0d889e33855ebef43b26f43b43feb5720239e677e5"
+            }
+          ]
+        },
+        "license_review": {
+          "license": "other (swift-open-license-1.0) (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/Blackfrost-AI/CYBER-FROST-3.8-BF16",
+        "repository": "Blackfrost-AI/CYBER-FROST-3.8-BF16",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "7fc56ac4ecb6a61d50cfb192158b813f926d4466",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (qwen-community-license-1.0) (Hub card metadata)",
+        "architecture": "text-generation",
+        "resource_class": "exceeds-host",
+        "runtime_route": "335.3 GiB BF16 safetensors of a ~180B qwen4exp model; the runnable form is the freakyskittle GGUF.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "none; use freakyskittle/CYBER-FROST-3.8-GGUF",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "BF16 source checkpoint, not a runnable artifact here."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/akatz-ai/MiniMax-H3-Character-Swap-LoRA",
+        "repository": "akatz-ai/MiniMax-H3-Character-Swap-LoRA",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "62407e0cc8089c363abd9ce4b0b27662abb237af",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (minimax-h3-community-license-agreement) (Hub card metadata)",
+        "architecture": "video-to-video",
+        "resource_class": "media-staged",
+        "runtime_route": "MiniMax-H3 video-to-video LoRA (0.14 GiB); community license accepted by the operator.",
+        "disposition": "media candidate; LoRA downloaded",
+        "next_gate": "a MiniMax-H3 base install and video workflow gate",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "h3_character_swap_pro4500_1000.safetensors",
+              "size": 155110320,
+              "sha256": "4b2a3f420ae804c0aa3422761ff84dbd1bf52eef6900ffab6d2e66df63cb4e79"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "MiniMax-H3 base is not installed."
+        ],
+        "license_review": {
+          "license": "other (minimax-h3-community-license-agreement) (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/NSFW-API/NSFW_Wan_1.3b",
+        "repository": "NSFW-API/NSFW_Wan_1.3b",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "4d8db25317335b4a0cfbefad9877b893f08dbc67",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "creativeml-openrail-m (Hub card metadata)",
+        "architecture": null,
+        "resource_class": "media-staged",
+        "runtime_route": "Wan2.1-T2V-1.3B finetune epochs; the publisher-recommended wan_1.3B_exp_e14 checkpoint selected (2.64 GiB). OpenRAIL-M accepted by the operator.",
+        "disposition": "media candidate; exp_e14 downloaded",
+        "next_gate": "Wan2.1 1.3B VAE/text-encoder install and a video workflow gate",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "wan_1.3B_exp_e14.safetensors",
+              "size": 2838077328,
+              "sha256": "86daed5f43a68d7be2ca1f0e85d2ac51f3ba7fb735c76fd9574323e18fe40c6c"
+            }
+          ]
+        },
+        "capability_blockers": [
+          "Wan2.1 base components are not installed."
+        ],
+        "license_review": {
+          "license": "creativeml-openrail-m (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/Blackfrost-AI/MiMo-v2.6-Flash-RL-Derisked",
+        "repository": "Blackfrost-AI/MiMo-v2.6-Flash-RL-Derisked",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "d29cb1d300cd4b6f2eb6a6c7c60624210ddf7865",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "mit (Hub card metadata)",
+        "architecture": "any-to-any",
+        "resource_class": "exceeds-host",
+        "runtime_route": "~311B MoE safetensors (165.6 GiB); also ships pickle .pt intervention tensors that must never be torch.load-ed without review.",
+        "disposition": "research only; not downloaded",
+        "next_gate": "a published GGUF small enough for this host",
+        "download_admission": "blocked",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "blocked",
+          "downloaded": false,
+          "admitted": false,
+          "blockers": [
+            "No GGUF; exceeds host at usable quants.",
+            "Contains pickle .pt files."
+          ],
+          "artifact_candidates": []
+        }
+      },
+      {
+        "url": "https://huggingface.co/lukey03/Qwen3.5-9B-abliterated-GGUF",
+        "repository": "lukey03/Qwen3.5-9B-abliterated-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "dac35c6385d79a6a9fe113d7a3b730348791d37f",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen35",
+        "resource_class": "fits",
+        "runtime_route": "qwen35 9B; text-only Q4_K_M selected. The vision-Q4_K_M file embeds vision tensors in the main GGUF for Ollama, which llama.cpp does not load as a projector. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download Q4_K_M",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen3.5-9B-abliterated-Q4_K_M.gguf",
+              "size": 5627044704,
+              "sha256": "dba64d0e5cce0739e27535ee0a6b75249eb8006ce8b2d6c060e20750035c4695"
+            }
+          ]
+        }
+      },
+      {
+        "url": "https://huggingface.co/freakyskittle/CYBER-FROST-3.8-GGUF",
+        "repository": "freakyskittle/CYBER-FROST-3.8-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "75ab99995d6f106f4aaf52d4e5cd376d6f746459",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "other (qwen-community-license-1.0) (Hub card metadata)",
+        "architecture": "qwen4exp",
+        "resource_class": "fits-with-cpu-ngram-table",
+        "runtime_route": "qwen4exp ~180B (512 experts). Q2_K_S (77.16 GiB, in-file Q8 MTP head) selected: its n-gram table can stay on CPU as with qwen38-coder, leaving ~50 GiB for the GPUs. Publisher warns quantized KV crashes this architecture. qwen-community-license-1.0 accepted by the operator. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download Q2_K_S",
+        "next_gate": "placement evaluation, then router-models gate with f16 KV",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "downloaded",
+          "downloaded": true,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "CYBER-FROST-3.8-Q2_K_S.gguf",
+              "size": 82849634592,
+              "sha256": "1baa10a6a4edc44f3e2bc6894036feb23cc905cff6d3af305fa07156516aabdf"
+            }
+          ]
+        },
+        "license_review": {
+          "license": "other (qwen-community-license-1.0) (Hub card metadata)",
+          "accepted": true,
+          "accepted_at": "2026-09-29",
+          "scope": "operator accepted these terms for private local use on this host; no redistribution",
+          "accepted_by": "operator"
+        }
+      },
+      {
+        "url": "https://huggingface.co/Thaurock/Qwen2.5-Coder-32B-abliterated-GGUF",
+        "repository": "Thaurock/Qwen2.5-Coder-32B-abliterated-GGUF",
+        "state": "investigated",
+        "investigated": true,
+        "qualified": false,
+        "submitted": "2026-09-29",
+        "revision": "573a35541895148b9808ad23ca0c07d1625b1c68",
+        "checked_at": "2026-09-29",
+        "gated": false,
+        "license": "apache-2.0 (Hub card metadata)",
+        "architecture": "qwen2",
+        "resource_class": "fits",
+        "runtime_route": "qwen2 32B, 32K context; Q6_K (25.04 GiB). Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
+        "disposition": "download Q6_K",
+        "next_gate": "router-models gate as a candidate preset",
+        "download_admission": "admitted",
+        "download_request": {
+          "requested_at": "2026-09-29",
+          "requested": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
+          "admitted": true,
+          "blockers": [],
+          "artifact_candidates": [
+            {
+              "path": "Qwen2.5-Coder-32B-abliterated-Q6_K.gguf",
+              "size": 26886155040,
+              "sha256": "34294101f8613bb0cb26a28e4e0a2ff535b08e56d5e9d08850aed369f2b3725f"
+            }
+          ]
+        }
       }
     ]
   },
