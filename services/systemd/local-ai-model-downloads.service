@@ -5,6 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# A user unit's After=network-online.target does not wait for the system network:
+# the service starts at login, and on 2026-09-29 two consecutive boots failed their
+# first transfers with aria2c exit 19 (name resolution) before DNS was up. Wait,
+# bounded, until the Hub resolves.
+ExecStartPre=/usr/bin/timeout 300 /usr/bin/sh -c 'until getent ahosts huggingface.co >/dev/null; do sleep 5; done'
 ExecStart=/usr/bin/python3 /home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/download_service.py
 Restart=on-failure
 RestartSec=30
