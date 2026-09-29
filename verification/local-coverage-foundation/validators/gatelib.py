@@ -21,11 +21,13 @@ import urllib.request
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'scripts'))
 import qualification_performance as performance
+import gpu_vram
 
 EVIDENCE = Path("/home/typhoon/git/frankenstein-llm/verification/local-coverage-foundation/evidence")
 
-# Measured 2026-09-01 from sysfs. Index is the DRM card, not the ROCm ordinal;
-# gates compare totals rather than trusting the two orderings to agree.
+# Measured 2026-09-01 from sysfs. The labels are logical: cardN is physical ROCm
+# index N, resolved to its current DRM card by PCI identity (gpu_vram), because the
+# 2026-09-29 reinstall renumbered the DRM minors to card1..card3.
 CARDS = {
     "card0": {"pci": "1002:73BF", "total": 17163091968, "name": "RX 6900 XT 16 GiB"},
     "card1": {"pci": "1002:73A1", "total": 32195477504, "name": "Radeon Pro V620 32 GiB"},
@@ -45,8 +47,15 @@ def check(condition: bool, message: str) -> None:
 def vram_used() -> dict[str, int]:
     """Per-card VRAM bytes in use, read from sysfs. No GPU work is submitted."""
     readings = {}
+    try:
+        paths = gpu_vram.logical_card_paths()
+    except OSError:
+        paths = {}
     for card in CARDS:
-        path = Path(f"/sys/class/drm/{card}/device/mem_info_vram_used")
+        if card not in paths:
+            readings[card] = -1
+            continue
+        path = paths[card] / "device" / "mem_info_vram_used"
         try:
             readings[card] = int(path.read_text().strip())
         except (OSError, ValueError):

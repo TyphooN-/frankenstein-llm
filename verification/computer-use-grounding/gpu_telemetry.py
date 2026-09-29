@@ -14,8 +14,12 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import sys
 import threading
 import time
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+import gpu_vram  # noqa: E402
 
 CARDS = ("card0", "card1", "card2")
 DEFAULT_INTERVAL = 0.1
@@ -32,9 +36,17 @@ def _read_int(path: Path) -> int | None:
 
 
 def sample_gpu_sysfs(root: Path = Path("/sys/class/drm")) -> dict:
+    """``CARDS`` are logical ROCm indices; on the live sysfs they resolve by PCI.
+
+    A caller-supplied ``root`` (tests) keeps the literal names.
+    """
     sample = {"monotonic": time.monotonic(), "cards": {}}
+    try:
+        paths = gpu_vram.logical_card_paths() if root == gpu_vram.DRM_ROOT else {}
+    except OSError:
+        paths = {}
     for card in CARDS:
-        device = root / card / "device"
+        device = paths.get(card, root / card) / "device"
         power_paths = sorted((device / "hwmon").glob("hwmon*/power1_average"))
         sample["cards"][card] = {
             "vram_used_bytes": _read_int(device / "mem_info_vram_used"),

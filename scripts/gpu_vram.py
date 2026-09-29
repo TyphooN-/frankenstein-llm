@@ -248,6 +248,25 @@ def devices(kfd_root: Path = KFD_ROOT, drm_root: Path = DRM_ROOT,
     return rows, applied
 
 
+def logical_card_paths(kfd_root: Path = KFD_ROOT, drm_root: Path = DRM_ROOT) -> dict[str, Path]:
+    """``cardN`` label -> the DRM card directory that is physical ROCm index N now.
+
+    Gate evidence has always labelled GPUs ``card0``/``card1``/``card2`` meaning
+    ROCm0/1/2, which matched the sysfs names until a reinstall renumbered the DRM
+    minors (2026-09-29: the GPUs became card1..card3 with no card0, and every
+    VRAM read of ``/sys/class/drm/card0`` failed). The labels stay logical; this
+    resolves them through the same KFD/PCI join as ``devices``. Visibility
+    variables are deliberately ignored (``environ={}``): a gate that narrows
+    ``HIP_VISIBLE_DEVICES`` must not renumber the physical cards it measures.
+    Rows whose identity is unresolved are omitted, so callers read them as
+    unreadable rather than as some other card's bytes.
+    """
+    rows, _ = devices(kfd_root, drm_root, environ={})
+    return {f"card{row['rocm_index']}": drm_root / row["card"]
+            for row in rows if row["card"] is not None and not any(
+                "identity unresolved" in problem for problem in row["problems"])}
+
+
 def format_row(row: dict) -> str:
     label = f"ROCm{row['rocm_index']}"
     where = row["card"] or "no card"
