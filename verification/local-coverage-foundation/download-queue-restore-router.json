@@ -1,0 +1,169 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-29T02:20:00-0400",
+  "source_of_truth": "Hugging Face recursive tree LFS metadata at each artifact's pinned revision, resolved 2026-09-29",
+  "policy": {
+    "single_writer": true,
+    "resume": "aria2 bounded multi-range continuation with its piece map; curl fallback",
+    "promotion": "fsync content, replace, and fsync parent only after exact size and SHA-256 when published",
+    "hash_available": "LFS files use publisher SHA-256",
+    "selection": "exactly the weight files llama-models.ini presets load that no maintained queue installs"
+  },
+  "notes": "Restore after the 2026-09-29 OS reinstall. heretic, obliterated (+mmproj), fable and phr00ty digests equal the SHA-256 the download scripts and obliterated-mmproj-manifest.json already pin. ridge, signal, qwopus and nex previously had no recorded identity; their pins here are the publisher revision at restore time, not proof they are the bytes earlier receipts qualified. Hand-started; not part of local-ai-model-downloads.service.",
+  "total_bytes": 179892561120,
+  "artifacts": [
+    {
+      "key": "router-ridge",
+      "capability": "router-preset:ridge",
+      "repository": "empero-ai/Qwen3.8-27B-Ridge-GGUF",
+      "revision": "486faa5f2032ff99bdc8993ade1b8fff13d1464c",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 12599187008,
+      "files": [
+        {
+          "repo_path": "Qwen3.8-27B-Ridge-3.7bpw.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-Ridge-3.7bpw.gguf",
+          "size": 12599187008,
+          "sha256": "95580dbdaad579582ee898257116abc18d7f3625a00c16a15735d41444a09f5e"
+        }
+      ]
+    },
+    {
+      "key": "router-heretic",
+      "capability": "router-preset:heretic",
+      "repository": "0bserverx/Qwen3.8-27B-Heretic-Abliterated-Uncensored-GGUF",
+      "revision": "ab8d7bd81d03117501e4da60cccdff4c80f0eea0",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 22533850592,
+      "files": [
+        {
+          "repo_path": "RVN-Q6_K-multilingual-mtp.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/RVN-Q6_K-multilingual-mtp.gguf",
+          "size": 22533850592,
+          "sha256": "1344d07425d73f0d1b8f36213910eae8fec21061b1a90835927e8485238f93a4"
+        }
+      ]
+    },
+    {
+      "key": "router-obliterated",
+      "capability": "router-preset:obliterated",
+      "repository": "OBLITERATUS/Qwen3.8-27B-OBLITERATED",
+      "revision": "a58c3b53b3ce71551eafde2ed5ec8df48e0f4ff8",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 22430991392,
+      "files": [
+        {
+          "repo_path": "Qwen3.8-27B-OBLITERATED-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-OBLITERATED-Q6_K.gguf",
+          "size": 22430991392,
+          "sha256": "3535d4a15b75840fb391138ce04e6c73fde709320c6f5fe788cdbd586ee08e3a"
+        }
+      ]
+    },
+    {
+      "key": "router-obliterated-mmproj",
+      "capability": "router-preset:obliterated-vision",
+      "repository": "OBLITERATUS/Qwen3.8-27B-OBLITERATED",
+      "revision": "a58c3b53b3ce71551eafde2ed5ec8df48e0f4ff8",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 931145888,
+      "files": [
+        {
+          "repo_path": "mmproj-model-bf16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/Qwen3.8-27B-OBLITERATED-mmproj-bf16.gguf",
+          "size": 931145888,
+          "sha256": "e484e3b7e907ed0e0644c0de56c3f5929c7ad5c9c6cc84d35a9d8dc08d461545"
+        }
+      ]
+    },
+    {
+      "key": "router-fable",
+      "capability": "router-preset:fable",
+      "repository": "DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF",
+      "revision": "c6b3770b677093fafc44a801c23c9f88c41df93a",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 24033705440,
+      "files": [
+        {
+          "repo_path": "Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/Qwen3.6-27B-Fable-Fus-711-UnHeretic-NM-DAU-NEO-MAX-NEO-AMD-MTP-Q6_K.gguf",
+          "size": 24033705440,
+          "sha256": "c394c7c0dcbd32e04f4695ad5d4dad8f2f5b7286b366d165815ac0cdc5ccf4aa"
+        }
+      ]
+    },
+    {
+      "key": "router-phr00ty",
+      "capability": "router-preset:phr00ty",
+      "repository": "Phr00t/Phr00tyMix-v4-32B-GGUF",
+      "revision": "aa4851437d0b00788bf9553e4c7152d1cbb4e6ae",
+      "license": "unspecified",
+      "gated": false,
+      "total_bytes": 26882826592,
+      "files": [
+        {
+          "repo_path": "Phr00tyMix-v4-32B-imat-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/Phr00tyMix-v4-32B-imat-Q6_K.gguf",
+          "size": 26882826592,
+          "sha256": "056fc85cb1f0873e90ddae4f6f747fbc4ce3ebf41fad15bfdc2a7e66e2af1700"
+        }
+      ]
+    },
+    {
+      "key": "router-signal",
+      "capability": "router-preset:signal",
+      "repository": "agentionai/Signal-3.8-27B-GGUF",
+      "revision": "ae272aa3e533854feebcfa1ded0f1dca9afedcef",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 22431000128,
+      "files": [
+        {
+          "repo_path": "AP-Q6_K/Signal-3.8-27B-AP-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/signal-3.8-27b/AP-Q6_K/Signal-3.8-27B-AP-Q6_K.gguf",
+          "size": 22431000128,
+          "sha256": "fe4760215d62b697686a7e608a9705b629003103228228b37e104da22e2385c0"
+        }
+      ]
+    },
+    {
+      "key": "router-qwopus",
+      "capability": "router-preset:qwopus",
+      "repository": "Jackrong/Qwopus3.8-27B-Flash-GGUF",
+      "revision": "9b90cd22b19276bc9e75c0e6d1665fa48619dd5b",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 19535701216,
+      "files": [
+        {
+          "repo_path": "Qwopus3.8-27B-Flash-MTP-Q5_K_M.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/qwopus3.8-27b-flash/Qwopus3.8-27B-Flash-MTP-Q5_K_M.gguf",
+          "size": 19535701216,
+          "sha256": "abc97cf74cae75be61667f3c640d9abc76ad87c617a10ee1fa47beb66aec3746"
+        }
+      ]
+    },
+    {
+      "key": "router-nex",
+      "capability": "router-preset:nex",
+      "repository": "mradermacher/Nex-N2.5-mini-i1-GGUF",
+      "revision": "4847ceb6ed0f49736abe3c36722cbb31fb1e80ee",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 28514152864,
+      "files": [
+        {
+          "repo_path": "Nex-N2.5-mini.i1-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/nex-n2.5-mini/Nex-N2.5-mini.i1-Q6_K.gguf",
+          "size": 28514152864,
+          "sha256": "6bd520b3c3cbb26251bfa96d1434dc743f46d30c2921b5b20eb3b67d42f5de42"
+        }
+      ]
+    }
+  ]
+}

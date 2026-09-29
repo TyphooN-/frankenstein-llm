@@ -1,0 +1,292 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-29T02:40:00-0400",
+  "source_of_truth": "Hugging Face recursive tree LFS metadata at each artifact's pinned revision, retrieved 2026-09-29 for the candidate intake",
+  "policy": {
+    "single_writer": true,
+    "resume": "aria2 bounded multi-range continuation with its piece map; curl fallback",
+    "promotion": "fsync content, replace, and fsync parent only after exact size and SHA-256 when published",
+    "hash_available": "LFS files use publisher SHA-256",
+    "selection": "one pinned quant per runtime-compatible candidate that fits this host: Q6_K where published, else the nearest higher-fidelity tier; the publisher projector/MTP companion where the card pairs one"
+  },
+  "notes": "Operator-authorized 2026-09-29, including license-restricted terms accepted for private local use (swift-open-license-1.0, qwen-community-license-1.0, polyform-small-business-1.0.0). Every tensor type in each selected file was checked against the pinned ggml type enum from a remote header read. Downloaded is not qualified; router presets are added only after a passing gate. Hand-started; not part of local-ai-model-downloads.service.",
+  "total_bytes": 311366466176,
+  "artifacts": [
+    {
+      "key": "cand-mindmeld-27b-i1-q6k",
+      "capability": "candidate-chat-27b",
+      "repository": "mradermacher/Qwen3.8-27B-MindMeld-i1-GGUF",
+      "revision": "bdb89abaf809c3d8e175ec795e9d24dc6047853c",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 22431002528,
+      "files": [
+        {
+          "repo_path": "Qwen3.8-27B-MindMeld.i1-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/mindmeld-27b/Qwen3.8-27B-MindMeld.i1-Q6_K.gguf",
+          "size": 22431002528,
+          "sha256": "b3f5d7d205d702e9ad98633af1bdfe0df79e13d910f7447b83a39ac5c6bfaf02"
+        }
+      ]
+    },
+    {
+      "key": "cand-cyber-ornith-9b-i1-q6k",
+      "capability": "candidate-chat-9b",
+      "repository": "mradermacher/Cyber-Ornith-1.5-9B-OBLITERATED-i1-GGUF",
+      "revision": "5936e88f1885b856b54520c372f2cd41e71819fd",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 7359262272,
+      "files": [
+        {
+          "repo_path": "Cyber-Ornith-1.5-9B-OBLITERATED.i1-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/cyber-ornith-9b/Cyber-Ornith-1.5-9B-OBLITERATED.i1-Q6_K.gguf",
+          "size": 7359262272,
+          "sha256": "0a43704d7b18c2eb62fdc6d67b4cf32d5fd4d7a147e1bf0b00d3dc75d88822fd"
+        }
+      ]
+    },
+    {
+      "key": "cand-swift15-27b-iq3s-mtp",
+      "capability": "candidate-agentic-27b",
+      "repository": "ukisai/Swift-1.5-Qwen3.8-27B-GSQ-RCO-GGUF",
+      "revision": "d74895bbe5db4bec1e0024e7cc87d59c02d7631a",
+      "license": "other:swift-open-license-1.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 12120016896,
+      "files": [
+        {
+          "repo_path": "Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/swift15-27b/Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf",
+          "size": 12120016896,
+          "sha256": "9aecf1cd41b2cb2f32a74e0d889e33855ebef43b26f43b43feb5720239e677e5"
+        }
+      ]
+    },
+    {
+      "key": "cand-qwen35-9b-abliterated-q4km",
+      "capability": "candidate-chat-9b",
+      "repository": "lukey03/Qwen3.5-9B-abliterated-GGUF",
+      "revision": "dac35c6385d79a6a9fe113d7a3b730348791d37f",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 5627044704,
+      "files": [
+        {
+          "repo_path": "Qwen3.5-9B-abliterated-Q4_K_M.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/qwen35-9b-abliterated/Qwen3.5-9B-abliterated-Q4_K_M.gguf",
+          "size": 5627044704,
+          "sha256": "dba64d0e5cce0739e27535ee0a6b75249eb8006ce8b2d6c060e20750035c4695"
+        }
+      ]
+    },
+    {
+      "key": "cand-cyber-frost-38-q2ks",
+      "capability": "candidate-large-moe",
+      "repository": "freakyskittle/CYBER-FROST-3.8-GGUF",
+      "revision": "75ab99995d6f106f4aaf52d4e5cd376d6f746459",
+      "license": "other:qwen-community-license-1.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 82849634592,
+      "files": [
+        {
+          "repo_path": "CYBER-FROST-3.8-Q2_K_S.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/cyber-frost-38/CYBER-FROST-3.8-Q2_K_S.gguf",
+          "size": 82849634592,
+          "sha256": "1baa10a6a4edc44f3e2bc6894036feb23cc905cff6d3af305fa07156516aabdf"
+        }
+      ]
+    },
+    {
+      "key": "cand-qwen25-coder-32b-abliterated-q6k",
+      "capability": "candidate-coder-32b",
+      "repository": "Thaurock/Qwen2.5-Coder-32B-abliterated-GGUF",
+      "revision": "573a35541895148b9808ad23ca0c07d1625b1c68",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 26886155040,
+      "files": [
+        {
+          "repo_path": "Qwen2.5-Coder-32B-abliterated-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/qwen25-coder-32b-abliterated/Qwen2.5-Coder-32B-abliterated-Q6_K.gguf",
+          "size": 26886155040,
+          "sha256": "34294101f8613bb0cb26a28e4e0a2ff535b08e56d5e9d08850aed369f2b3725f"
+        }
+      ]
+    },
+    {
+      "key": "cand-penjing-27b-q6k",
+      "capability": "candidate-chat-27b",
+      "repository": "PollardWeights/Penjing-27B-Pollard",
+      "revision": "43c245b3c709aaac66dd7f60716c7996f6916115",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 23362145952,
+      "files": [
+        {
+          "repo_path": "Penjing-27B-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/penjing-27b/Penjing-27B-Q6_K.gguf",
+          "size": 22431000000,
+          "sha256": "ad45e0e3306fc0e4bd390b7c6a46d2a44458e13dcc2043565822f3dd82f4d7d4"
+        },
+        {
+          "repo_path": "mmproj-Penjing-27B-bf16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/penjing-27b/mmproj-Penjing-27B-bf16.gguf",
+          "size": 931145952,
+          "sha256": "e43a597863a21bfa48b0fbd4553a771ae4117e25bb172e66f1dbc3fc6d037131"
+        }
+      ]
+    },
+    {
+      "key": "cand-qwen38-27b-ap-q4kxl",
+      "capability": "candidate-chat-27b",
+      "repository": "agentionai/Qwen3.8-27B-AP-GGUF",
+      "revision": "b51f047c2342c2e5e48ca8c442fac0865d109111",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 18490323552,
+      "files": [
+        {
+          "repo_path": "Qwen3.8-27B-AP-Q4_K_XL.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/qwen38-27b-ap/Qwen3.8-27B-AP-Q4_K_XL.gguf",
+          "size": 17559177120,
+          "sha256": "5490390fa01335062247d4f43190a6659117e3c388b26260b81285531edc3dfc"
+        },
+        {
+          "repo_path": "mmproj-BF16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/qwen38-27b-ap/mmproj-BF16.gguf",
+          "size": 931146432,
+          "sha256": "83ee4f4f205fa514161778c41df1ea14144faa0f713510893b63c2395f5c2d53"
+        }
+      ]
+    },
+    {
+      "key": "cand-genesis-mtp-27b-q8kp",
+      "capability": "candidate-chat-27b",
+      "repository": "LuffyTheFox/Qwen3.8-27B-Uncensored-Genesis-MTP-GGUF",
+      "revision": "02502fd6d7303381311a0ddaa9f3b74d1daa7094",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 32389137408,
+      "files": [
+        {
+          "repo_path": "Qwen3.8-27B-Uncensored-Genesis-Q8_K_P.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/genesis-mtp-27b/Qwen3.8-27B-Uncensored-Genesis-Q8_K_P.gguf",
+          "size": 31457990784,
+          "sha256": "3907e4a0008b1157f5b883e7b778ba7b18020c8fca0412bf99bda416786455bd"
+        },
+        {
+          "repo_path": "mmproj-Qwen3.8-27B-Uncensored-Genesis-BF16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/genesis-mtp-27b/mmproj-Qwen3.8-27B-Uncensored-Genesis-BF16.gguf",
+          "size": 931146624,
+          "sha256": "ea98c7ec706439c1e71b70a9f45bb7527a930cd1f60fe203432ba595ba35fe70"
+        }
+      ]
+    },
+    {
+      "key": "cand-distill-35b-a3b-apex-abliterated",
+      "capability": "candidate-moe-35b",
+      "repository": "IsValorum/Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1-Abliterated-GGUF",
+      "revision": "0497b501688a588737ec3a875a87bdb533237aa9",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 17263534976,
+      "files": [
+        {
+          "repo_path": "Qwen3.8-35B-A3B-Distill.APEX-I-MiniPlus-V2.1-Abliterated.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/distill-35b-a3b-abliterated/Qwen3.8-35B-A3B-Distill.APEX-I-MiniPlus-V2.1-Abliterated.gguf",
+          "size": 14658690144,
+          "sha256": "0dae47840f8115d894e74c5cd1a6aca27e01feaa4f07890a50bdcf7db4c56227"
+        },
+        {
+          "repo_path": "mtp-Qwen3.8-35B-A3B-Distill-Q8_0.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/distill-35b-a3b-abliterated/mtp-Qwen3.8-35B-A3B-Distill-Q8_0.gguf",
+          "size": 1990650112,
+          "sha256": "6dc07405819c36492fc32ce40a2c709f647e0d2284facbbb6cca72b929e25021"
+        },
+        {
+          "repo_path": "mmproj-Q8_0.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/distill-35b-a3b-abliterated/mmproj-Q8_0.gguf",
+          "size": 614194720,
+          "sha256": "d526b0a3910992e2af1cf56aae8785f7f38942e7a875e60590f7049b5c7112ca"
+        }
+      ]
+    },
+    {
+      "key": "cand-thinkingcap-27b-q6k",
+      "capability": "candidate-chat-27b",
+      "repository": "bottlecapai/ThinkingCap-Qwen3.8-27B-GGUF",
+      "revision": "108ff8f24ce8e9335fbf308844cd3c59c13380a4",
+      "license": "other:polyform-small-business-1.0.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 24791712384,
+      "files": [
+        {
+          "repo_path": "ThinkingCap-Qwen3.8-27B-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/thinkingcap-27b/ThinkingCap-Qwen3.8-27B-Q6_K.gguf",
+          "size": 23860566112,
+          "sha256": "36ab5032dc4725f8acdb237070f9e5574171e0e29cd583fcc417a6c8ef87f557"
+        },
+        {
+          "repo_path": "mmproj-ThinkingCap-Qwen3.8-27B-f16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/thinkingcap-27b/mmproj-ThinkingCap-Qwen3.8-27B-f16.gguf",
+          "size": 931146272,
+          "sha256": "98fa9aad59b42449786a16bbce96bcd92204d03cac0aee0cdccca711c2adefd1"
+        }
+      ]
+    },
+    {
+      "key": "cand-occamy-10-apex",
+      "capability": "candidate-moe-35b",
+      "repository": "IsValorum/Occamy-1.0-APEX-I-MiniPlus-V2.1-GGUF",
+      "revision": "1d329c47cc26615bfb371a399275834f47e0cbf1",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 15365495232,
+      "files": [
+        {
+          "repo_path": "Occamy-1.0.APEX-I-MiniPlus-V2.1.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/occamy-10/Occamy-1.0.APEX-I-MiniPlus-V2.1.gguf",
+          "size": 14751300704,
+          "sha256": "5fa88e7a3e7ea4833d6e45bb3dcaf34aa5a8ebaf85cebe3794c4a94f4d4cb303"
+        },
+        {
+          "repo_path": "mmproj-Accio-Lab_occamy-1.0-Q8_0.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/occamy-10/mmproj-Accio-Lab_occamy-1.0-Q8_0.gguf",
+          "size": 614194528,
+          "sha256": "17c9213e22ccf9b1b68c64eb7a4abd4ef5166d6164b7d9720d34e06c309fcd82"
+        }
+      ]
+    },
+    {
+      "key": "cand-qwopus-flash-v2-27b-i1-q6k",
+      "capability": "candidate-chat-27b",
+      "repository": "mradermacher/Qwopus3.8-27B-Flash-V2-i1-GGUF",
+      "revision": "7c5548319070e7e6f832a94e04354dc13b0c8b3c",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 22431000640,
+      "files": [
+        {
+          "repo_path": "Qwopus3.8-27B-Flash-V2.i1-Q6_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/qwopus-flash-v2-27b/Qwopus3.8-27B-Flash-V2.i1-Q6_K.gguf",
+          "size": 22431000640,
+          "sha256": "77071a70aaa71096c3f4c980175772cad7bcd1301a67d96d49ecbb82ebaca973"
+        }
+      ]
+    }
+  ]
+}

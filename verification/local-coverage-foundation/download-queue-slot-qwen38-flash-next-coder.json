@@ -1,0 +1,56 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-29T00:00:00-0400",
+  "source_of_truth": "https://huggingface.co/api/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF/tree/04d8b36b50cc0479fda9214a378336f89b356d67?recursive=true&expand=false&limit=1000",
+  "policy": {
+    "single_writer": true,
+    "resume": "aria2 bounded multi-range continuation with its piece map; curl fallback",
+    "promotion": "fsync content, replace, and fsync parent only after exact size and SHA-256 when published",
+    "hash_available": "LFS files use publisher SHA-256",
+    "selection": "both IQ1_M shards (llama.cpp loads the pair from shard 1) plus the BF16 vision projector; the only quant the publisher ships"
+  },
+  "notes": "Hand-started, operator-requested 2026-09-29. Not part of local-ai-model-downloads.service. Downloaded weights are not qualification; the preset must pass router-models before it is a working capability.",
+  "total_bytes": 59316127936,
+  "artifacts": [
+    {
+      "key": "qwen38-flash-next-coder-gsq-rco-iq1m",
+      "capability": "coding-agent-candidate",
+      "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+      "revision": "04d8b36b50cc0479fda9214a378336f89b356d67",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 58408584928,
+      "files": [
+        {
+          "repo_path": "IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/qwen38-flash-next-coder/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00001-of-00002.gguf",
+          "size": 29608446496,
+          "sha256": "e11083ba855e7666b48ea3f2db6a9c3a20c18751a012cc24f948de91b7087fad"
+        },
+        {
+          "repo_path": "IQ1_M/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/qwen38-flash-next-coder/Qwen3.8-Flash-Next-GSQ-RCO-IQ1_M-00002-of-00002.gguf",
+          "size": 28800138432,
+          "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113"
+        }
+      ]
+    },
+    {
+      "key": "qwen38-flash-next-coder-mmproj-bf16",
+      "capability": "coding-agent-candidate-vision",
+      "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+      "revision": "04d8b36b50cc0479fda9214a378336f89b356d67",
+      "license": "apache-2.0",
+      "gated": false,
+      "total_bytes": 907543008,
+      "files": [
+        {
+          "repo_path": "mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/qwen38-flash-next-coder/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
+          "size": 907543008,
+          "sha256": "b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0"
+        }
+      ]
+    }
+  ]
+}

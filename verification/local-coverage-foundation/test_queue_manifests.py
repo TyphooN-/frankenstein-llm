@@ -34,6 +34,10 @@ QUEUES = {
 ALL_QUEUES = {
     **QUEUES,
     "slot-uncensored-27b": HERE / "download-queue-slot-uncensored-27b.json",
+    "slot-qwen38-flash-next-coder": HERE / "download-queue-slot-qwen38-flash-next-coder.json",
+    "restore-router": HERE / "download-queue-restore-router.json",
+    "candidates-llm-2026-09-29": HERE / "download-queue-candidates-llm-2026-09-29.json",
+    "candidates-media-2026-09-29": HERE / "download-queue-candidates-media-2026-09-29.json",
 }
 STAMP_BYTES = {name: json.loads(path.read_text())["total_bytes"]
                for name, path in QUEUES.items()}

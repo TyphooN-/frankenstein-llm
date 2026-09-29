@@ -1,0 +1,202 @@
+{
+  "schema": "hermes-hf-artifact-queue/1",
+  "built_at": "2026-09-29T02:40:00-0400",
+  "source_of_truth": "Hugging Face recursive tree LFS metadata at each artifact's pinned revision, retrieved 2026-09-29 for the candidate intake",
+  "policy": {
+    "single_writer": true,
+    "resume": "aria2 bounded multi-range continuation with its piece map; curl fallback",
+    "promotion": "fsync content, replace, and fsync parent only after exact size and SHA-256 when published",
+    "hash_available": "LFS files use publisher SHA-256",
+    "selection": "Qwen-Image-2.1 uncensored Q8_0 transformer with its text encoder and VAE, the heretic text encoder, the publisher-recommended turbo LoRA, the linked controlnet patch, and single small video LoRAs/checkpoints"
+  },
+  "notes": "Operator-authorized 2026-09-29, including qwen-research, minimax-h3 community and creativeml-openrail-m terms accepted for private local use; Kijai/QwenImage_experimental declares no license and is downloaded only because the operator linked its model_patches folder explicitly. MiniMax-H3 and Wan2.1-1.3B base components are not installed; these files are staged, not a working capability. Hand-started.",
+  "total_bytes": 56322153544,
+  "artifacts": [
+    {
+      "key": "media-qwen-image21-uc-q8",
+      "capability": "candidate-image-generation",
+      "repository": "abenzerps/Qwen-Image-2.1-Uncensored-GGUF",
+      "revision": "8d0887daa8af483d79cdd2f0d7da85e59cff19fd",
+      "license": "other:qwen-research",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 7591557920,
+      "files": [
+        {
+          "repo_path": "qwen-image-2.1-UC-Q8_0.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/diffusion_models/qwen-image-2.1-UC-Q8_0.gguf",
+          "size": 7591557920,
+          "sha256": "cde456c72ea3ecebfc1be783300e972711d875e0c5f1bed33d42b66b156affa8"
+        }
+      ]
+    },
+    {
+      "key": "media-qwen-image21-text-encoder-bf16",
+      "capability": "candidate-image-generation",
+      "repository": "abenzerps/Qwen-Image-2.1-Uncensored-GGUF",
+      "revision": "8d0887daa8af483d79cdd2f0d7da85e59cff19fd",
+      "license": "other:qwen-research",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 17534334616,
+      "files": [
+        {
+          "repo_path": "text_encoders/qwen3vl_8b_bf16.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/text_encoders/qwen3vl_8b_bf16.safetensors",
+          "size": 17534334616,
+          "sha256": "68bdc82bc1b66851162ae656225e7e2068166b603db19bd5d5a3b90eb12669a9"
+        }
+      ]
+    },
+    {
+      "key": "media-qwen-image21-vae",
+      "capability": "candidate-image-generation",
+      "repository": "abenzerps/Qwen-Image-2.1-Uncensored-GGUF",
+      "revision": "8d0887daa8af483d79cdd2f0d7da85e59cff19fd",
+      "license": "other:qwen-research",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 675509688,
+      "files": [
+        {
+          "repo_path": "vae/qwen_image_2.1_vae_bf16.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/vae/qwen_image_2.1_vae_bf16.safetensors",
+          "size": 675509688,
+          "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"
+        }
+      ]
+    },
+    {
+      "key": "media-qwen-image21-text-encoder-heretic-bf16",
+      "capability": "candidate-image-generation",
+      "repository": "pottokao/Qwen-Image-2.1-Text-Encoder-Heretic-GGUF",
+      "revision": "23813717f7f9282b372c23c7207468a7a168fa68",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 17534334584,
+      "files": [
+        {
+          "repo_path": "qwen3vl_8b_bf16_heretic.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/text_encoders/qwen3vl_8b_bf16_heretic.safetensors",
+          "size": 17534334584,
+          "sha256": "b1f17ffe6e043c0e1da49ba75fd537d3ea3074fee83b4c9de377bb54689774b1"
+        }
+      ]
+    },
+    {
+      "key": "media-qwen-image21-viggle-turbo-lora",
+      "capability": "candidate-image-generation",
+      "repository": "Viggle/Qwen-Image-2.1-viggle-turbo",
+      "revision": "bb26a0f38e5fe6c124aaccc9187a87eed5d9ed13",
+      "license": "other:qwen-research",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 1359147904,
+      "files": [
+        {
+          "repo_path": "Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r256.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/loras/Qwen-Image-2.1-viggle-turbo-v0.2.1-6step-lora-r256.safetensors",
+          "size": 1359147904,
+          "sha256": "2a0148f5c73abbed5f97da5ea356e439318aadb281d01fce4af39cdf43728803"
+        }
+      ]
+    },
+    {
+      "key": "media-qwen-image21-warmblood-loras",
+      "capability": "candidate-image-generation",
+      "repository": "WarmBloodAban/Qwen-Image-2.1-LoRAs",
+      "revision": "c4ab5473bfdf585fc19cfd1e280f79d2b0c79947",
+      "license": "apache-2.0",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 486650608,
+      "files": [
+        {
+          "repo_path": "Qwen2.1_Anime_consistency.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/loras/Qwen2.1_Anime_consistency.safetensors",
+          "size": 167830408,
+          "sha256": "0c171eb802ea8051b511f2d93c1743eeadd030316255aa98fa65d40809366752"
+        },
+        {
+          "repo_path": "Qwen2.1_Anything2RealCharacters.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/loras/Qwen2.1_Anything2RealCharacters.safetensors",
+          "size": 318820200,
+          "sha256": "5db4dd2376e6017812bf1189b2fc46e52aaa2c0b7e688faac75e83e1c4dce849"
+        }
+      ]
+    },
+    {
+      "key": "media-qwen-image21-fun-controlnet-union",
+      "capability": "candidate-image-generation",
+      "repository": "Kijai/QwenImage_experimental",
+      "revision": "04987755e10002ff33e4ea307a811487dddd79d9",
+      "license": "unspecified",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 7550977992,
+      "files": [
+        {
+          "repo_path": "model_patches/qwen_image_2.1_fun_controlnet_union_bf16.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/model_patches/qwen_image_2.1_fun_controlnet_union_bf16.safetensors",
+          "size": 7550977992,
+          "sha256": "1f9dea8384ba167084f39f624908f1dbf2ea8a223bb4a8108a77dafa9b55bfe1"
+        }
+      ]
+    },
+    {
+      "key": "media-minimax-h3-ref2va-crossview-lora",
+      "capability": "candidate-video-generation",
+      "repository": "Cseti/MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1",
+      "revision": "94dc2a07c5a3f7e10b7c1d053cc700762d15c35d",
+      "license": "other:minimax-h3-community-license",
+      "gated": false,
+      "intake_batch": "2026-09-29-a",
+      "total_bytes": 596452584,
+      "files": [
+        {
+          "repo_path": "MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1_3500.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/loras/MiniMax-H3_Ref2VA-LoRA-CrossView-Warp_v1_3500.safetensors",
+          "size": 596452584,
+          "sha256": "aab492964261f6611ced672c70866ce9d64bab66fbd28fd39d26bcd09c852f91"
+        }
+      ]
+    },
+    {
+      "key": "media-minimax-h3-character-swap-lora",
+      "capability": "candidate-video-generation",
+      "repository": "akatz-ai/MiniMax-H3-Character-Swap-LoRA",
+      "revision": "62407e0cc8089c363abd9ce4b0b27662abb237af",
+      "license": "other:minimax-h3-community-license-agreement",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 155110320,
+      "files": [
+        {
+          "repo_path": "h3_character_swap_pro4500_1000.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/loras/h3_character_swap_pro4500_1000.safetensors",
+          "size": 155110320,
+          "sha256": "4b2a3f420ae804c0aa3422761ff84dbd1bf52eef6900ffab6d2e66df63cb4e79"
+        }
+      ]
+    },
+    {
+      "key": "media-nsfw-wan-13b-exp-e14",
+      "capability": "candidate-video-generation",
+      "repository": "NSFW-API/NSFW_Wan_1.3b",
+      "revision": "4d8db25317335b4a0cfbefad9877b893f08dbc67",
+      "license": "creativeml-openrail-m",
+      "gated": false,
+      "intake_batch": "2026-09-29-b",
+      "total_bytes": 2838077328,
+      "files": [
+        {
+          "repo_path": "wan_1.3B_exp_e14.safetensors",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/comfy/diffusion_models/wan_1.3B_exp_e14.safetensors",
+          "size": 2838077328,
+          "sha256": "86daed5f43a68d7be2ca1f0e85d2ac51f3ba7fb735c76fd9574323e18fe40c6c"
+        }
+      ]
+    }
+  ]
+}
