@@ -14,7 +14,7 @@ so the upgrade plan is not lost.
 | BCLK | Overclocked to 104.09 MHz (stock 100 MHz) — ~+4% CPU, DRAM, PCIe, DMI, and QPI clocking |
 | RAM | 96 GB G.Skill Trident Z B-Die (UDIMM), 8 DIMMs, 2 DIMMs/channel (2DPC), quad-channel; mixed rank — 4×16 GB (2R) + 4×8 GB (1R), tuned CL12 @ 2498 MHz |
 | NUMA | Single node (0-43) |
-| Kernel | 7.2.4-273-tkg-eevdf-llvm (linux-tkg, eevdf + LLVM + full LTO) |
+| Kernel | 7.2.5-3-omarchy since the 2026-09-29 Omarchy reinstall (previously 7.2.4-273-tkg-eevdf-llvm: linux-tkg, eevdf + LLVM + full LTO) |
 | Scheduler | eevdf (kernel default), performance governor, tickless idle |
 
 ## GPU / PCIe
@@ -24,11 +24,11 @@ three x16 slots; each GPU gets an x8 link. This is the normal three-GPU layout o
 this platform (see the BIOS mod's "PCIe Hardware Limitations" section) and is not
 a degraded link.
 
-| GPU | BDF | Slot | Negotiated | Capable | Note |
-| --- | --- | --- | --- | --- | --- |
-| 6900 XT (ASRock Phantom) | 03:00.0 | 2 | PCIe 3.0 (8.0 GT/s) x8 = 63 Gb/s | x16 4.0 | Headless / ROCm work |
-| Radeon Pro V620 | 07:00.0 | 6 | PCIe 2.0 (5.0 GT/s) x8 = 32 Gb/s | x16 4.0 | V620 root port is PCIe 2.0 |
-| 6900 XT (Liquid Devil) | 0a:00.0 | 4 | PCIe 3.0 (8.0 GT/s) x8 = 63 Gb/s | x16 4.0 | ROCm work |
+| GPU | BDF | DRM card (2026-09-29) | Slot | Negotiated | Capable | Note |
+| --- | --- | --- | --- | --- | --- | --- |
+| 6900 XT (ASRock Phantom) | 03:00.0 | card1 | 2 | PCIe 3.0 (8.0 GT/s) x8 = 63 Gb/s | x16 4.0 | Headless / ROCm work |
+| Radeon Pro V620 | 07:00.0 | card2 | 6 | PCIe 2.0 (5.0 GT/s) x8 = 32 Gb/s | x16 4.0 | V620 root port is PCIe 2.0 |
+| 6900 XT (Liquid Devil) | 0a:00.0 | card3 | 4 | PCIe 3.0 (8.0 GT/s) x8 = 63 Gb/s | x16 4.0 | ROCm work |
 
 The V620's PCIe 2.0 x8 link is ~2x lower per-link bandwidth than the 6900 XTs'
 PCIe 3.0 x8, but for LLM inference (model resident in VRAM, bottleneck is HBM/VRAM
@@ -47,15 +47,48 @@ CPU/DRAM-bound paths (KV-cache movement, prompt prefill on CPU fallback, page
 faults) even with identical GPU config. This host's numbers are the baseline;
 flag them as "BCLK 104.09" in any cross-host comparison.
 
-## Fan control
+## Fan control and GPU tuning
 
-- card0 (6900 XT): hwmon exposes `pwm1` (0-255) but the driver/firmware locks
-  manual override on this kernel + board combo — writes to `pwm1` return
-  `EINVAL` even as root. Fan stays on the driver's auto curve.
-- card1 (V620): `pwm1` is read-only; no manual override.
-- `amdgpu-clocks.service` (enabled, runs at boot) applies the clock overrides in
-  `/etc/default/amdgpu-custom-state.card0` and `.card2`. This is the only
-  effective manual control; the fan is auto.
+DRM card numbers are not stable across installs: the 2026-09-29 reinstall has no
+`card0` and the GPUs are `card1`..`card3`. Everything below is keyed by PCI address.
+Gate evidence keeps the logical labels `card0`..`card2` = ROCm0..ROCm2, resolved by
+`scripts/gpu_vram.py:logical_card_paths()`.
+
+- ASRock 6900 XT (03:00.0): on 7.2.5-3-omarchy manual fan control works
+  (`pwm1_enable=1`, `pwm1=255`; the old linux-tkg kernel returned `EINVAL`). It is
+  held at 100% (~2984 RPM measured) by the operator's root unit
+  `asrock-fan-100.service` (`~/asrock-fan-100.sh`), not by this repository.
+- V620 (07:00.0): `pwm1` is read-only; no manual override.
+- `amdgpu-clocks.service` applies `/etc/default/amdgpu-custom-state.pci:<BDF>` for all
+  three cards; the repo copies in `config/hardware/amdgpu/` map card0 → 03:00.0,
+  card1 → 07:00.0, card2 → 0a:00.0. Overdrive needs `amdgpu.ppfeaturemask=0xfff7ffff`
+  on the kernel command line. The driver may round an offset (ASRock reads back
+  −40 mV for a −45 mV profile).
+- All amdgpu devices are kept out of PCI runtime suspend (udev
+  `ATTR{power/control}="on"`); a suspended card hid its sensors from ROCm SMI.
+
+## Host configuration after the 2026-09-29 reinstall
+
+- Swap is zram only: zstd 16G, priority 100 (ADR 0003). Omarchy's hibernation
+  swapfile, resume hook and `resume=` parameters were removed; hibernate targets are
+  masked. 3 × 1 GiB HugeTLB pages are reserved on the command line.
+- ROCm 7.2.4 from Arch `extra`; its clang guesses `/opt/rocm/lib` as the HIP root,
+  which `scripts/build-llama-cpp.sh` handles by exporting `HIP_PATH`.
+- Host Python provides ROCm PyTorch 2.13 and torchvision 0.28; every lane under
+  `venvs/` reuses them (`scripts/setup-python-runtimes.sh`).
+
+## Stability record: 2026-09-29
+
+Under combined CPU, disk and GPU DMA load this configuration (BCLK 104.09, tuned
+mixed-rank RAM, GPU undervolts) produced repeated memory corruption: `Bad page state`
+reports (one a single-bit flip, refcount `0x40000000`), general protection faults on
+pointers one bit from canonical, kernel oopses that took the host down, btrfs
+checksum failures on data at rest (lifetime `corruption_errs` 3 → 13), and
+previously verified model files that failed SHA-256 on re-read. memtest86+ passed
+and NVMe SMART is clean (0 media errors), so the fault needs the full-system load
+memtest does not generate. The kernel taints the boot `[S]=CPU_OUT_OF_SPEC`.
+Qualification results recorded on this configuration are provisional until a pass
+completes with no kernel memory errors and no SHA-256 quarantines.
 
 ## Upgrade plan (noted for documentation / future runs)
 
