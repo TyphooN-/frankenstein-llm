@@ -62,5 +62,57 @@
   "qwen38-coder": {
     "source": "ISTA-DASLab Qwen3.8-Flash-Next GSQ-RCO Coder IQ1_M (qwen4exp MoE, 256 of 512 experts kept, n-gram table on CPU)",
     "purpose": "Candidate coding and agentic model; not yet gate-qualified"
+  },
+  "mindmeld-27b": {
+    "source": "nightmedia Qwen3.8-27B MindMeld i1-Q6_K (mradermacher)",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "cyber-ornith-9b": {
+    "source": "DuoNeural Cyber-Ornith-1.5-9B OBLITERATED i1-Q6_K (mradermacher)",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "swift15-27b": {
+    "source": "ukisai Swift 1.5 Qwen3.8-27B GSQ-RCO IQ3_S with MTP head",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "qwen35-9b-abliterated": {
+    "source": "lukey03 Qwen3.5-9B abliterated Q4_K_M (text only)",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "cyber-frost-38": {
+    "source": "freakyskittle CYBER-FROST-3.8 Q2_K_S (qwen4exp ~180B, n-gram table on CPU)",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "qwen25-coder-32b-abliterated": {
+    "source": "Thaurock Qwen2.5-Coder-32B-Instruct abliterated Q6_K",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "penjing-27b": {
+    "source": "PollardWeights Penjing-27B Q6_K",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "qwen38-27b-ap": {
+    "source": "agentionai Qwen3.8-27B Agention Precision Q4_K_XL",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "genesis-27b": {
+    "source": "LuffyTheFox Qwen3.8-27B Uncensored Genesis Q8_K_P",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "distill-35b-a3b-abliterated": {
+    "source": "IsValorum Qwen3.8-35B-A3B Distill APEX-I-MiniPlus V2.1 abliterated",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "thinkingcap-27b": {
+    "source": "bottlecapai ThinkingCap-Qwen3.8-27B Q6_K",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "occamy-10": {
+    "source": "IsValorum Occamy-1.0 APEX-I-MiniPlus V2.1",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
+  },
+  "qwopus-flash-v2-27b": {
+    "source": "Jackrong Qwopus3.8-27B-Flash-V2 i1-Q6_K (mradermacher)",
+    "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
   }
 }
