@@ -180,6 +180,7 @@ INCUMBENT_PRESETS: dict[str, str] = {
     "signal": PRIVILEGE_TOOL_USING,
     "qwopus": PRIVILEGE_TOOL_USING,
     "nex": PRIVILEGE_TOOL_USING,
+    "qwen38-coder": PRIVILEGE_TOOL_USING,
     "qwen3-embedding-8b": PRIVILEGE_READ_ONLY,
     "qwen3-reranker-8b": PRIVILEGE_READ_ONLY,
     "qwen25-coder-7b-fim": PRIVILEGE_READ_ONLY,

@@ -58,5 +58,9 @@
   "nex": {
     "source": "Nex-Agi Nex-N2.5-mini i1-Q6_K (35B MoE, 8 active, 262K context)",
     "purpose": "Agentic, computer-use, and tool-calling; 3B active params for fast inference"
+  },
+  "qwen38-coder": {
+    "source": "ISTA-DASLab Qwen3.8-Flash-Next GSQ-RCO Coder IQ1_M (qwen4exp MoE, 256 of 512 experts kept, n-gram table on CPU)",
+    "purpose": "Candidate coding and agentic model; not yet gate-qualified"
   }
 }

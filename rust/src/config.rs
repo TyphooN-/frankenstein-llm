@@ -164,6 +164,8 @@ fn is_value_flag(key: &str) -> bool {
             | "ubatch-size"
             | "pooling"
             | "embd-normalize"
+            // Tensor-to-buffer placement, e.g. keeping qwen4exp's n-gram table on CPU.
+            | "override-tensor"
             | "chat-template-file"
             | "chat-template-kwargs"
             | "load-mode"

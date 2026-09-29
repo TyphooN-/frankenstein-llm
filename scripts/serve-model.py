@@ -18,6 +18,8 @@ VALUE_FLAGS = {'model', 'mmproj', 'mmproj-device', 'ctx-size', 'gpu-layers', 'fl
                'reasoning', 'spec-type', 'spec-draft-n-max', 'temp', 'repeat-penalty',
                'min-p', 'top-p', 'top-k', 'batch-size', 'ubatch-size', 'pooling',
                'embd-normalize',
+               # Tensor-to-buffer placement, e.g. keeping qwen4exp's n-gram table on CPU.
+               'override-tensor',
                # Presets whose weights ship a chat template with no tools branch
                # override it from config/chat-templates/. Serving a preset here
                # with a different template than the router uses would make this
