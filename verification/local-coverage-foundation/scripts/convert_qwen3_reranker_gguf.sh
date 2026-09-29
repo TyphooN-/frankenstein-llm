@@ -27,11 +27,19 @@ mkdir -p "$OUT_DIR"
 
 if [ ! -x "$VENV/bin/python" ]; then
     echo "creating conversion venv at $VENV"
-    python3 -m venv "$VENV"
+    # Reuse the host numpy/torch: the converter only reads safetensors shards.
+    # llama.cpp pins numpy~=2.2.6 and torch==2.11.0, neither of which ships a
+    # wheel for the host Python 3.14; pip then compiles numpy 2.2.6 from source,
+    # which GCC 16 rejects ('evex512' target attribute). Drop those two pins and
+    # constrain them to the host versions so a mismatch fails instead of building.
+    python3 -m venv --system-site-packages "$VENV"
     "$VENV/bin/pip" install --quiet --upgrade pip
-    # CPU torch is enough: the converter only reads safetensors shards.
-    "$VENV/bin/pip" install --quiet torch --index-url https://download.pytorch.org/whl/cpu
-    "$VENV/bin/pip" install --quiet -r "$LLAMA_SRC/requirements/requirements-convert_hf_to_gguf.txt"
+    REQS=$(mktemp); CONSTRAINTS=$(mktemp)
+    cat "$LLAMA_SRC/requirements/requirements-convert_legacy_llama.txt" \
+        | grep -vE '^\s*(-r|--extra-index-url|torch|numpy)\b' > "$REQS"
+    python3 -c 'import numpy, torch; print(f"numpy=={numpy.__version__}\ntorch=={torch.__version__}")' > "$CONSTRAINTS"
+    "$VENV/bin/pip" install --quiet -r "$REQS" -c "$CONSTRAINTS"
+    rm -f "$REQS" "$CONSTRAINTS"
 fi
 
 if [ ! -f "$F16" ]; then
