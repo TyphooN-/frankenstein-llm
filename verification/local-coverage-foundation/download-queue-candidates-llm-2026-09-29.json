@@ -148,7 +148,7 @@
       "key": "cand-qwen38-27b-ap-q4kxl",
       "capability": "candidate-chat-27b",
       "repository": "agentionai/Qwen3.8-27B-AP-GGUF",
-      "revision": "b51f047c2342c2e5e48ca8c442fac0865d109111",
+      "revision": "021f5494ab708fc1c28e38c89ac57acdabc8ba1f",
       "license": "apache-2.0",
       "gated": false,
       "intake_batch": "2026-09-29-a",

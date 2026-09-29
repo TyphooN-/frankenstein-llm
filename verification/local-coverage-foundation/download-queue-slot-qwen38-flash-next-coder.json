@@ -1,7 +1,7 @@
 {
   "schema": "hermes-hf-artifact-queue/1",
   "built_at": "2026-09-29T00:00:00-0400",
-  "source_of_truth": "https://huggingface.co/api/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF/tree/04d8b36b50cc0479fda9214a378336f89b356d67?recursive=true&expand=false&limit=1000",
+  "source_of_truth": "https://huggingface.co/api/models/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF/tree/5348543e0147355ac9cbcb031184a3546350988e?recursive=true&expand=false&limit=1000",
   "policy": {
     "single_writer": true,
     "resume": "aria2 bounded multi-range continuation with its piece map; curl fallback",
@@ -16,7 +16,7 @@
       "key": "qwen38-flash-next-coder-gsq-rco-iq1m",
       "capability": "coding-agent-candidate",
       "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
-      "revision": "04d8b36b50cc0479fda9214a378336f89b356d67",
+      "revision": "5348543e0147355ac9cbcb031184a3546350988e",
       "license": "apache-2.0",
       "gated": false,
       "total_bytes": 58408584928,
@@ -39,7 +39,7 @@
       "key": "qwen38-flash-next-coder-mmproj-bf16",
       "capability": "coding-agent-candidate-vision",
       "repository": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
-      "revision": "04d8b36b50cc0479fda9214a378336f89b356d67",
+      "revision": "5348543e0147355ac9cbcb031184a3546350988e",
       "license": "apache-2.0",
       "gated": false,
       "total_bytes": 907543008,
