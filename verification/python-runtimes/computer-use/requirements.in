@@ -1,0 +1,7 @@
+# venvs/computer-use: UI-TARS-1.5 grounding gate (Qwen2_5_VLForConditionalGeneration),
+# and the interpreter the repository-agent, TTS and media runners use for their
+# host checks. Torch and Pillow come from the host ROCm installation via
+# --system-site-packages and must not be resolved or replaced here.
+transformers==5.16.1
+accelerate==1.14.0
+qwen-vl-utils==0.0.14

@@ -19,6 +19,7 @@ router-state.json
 *.lock
 # This is a dependency hash lock, not a transient process lock.
 !/verification/candidate-qualification/requirements.lock
+!/verification/python-runtimes/*/requirements.lock
 *.partial
 *.recovered
 # Durable state is published by writing "<name>.tmp" and renaming. A crash

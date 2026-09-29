@@ -1,0 +1,7 @@
+# venvs/asr: Qwen3-ASR gate and TTS round-trip transcription. Needs
+# AutoModelForMultimodalLM (transformers 5.x); kept apart from venvs/tts, whose
+# qwen-tts stack pins transformers 4.57. Torch, numpy, scipy and soundfile come
+# from the host (python-pytorch-opt-rocm et al.) via --system-site-packages and
+# must not be resolved or replaced here.
+transformers==5.16.1
+accelerate==1.14.0
