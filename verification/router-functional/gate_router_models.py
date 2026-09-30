@@ -42,6 +42,7 @@ from qualification_cache import (  # noqa: E402
 )
 from run_qualification import (  # noqa: E402
     QUALIFICATION_BLOCKING_REASONS,
+    WAIVED_CONFLICTS,
     conflict_reason,
     process_metadata,
 )
@@ -69,6 +70,11 @@ RAM_TOLERANCE = 2 << 30
 # verdict. Refuse only what the qualification itself waits out, plus an in-flight
 # download queue that can replace the weights under the router.
 DOWNLOAD_UNIT_PREFIX = "local-ai-model-downloads"
+
+
+def receipt_extra(model: str) -> tuple[str, ...]:
+    """What besides the sources decides a receipt: the checks, and any conflict waiver."""
+    return checks_for(model) + tuple(f"waived-conflict:{name}" for name in sorted(WAIVED_CONFLICTS))
 
 
 def checks_for(model: str) -> tuple[str, ...]:
@@ -523,7 +529,7 @@ def qualify_cached(model, vision=False, force=False):
     if vision:
         sources.append(VISION_FIXTURE)
     try:
-        details = model_key('router-models', model, sources, extra=checks_for(model), details=True)
+        details = model_key('router-models', model, sources, extra=receipt_extra(model), details=True)
     except (OSError, ValueError, KeyError, TypeError) as error:
         return unreadable_identity('router-models', model, error)
     key = digest(details)
@@ -533,7 +539,7 @@ def qualify_cached(model, vision=False, force=False):
             # Nothing ran, so there is no window for the inputs to have moved in.
             return result
         try:
-            unchanged = model_key('router-models', model, sources, extra=checks_for(model)) == key
+            unchanged = model_key('router-models', model, sources, extra=receipt_extra(model)) == key
         except (OSError, ValueError, KeyError, TypeError):
             unchanged = False
         if not unchanged:
@@ -575,7 +581,7 @@ def main(argv=()) -> int:
                 sources.append(VISION_FIXTURE)
             try:
                 details = model_key('router-models', model, sources,
-                                    extra=checks_for(model), details=True)
+                                    extra=receipt_extra(model), details=True)
                 explanation = Store().explain('router-models', model, digest(details),
                                                key_components(details), force)
             except (OSError, ValueError, KeyError, TypeError):
@@ -594,6 +600,7 @@ def main(argv=()) -> int:
         "models": [],
         "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
+    summary["waived_conflicts"] = sorted(WAIVED_CONFLICTS)
     summary["admission_refused"] = False
     summary["blocked_by"] = []
     # Refuse before the loop, not inside it. The refusal used to be raised from

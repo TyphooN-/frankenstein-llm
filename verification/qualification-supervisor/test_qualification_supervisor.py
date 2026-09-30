@@ -275,6 +275,13 @@ class ConflictDiscoveryTests(SupervisorTestCase):
         self.assertEqual([pid], self.pids_found())
         self.assertEqual("kernel-build", self.found()[0]["reason"])
 
+    def test_an_operator_waiver_excuses_only_the_named_class(self):
+        kernel = self.process("bash", cwd=f"/home/typhoon/git{self.supervisor.KERNEL_TREE}/src")
+        compiler = self.process("gcc", cwd="/tmp/build")
+        with mock.patch.object(self.supervisor, "WAIVED_CONFLICTS", frozenset({"kernel-build"})):
+            self.assertEqual([compiler], self.pids_found())
+        self.assertEqual([kernel, compiler], self.pids_found())
+
     def test_python_in_repository_is_a_fail_closed_conflict(self):
         inside = self.process("python3", cwd=self.supervisor.ROOT / "verification")
         self.process("python3", cwd="/tmp/unrelated")

@@ -304,6 +304,13 @@ QUALIFICATION_BLOCKING_REASONS = frozenset({"kernel-build", "inference", "downlo
 # to qualify beside one, so the qualification has to wait for it rather than start a
 # gate that will immediately refuse.
 DOWNLOAD_UNIT_PREFIX = "local-ai-model-downloads"
+# Operator waiver: conflict classes named here (comma-separated) stop counting as
+# conflicts. It is for an operator who has accepted the contention, not a default.
+# router-models folds it into the receipt identity and records it in its summary,
+# so a verdict taken under a waiver is never reused as a clean one.
+WAIVED_CONFLICTS = frozenset(
+    name.strip() for name in os.environ.get("HERMES_QUALIFICATION_WAIVE_CONFLICTS", "").split(",")
+    if name.strip())
 
 
 def printable(raw: bytes | str) -> str:
@@ -356,6 +363,12 @@ def under(path: str, root: str) -> bool:
 
 
 def conflict_reason(command: str, cwd: str, cgroup: str) -> str | None:
+    """``classify_conflict``, less any class the operator waived."""
+    reason = classify_conflict(command, cwd, cgroup)
+    return None if reason in WAIVED_CONFLICTS else reason
+
+
+def classify_conflict(command: str, cwd: str, cgroup: str) -> str | None:
     """Why this process collides with a serialized gate, or None if it does not.
 
     Classification is from kernel metadata only, so it is deliberately coarse
