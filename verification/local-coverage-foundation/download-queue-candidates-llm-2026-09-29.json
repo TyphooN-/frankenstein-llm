@@ -10,7 +10,7 @@
     "selection": "one pinned quant per runtime-compatible candidate that fits this host: Q6_K where published, else the nearest higher-fidelity tier; the publisher projector/MTP companion where the card pairs one"
   },
   "notes": "Operator-authorized 2026-09-29, including license-restricted terms accepted for private local use (swift-open-license-1.0, qwen-community-license-1.0, polyform-small-business-1.0.0). Every tensor type in each selected file was checked against the pinned ggml type enum from a remote header read. Downloaded is not qualified; router presets are added only after a passing gate. Hand-started; not part of local-ai-model-downloads.service.",
-  "total_bytes": 311366466176,
+  "total_bytes": 308596236192,
   "artifacts": [
     {
       "key": "cand-mindmeld-27b-i1-q6k",
@@ -85,20 +85,20 @@
       ]
     },
     {
-      "key": "cand-cyber-frost-38-q2ks",
+      "key": "cand-cyber-frost-38-q2k",
       "capability": "candidate-large-moe",
       "repository": "freakyskittle/CYBER-FROST-3.8-GGUF",
       "revision": "75ab99995d6f106f4aaf52d4e5cd376d6f746459",
       "license": "other:qwen-community-license-1.0",
       "gated": false,
       "intake_batch": "2026-09-29-b",
-      "total_bytes": 82849634592,
+      "total_bytes": 80079404608,
       "files": [
         {
-          "repo_path": "CYBER-FROST-3.8-Q2_K_S.gguf",
-          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/cyber-frost-38/CYBER-FROST-3.8-Q2_K_S.gguf",
-          "size": 82849634592,
-          "sha256": "1baa10a6a4edc44f3e2bc6894036feb23cc905cff6d3af305fa07156516aabdf"
+          "repo_path": "CYBER-FROST-3.8-Q2_K.gguf",
+          "destination": "/home/typhoon/git/frankenstein-llm/models/candidates/cyber-frost-38/CYBER-FROST-3.8-Q2_K.gguf",
+          "size": 80079404608,
+          "sha256": "1b770691e7b6db3c9b5af91e8673927556f19ab334dc32b647a3c8e8fe6f5059"
         }
       ]
     },

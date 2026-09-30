@@ -80,7 +80,7 @@
     "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
   },
   "cyber-frost-38": {
-    "source": "freakyskittle CYBER-FROST-3.8 Q2_K_S (qwen4exp ~180B, n-gram table on CPU)",
+    "source": "freakyskittle CYBER-FROST-3.8 Q2_K (qwen4exp ~180B, n-gram table on CPU)",
     "purpose": "Candidate from the 2026-09-29 intake; not yet gate-qualified"
   },
   "qwen25-coder-32b-abliterated": {

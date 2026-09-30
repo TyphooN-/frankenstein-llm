@@ -2461,22 +2461,22 @@
         "license": "other (qwen-community-license-1.0) (Hub card metadata)",
         "architecture": "qwen4exp",
         "resource_class": "fits-with-cpu-ngram-table",
-        "runtime_route": "qwen4exp ~180B (512 experts). Q2_K_S (77.16 GiB, in-file Q8 MTP head) selected: its n-gram table can stay on CPU as with qwen38-coder, leaving ~50 GiB for the GPUs. Publisher warns quantized KV crashes this architecture. qwen-community-license-1.0 accepted by the operator. Every tensor type in the selected file was read from its remote GGUF header and is in the pinned ggml type enum.",
-        "disposition": "download Q2_K_S",
+        "runtime_route": "qwen4exp ~180B (512 experts). Q2_K selected; its n-gram table stays on CPU as with qwen38-coder. Q2_K_S (in-file grafted MTP head) was downloaded first but fails the pinned loader with 'wrong number of tensors; expected 1256, got 1224' (2026-09-29 router-models), so it was replaced. Publisher warns quantized KV crashes this architecture. qwen-community-license-1.0 accepted by the operator.",
+        "disposition": "download Q2_K",
         "next_gate": "placement evaluation, then router-models gate with f16 KV",
         "download_admission": "admitted",
         "download_request": {
           "requested_at": "2026-09-29",
           "requested": true,
-          "state": "downloaded",
-          "downloaded": true,
+          "state": "admitted-in-transfer",
+          "downloaded": false,
           "admitted": true,
           "blockers": [],
           "artifact_candidates": [
             {
-              "path": "CYBER-FROST-3.8-Q2_K_S.gguf",
-              "size": 82849634592,
-              "sha256": "1baa10a6a4edc44f3e2bc6894036feb23cc905cff6d3af305fa07156516aabdf"
+              "path": "CYBER-FROST-3.8-Q2_K.gguf",
+              "size": 80079404608,
+              "sha256": "1b770691e7b6db3c9b5af91e8673927556f19ab334dc32b647a3c8e8fe6f5059"
             }
           ]
         },
