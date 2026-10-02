@@ -81,9 +81,19 @@ a laptop with a 6 GB Quadro.
 - Build detection, per-backend directories and offline orchestration tests are
   implemented. Tests exercise mock host/toolchain fixtures; they do not establish
   a successful CUDA or Vulkan compilation or hardware qualification.
-- NVIDIA VRAM/runtime-index enumeration is still pending. An `nvidia-smi` index
-  must not be assumed to equal a CUDA runtime index after ordering, visibility
-  filtering or partitioning. Preserve identity and fail closed when unresolved.
+- Physical KFD/NVIDIA VRAM inventory is implemented as the additive
+  `physical_inventory()` API and `--physical-inventory` CLI mode. NVIDIA rows
+  retain raw identifiers beside validated join keys; malformed, duplicate or
+  unreadable observations report errors rather than fabricated values. Legacy
+  ROCm APIs and default CLI behavior are unchanged.
+- Physical inventory never establishes a runtime index: all its rows carry
+  `runtime_index=None`, a mapping error and `placement_usable=false`. Visibility
+  and ordering variables are recorded, not applied. NVIDIA memory is physical
+  parent memory, not a MIG-instance placement budget. Independent CUDA runtime
+  mapping, MIG-instance enumeration and NVIDIA placement remain pending;
+  `nvidia-smi` indices must not be assumed to equal CUDA runtime indices.
+- Inventory proof is offline fixtures and reference-host read-only observations,
+  not NVIDIA hardware, CUDA runtime or MIG qualification.
 - Phases 2–4 remain pending; existing services and model presets are reference-host
   configuration, not portable installation output. No NVIDIA model fit or Bonsai
   runtime compatibility verdict has been earned by these build changes.
