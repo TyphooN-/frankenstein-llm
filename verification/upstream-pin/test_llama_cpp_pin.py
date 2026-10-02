@@ -86,8 +86,14 @@ class LockTests(unittest.TestCase):
 
     def test_lock_records_the_build_the_stack_actually_needs(self):
         build = LOCK["build"]
-        self.assertEqual("ROCm/HIP", build["backend"])
-        self.assertEqual(["gfx1030"], build["gpu_targets"])
+        # ADR 0009: the lock names every backend the build knows, and records the
+        # reference host's target; what is built on a host is detected there.
+        self.assertEqual({"hip", "cuda", "vulkan", "cpu"}, set(build["backends"]))
+        self.assertEqual("build", build["backends"]["hip"]["build_dir"])
+        dirs = [entry["build_dir"] for entry in build["backends"].values()]
+        self.assertEqual(len(dirs), len(set(dirs)), "backends must not share a build directory")
+        self.assertEqual({"backend": "hip", "gpu_targets": ["gfx1030"],
+                          "host": "docs/reference/HOST-SYSTEM-AND-PCIE.md"}, build["reference"])
         self.assertEqual("Release", build["build_type"])
         self.assertEqual("Ninja", build["generator"])
         self.assertEqual(
@@ -159,13 +165,19 @@ class BuildScriptTests(unittest.TestCase):
         self.assertIn('rev-parse HEAD)" == "$EXPECTED"', self.source)
         self.assertIn("status --porcelain", self.source)
         self.assertIn(LOCK["repository"], self.source)
-        self.assertIn('"$GPU_TARGETS" == "gfx1030"', self.source)
+
+    def test_build_refuses_a_gpu_backend_with_no_detected_device(self):
+        # An explicitly requested GPU backend with nothing detected stops before
+        # CMake instead of building for a guessed target.
+        self.assertIn("no ROCm GPU in the KFD topology", self.source)
+        self.assertIn("no NVIDIA GPU detected", self.source)
 
     def test_build_configures_the_locked_backend_and_targets(self):
-        self.assertIn("-DGGML_HIP=ON", self.source)
-        for flag in ("GGML_NATIVE", "GGML_LTO", "GGML_HIP_GRAPHS", "GGML_CUDA_FA", "GGML_CPU_REPACK"):
+        for flag in ("GGML_HIP", "GGML_CUDA", "GGML_VULKAN", "GGML_NATIVE", "GGML_LTO",
+                     "GGML_HIP_GRAPHS", "GGML_CUDA_FA", "GGML_CPU_REPACK"):
             self.assertIn(f"-D{flag}=ON", self.source)
         self.assertIn('-DGPU_TARGETS="$GPU_TARGETS"', self.source)
+        self.assertIn('-DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCHS"', self.source)
         self.assertIn("-DCMAKE_BUILD_TYPE=Release", self.source)
         self.assertIn("-G Ninja", self.source)
         for target in LOCK["build"]["targets"]:

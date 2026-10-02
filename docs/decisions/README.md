@@ -11,6 +11,7 @@ implementation references start at the [documentation index](../README.md).
 - [0006 — Placement policy prefers the RX 6900 XTs](0006-placement-policy-prefers-the-rx-6900-xts.md)
 - [0007 — Conditional custom quantization (proposed)](0007-conditional-custom-quantization.md)
 - [0008 — Local Frankenstein LLM artwork and audiovisual showcase (qualification-gated)](0008-local-frankenstein-artwork-and-animation.md)
+- [0009 — Portable host profiles (AMD ROCm and NVIDIA CUDA)](0009-portable-host-profiles.md)
 
 A reboot does not itself authorize benchmarks; explicit user authorization is
 required before performance testing. Historical sections retain their original

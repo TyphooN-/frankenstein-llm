@@ -4,13 +4,43 @@
   "repository": "https://github.com/ggml-org/llama.cpp.git",
   "submodule_path": "upstream/llama.cpp",
   "branch": "master",
-  "commit": "9f31776c3773cf03f98535c19b7e6d394af374b4",
+  "commit": "bed0a856606ee4a24a164066f73d2379447033f5",
   "build": {
-    "backend": "ROCm/HIP",
-    "gpu_targets": ["gfx1030"],
+    "backends": {
+      "hip": {
+        "build_dir": "build"
+      },
+      "cuda": {
+        "build_dir": "build-cuda"
+      },
+      "vulkan": {
+        "build_dir": "build-vulkan"
+      },
+      "cpu": {
+        "build_dir": "build-cpu"
+      }
+    },
+    "reference": {
+      "backend": "hip",
+      "gpu_targets": [
+        "gfx1030"
+      ],
+      "host": "docs/reference/HOST-SYSTEM-AND-PCIE.md"
+    },
     "build_type": "Release",
     "generator": "Ninja",
     "parallelism": "nproc",
-    "targets": ["llama-server", "llama-cli", "llama-quantize", "llama-gguf"]
-  }
+    "targets": [
+      "llama-server",
+      "llama-cli",
+      "llama-quantize",
+      "llama-gguf"
+    ]
+  },
+  "local_patches": [
+    {
+      "path": "upstream/patches/0001-convolution-kernel-types-bed0a8566.patch",
+      "sha256": "24a75e977498cfeeb9a50742c56dd33687d1bd95742c3027b369698f3e35e439"
+    }
+  ]
 }

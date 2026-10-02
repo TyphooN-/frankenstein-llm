@@ -1,0 +1,546 @@
+diff --git a/src/models/bailingmoe3.cpp b/src/models/bailingmoe3.cpp
+index e208c7d5a..4ebe5edb8 100644
+--- a/src/models/bailingmoe3.cpp
++++ b/src/models/bailingmoe3.cpp
+@@ -210,7 +210,7 @@ static ggml_tensor * bailingmoe3_causal_conv1d(
+     }
+ 
+     ggml_tensor * conv_weight = ggml_reshape_2d(ctx0, conv_w, d_conv, d_inner);
+-    ggml_tensor * out = ggml_ssm_conv(ctx0, conv_x, conv_weight);
++    ggml_tensor * out = build_ssm_conv(ctx0, conv_x, conv_weight);
+     out = ggml_silu(ctx0, ggml_reshape_2d(ctx0, out, d_inner, n_tokens));
+     return ggml_reshape_4d(ctx0, out, head_dim, n_head, n_seq_tokens, n_seqs);
+ }
+diff --git a/src/models/kimi-k3.cpp b/src/models/kimi-k3.cpp
+index 112b09849..6c58565d2 100644
+--- a/src/models/kimi-k3.cpp
++++ b/src/models/kimi-k3.cpp
+@@ -389,7 +389,7 @@ static ggml_tensor * kimi_k3_conv1d(ggml_cgraph * gf, ggml_context * ctx0,
+     }
+ 
+     ggml_tensor * conv_weight = ggml_reshape_2d(ctx0, conv_w, d_conv, d_inner);
+-    ggml_tensor * Xcur = ggml_ssm_conv(ctx0, conv_x, conv_weight);
++    ggml_tensor * Xcur = build_ssm_conv(ctx0, conv_x, conv_weight);
+     Xcur = ggml_reshape_2d(ctx0, Xcur, d_inner, n_tokens);
+     Xcur = ggml_silu(ctx0, Xcur);
+ 
+diff --git a/src/models/kimi-linear.cpp b/src/models/kimi-linear.cpp
+index b9cf28d85..28dc93f13 100644
+--- a/src/models/kimi-linear.cpp
++++ b/src/models/kimi-linear.cpp
+@@ -223,7 +223,7 @@ static ggml_tensor * causal_conv1d(ggml_cgraph * gf, ggml_context * ctx0, ggml_t
+ 
+     // Apply conv1d
+     // ggml_ssm_conv output: {d_inner, n_seq_tokens, n_seqs}
+-    ggml_tensor * Xcur = ggml_ssm_conv(ctx0, conv_x, conv_weight);
++    ggml_tensor * Xcur = build_ssm_conv(ctx0, conv_x, conv_weight);
+     // Reshape to 2D for bias add: {d_inner, n_tokens}
+     Xcur = ggml_reshape_2d(ctx0, Xcur, d_inner, n_tokens);
+     Xcur = ggml_silu(ctx0, Xcur);
+diff --git a/src/models/lfm2.cpp b/src/models/lfm2.cpp
+index 07b71ccd3..d9a813e86 100644
+--- a/src/models/lfm2.cpp
++++ b/src/models/lfm2.cpp
+@@ -220,7 +220,7 @@ llama_model_lfm2::graph<iswa>::graph(const llama_model & model, const llm_graph_
+         }
+ 
+         auto * conv_kernel = model.layers[il].shortconv.conv;
+-        auto * conv_out    = ggml_ssm_conv(ctx0, bx, conv_kernel);
++        auto * conv_out    = build_ssm_conv(ctx0, bx, conv_kernel);
+         cb(conv_out, "model.layers.{}.conv.conv", il);
+ 
+         auto * y = ggml_mul(ctx0, c, conv_out);
+diff --git a/src/models/mamba-base.cpp b/src/models/mamba-base.cpp
+index 03ee3805b..4ca10ce5f 100644
+--- a/src/models/mamba-base.cpp
++++ b/src/models/mamba-base.cpp
+@@ -74,7 +74,7 @@ ggml_tensor * llm_build_mamba_base::build_mamba_layer(llm_graph_input_rs * inp,
+         // then permute away the ne[0] dimension,
+         // and then you're left with the resulting x tensor.
+         // For simultaneous sequences, all sequences need to have the same length.
+-        x = ggml_ssm_conv(ctx0, conv_x, layer.ssm_conv1d);
++        x = build_ssm_conv(ctx0, conv_x, layer.ssm_conv1d);
+ 
+         // bias
+         x = ggml_add(ctx0, x, layer.ssm_conv1d_b);
+@@ -227,7 +227,7 @@ ggml_tensor * llm_build_mamba_base::build_mamba2_layer(llm_graph_input_rs * inp,
+         // then permute away the ne[0] dimension,
+         // and then you're left with the resulting x tensor.
+         // For simultaneous sequences, all sequences need to have the same length.
+-        xBC = ggml_ssm_conv(ctx0, conv_x, model.layers[il].ssm_conv1d);
++        xBC = build_ssm_conv(ctx0, conv_x, model.layers[il].ssm_conv1d);
+ 
+         // bias
+         xBC = ggml_add(ctx0, xBC, model.layers[il].ssm_conv1d_b);
+diff --git a/src/models/models.h b/src/models/models.h
+index da519dcfd..116212058 100644
+--- a/src/models/models.h
++++ b/src/models/models.h
+@@ -17,6 +17,15 @@ static inline ggml_tensor * build_gdn_l2_norm(ggml_context * ctx, ggml_tensor *
+     return ggml_scale(ctx, ggml_rms_norm(ctx, x, eps/n), 1.0f/sqrtf(n));
+ }
+ 
++// ssm_conv reads an F32 kernel on every backend, but the model file may store it as F16/BF16
++static inline ggml_tensor * build_ssm_conv(ggml_context * ctx, ggml_tensor * conv_x, ggml_tensor * conv_w) {
++    if (conv_w->type != GGML_TYPE_F32) {
++        conv_w = ggml_cast(ctx, conv_w, GGML_TYPE_F32);
++    }
++
++    return ggml_ssm_conv(ctx, conv_x, conv_w);
++}
++
+ //
+ // base classes
+ //
+diff --git a/src/models/plamo2.cpp b/src/models/plamo2.cpp
+index ba1cea146..34d3bba1a 100644
+--- a/src/models/plamo2.cpp
++++ b/src/models/plamo2.cpp
+@@ -327,7 +327,7 @@ ggml_tensor * llama_model_plamo2::graph::build_plamo2_mamba_layer(llm_graph_inpu
+         cb(conv_states_all, "mamba_conv1d_state", il);
+ 
+         // 1D convolution
+-        x = ggml_ssm_conv(ctx0, conv_x, model.layers[il].ssm_conv1d);
++        x = build_ssm_conv(ctx0, conv_x, model.layers[il].ssm_conv1d);
+         cb(x, "mamba_conv1d", il);
+ 
+         x = ggml_silu(ctx0, x);
+diff --git a/src/models/qwen35.cpp b/src/models/qwen35.cpp
+index a1e263500..833ec17f0 100644
+--- a/src/models/qwen35.cpp
++++ b/src/models/qwen35.cpp
+@@ -388,7 +388,7 @@ ggml_tensor * llama_model_qwen35::graph::build_layer_attn_linear(
+     state = ggml_reshape_4d(ctx0, state, head_v_dim, head_v_dim, num_v_heads, n_seqs);
+     cb(state, "state_predelta", il);
+ 
+-    ggml_tensor * conv_output_proper = ggml_ssm_conv(ctx0, conv_input, conv_kernel);
++    ggml_tensor * conv_output_proper = build_ssm_conv(ctx0, conv_input, conv_kernel);
+     cb(conv_output_proper, "conv_output_raw", il);
+ 
+     ggml_tensor * conv_output_silu = ggml_silu(ctx0, conv_output_proper);
+diff --git a/src/models/qwen35moe.cpp b/src/models/qwen35moe.cpp
+index bdf772625..af0e7369d 100644
+--- a/src/models/qwen35moe.cpp
++++ b/src/models/qwen35moe.cpp
+@@ -412,7 +412,7 @@ ggml_tensor * llama_model_qwen35moe::graph::build_layer_attn_linear(
+     state = ggml_reshape_4d(ctx0, state, head_v_dim, head_v_dim, num_v_heads, n_seqs);
+     cb(state, "state_predelta", il);
+ 
+-    ggml_tensor * conv_output_proper = ggml_ssm_conv(ctx0, conv_input, conv_kernel);
++    ggml_tensor * conv_output_proper = build_ssm_conv(ctx0, conv_input, conv_kernel);
+     cb(conv_output_proper, "conv_output_raw", il);
+ 
+     ggml_tensor * conv_output_silu = ggml_silu(ctx0, conv_output_proper);
+diff --git a/src/models/qwen3next.cpp b/src/models/qwen3next.cpp
+index b63fc9c6a..53d9c0fe1 100644
+--- a/src/models/qwen3next.cpp
++++ b/src/models/qwen3next.cpp
+@@ -468,7 +468,7 @@ ggml_tensor * llama_model_qwen3next::graph::build_layer_attn_linear(
+     state = ggml_reshape_4d(ctx0, state, head_v_dim, head_v_dim, num_v_heads, n_seqs);
+     cb(state, "state_predelta", il);
+ 
+-    ggml_tensor * conv_output_proper = ggml_ssm_conv(ctx0, conv_input, conv_kernel);
++    ggml_tensor * conv_output_proper = build_ssm_conv(ctx0, conv_input, conv_kernel);
+     cb(conv_output_proper, "conv_output_raw", il);
+ 
+     ggml_tensor * conv_output_silu = ggml_silu(ctx0, conv_output_proper);
+diff --git a/src/models/qwen4exp.cpp b/src/models/qwen4exp.cpp
+index e58d35034..16a193b9d 100644
+--- a/src/models/qwen4exp.cpp
++++ b/src/models/qwen4exp.cpp
+@@ -903,7 +903,7 @@ ggml_tensor * llama_model_qwen4exp::graph::build_layer_attn_linear(
+     state = ggml_reshape_4d(ctx0, state, head_v_dim, head_v_dim, num_v_heads, n_seqs);
+     cb(state, "state_predelta", il);
+ 
+-    ggml_tensor * conv_output_proper = ggml_ssm_conv(ctx0, conv_input, conv_kernel);
++    ggml_tensor * conv_output_proper = build_ssm_conv(ctx0, conv_input, conv_kernel);
+     cb(conv_output_proper, "conv_output_raw", il);
+ 
+     ggml_tensor * conv_output_silu = ggml_silu(ctx0, conv_output_proper);
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index a398344c8..938daf931 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -207,6 +207,13 @@ if (NOT WIN32 OR NOT BUILD_SHARED_LIBS)
+         FIXTURES_SETUP generate-models
+     )
+ 
++    llama_test(
++        test-llama-archs
++        NAME test-conv-kernel-types
++        LABEL main
++        ARGS --conv-kernel-types
++    )
++
+     llama_test(
+         test-recurrent-state-rollback
+         LABEL main
+diff --git a/tests/test-llama-archs.cpp b/tests/test-llama-archs.cpp
+index 90a6a7162..656cfa471 100644
+--- a/tests/test-llama-archs.cpp
++++ b/tests/test-llama-archs.cpp
+@@ -1,5 +1,6 @@
+ #include "common.h"
+ #include "log.h"
++#include "ggml-alloc.h"
+ #include "ggml-backend.h"
+ #include "ggml.h"
+ #include "gguf.h"
+@@ -22,6 +23,21 @@
+ #include <utility>
+ #include <vector>
+ 
++#ifndef _WIN32
++#include <cerrno>
++#include <chrono>
++#include <csignal>
++#include <cstdlib>
++#include <spawn.h>
++#include <sys/resource.h>
++#include <sys/wait.h>
++#include <thread>
++#include <unistd.h>
++#ifdef __APPLE__
++#include <crt_externs.h>
++#endif
++#endif // _WIN32
++
+ // normalized mean squared error = mse(a, b) / mse(a, 0)
+ static double nmse(const std::vector<float> & a, const std::vector<float> & b) {
+     GGML_ASSERT(a.size() == b.size());
+@@ -59,13 +75,70 @@ static void set_tensor_data(struct ggml_tensor * tensor, void * userdata) {
+             tmp[i] = ggml_fp32_to_fp16(dis(gen));
+         }
+         ggml_backend_tensor_set(tensor, tmp.data(), 0, ggml_nbytes(tensor));
++    } else if (tensor->type == GGML_TYPE_BF16) {
++        std::vector<ggml_bf16_t> tmp(ne);
++        for (int64_t i = 0; i < ne; i++) {
++            tmp[i] = ggml_fp32_to_bf16(dis(gen));
++        }
++        ggml_backend_tensor_set(tensor, tmp.data(), 0, ggml_nbytes(tensor));
+     } else {
+         GGML_ABORT("fatal error");
+     }
+ }
+ 
++// the convolution kernels a model file may store as F16/BF16 instead of F32
++static const llm_tensor conv_kernel_tensors[] = {
++    LLM_TENSOR_SSM_CONV1D,
++    LLM_TENSOR_SSM_CONV1D_Q,
++    LLM_TENSOR_SSM_CONV1D_K,
++    LLM_TENSOR_SSM_CONV1D_V,
++    LLM_TENSOR_SHORTCONV_CONV,
++    LLM_TENSOR_PLE_CONV1D,
++};
++
++static bool is_conv_kernel(const llm_arch arch, const char * name) {
++    for (const llm_tensor tensor : conv_kernel_tensors) {
++        for (int il = 0; il < 64; il++) {
++            if (LLM_TN(arch)(tensor, "weight", il).str() == name) {
++                return true;
++            }
++        }
++    }
++    return false;
++}
++
++struct rounded_conv_data {
++    size_t    seed;
++    llm_arch  arch;
++    ggml_type kernel_type;
++    int       n_conv = 0;
++};
++
++// F32 kernel with the values of a kernel_type kernel: the reference for a graph that casts the kernel to F32
++static void set_tensor_data_rounded_conv(struct ggml_tensor * tensor, void * userdata) {
++    rounded_conv_data * ud = (rounded_conv_data *) userdata;
++    size_t seed = ud->seed;
++    if (tensor->type != GGML_TYPE_F32 || !is_conv_kernel(ud->arch, tensor->name)) {
++        set_tensor_data(tensor, &seed);
++        return;
++    }
++    ud->n_conv++;
++    std::hash<std::string> hasher;
++    seed ^= hasher(tensor->name);
++    std::mt19937 gen(seed);
++    std::normal_distribution<float> dis(0.0f, 1.0e-2f);
++
++    const int64_t ne = ggml_nelements(tensor);
++    std::vector<float> tmp(ne);
++    for (int64_t i = 0; i < ne; i++) {
++        const float x = dis(gen);
++        tmp[i] = ud->kernel_type == GGML_TYPE_F16 ? ggml_fp16_to_fp32(ggml_fp32_to_fp16(x)) : ggml_bf16_to_fp32(ggml_fp32_to_bf16(x));
++    }
++    ggml_backend_tensor_set(tensor, tmp.data(), 0, ggml_nbytes(tensor));
++}
++
+ static void usage(char ** argv) {
+-    printf("Usage: %s [-a/--arch arch] [-s/--seed seed] [-o/--out dir] [-v N] [-h/--help]\n", argv[0]);
++    printf("Usage: %s [-a/--arch arch] [-s/--seed seed] [-o/--out dir] [--conv-kernel-types] [-v N] [-h/--help]\n", argv[0]);
+ }
+ 
+ static std::vector<llama_token> get_tokens(const uint32_t n_tokens, const uint32_t n_vocab, const size_t seed){
+@@ -396,7 +469,8 @@ static bool silent_model_load_progress(float /*progress*/, void * /*user_data*/)
+ 
+ static std::pair<llama_model_ptr, llama_context_ptr> get_model_and_ctx(
+         struct gguf_context * gguf_ctx, FILE * file, const size_t seed, const std::vector<ggml_backend_dev_t> & devs,
+-        const llama_split_mode split_mode = LLAMA_SPLIT_MODE_LAYER, bool encode = false) {
++        const llama_split_mode split_mode = LLAMA_SPLIT_MODE_LAYER, bool encode = false,
++        llama_model_set_tensor_data_t set_data = nullptr, void * set_data_ud = nullptr) {
+     GGML_ASSERT((gguf_ctx == nullptr) != (file == nullptr));
+     llama_model_params model_params = llama_model_default_params();
+     model_params.progress_callback = silent_model_load_progress;
+@@ -414,8 +488,12 @@ static std::pair<llama_model_ptr, llama_context_ptr> get_model_and_ctx(
+     }
+ 
+     size_t tmp = seed;
++    if (set_data == nullptr) {
++        set_data    = set_tensor_data;
++        set_data_ud = &tmp;
++    }
+     llama_model_ptr model(gguf_ctx != nullptr ?
+-        llama_model_init_from_user(gguf_ctx, set_tensor_data, &tmp, model_params) :
++        llama_model_init_from_user(gguf_ctx, set_data, set_data_ud, model_params) :
+         llama_model_load_from_file_ptr(file, model_params));
+     if (!model) {
+         throw std::runtime_error("failed to create llama model");
+@@ -816,7 +894,211 @@ static int test_backends(const llm_arch target_arch, const size_t seed, const in
+     return all_ok ? 0 : 1;
+ }
+ 
++#ifndef _WIN32
++// Run before common_init in a fresh process, not a fork inheriting the logger's locks.
++static int ssm_conv_unconverted_kernel() {
++    const struct rlimit no_core = {0, 0};
++    if (setrlimit(RLIMIT_CORE, &no_core) != 0) {
++        return 2;
++    }
++    setenv("GGML_NO_BACKTRACE", "1", 1);
++    ggml_backend_dev_t dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
++    if (dev == nullptr) {
++        return 2;
++    }
++    ggml_backend_t backend = ggml_backend_dev_init(dev, nullptr);
++    if (backend == nullptr) {
++        return 2;
++    }
++    ggml_init_params params = {
++        /*.mem_size   =*/ ggml_tensor_overhead()*8 + ggml_graph_overhead(),
++        /*.mem_buffer =*/ nullptr,
++        /*.no_alloc   =*/ true,
++    };
++    ggml_context * ctx = ggml_init(params);
++    if (ctx == nullptr) {
++        return 2;
++    }
++    const int64_t d_conv = 4, d_inner = 128, n_t = 8, n_s = 2;
++    ggml_tensor * x = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, d_conv - 1 + n_t, d_inner, n_s);
++    ggml_tensor * w = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, d_conv, d_inner);
++    ggml_cgraph * gf = ggml_new_graph(ctx);
++    ggml_build_forward_expand(gf, ggml_ssm_conv(ctx, x, w));
++    ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(ctx, backend);
++    if (buf == nullptr) {
++        return 2;
++    }
++    ggml_backend_buffer_clear(buf, 0);
++    const ggml_status status = ggml_backend_graph_compute(backend, gf);
++    ggml_backend_buffer_free(buf);
++    ggml_free(ctx);
++    ggml_backend_free(backend);
++    return status == GGML_STATUS_SUCCESS ? 0 : 2; // zero means the invalid kernel was accepted
++}
++
++static bool ssm_conv_rejects_unconverted_kernel(const char * program) {
++    fflush(stdout);
++    fflush(stderr);
++    char * args[] = {const_cast<char *>(program), const_cast<char *>("--ssm-conv-unconverted-kernel"), nullptr};
++#ifdef __APPLE__
++    char ** child_env = *_NSGetEnviron();
++#else
++    extern char ** environ;
++    char ** child_env = environ;
++#endif
++    pid_t pid;
++    const int error = posix_spawnp(&pid, program, nullptr, nullptr, args, child_env);
++    if (error != 0) {
++        fprintf(stderr, "%s: posix_spawnp failed: %s\n", __func__, strerror(error));
++        return false;
++    }
++    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
++    int status = 0;
++    for (;;) {
++        const pid_t waited = waitpid(pid, &status, WNOHANG);
++        if (waited == pid) {
++            return WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT;
++        }
++        if (waited < 0 && errno != EINTR) {
++            return false;
++        }
++        if (std::chrono::steady_clock::now() >= deadline) {
++            kill(pid, SIGKILL);
++            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
++            fprintf(stderr, "%s: child timed out\n", __func__);
++            return false;
++        }
++        std::this_thread::sleep_for(std::chrono::milliseconds(10));
++    }
++}
++#endif // _WIN32
++
++// a model with F16/BF16 conv kernels must give the logits of the same model with the kernel values stored as F32
++static int test_conv_kernel_types(const llm_arch target_arch, const size_t seed, const int verbosity, const char * program) {
++    bool all_ok = true;
++#ifndef _WIN32
++    const bool rejected = ssm_conv_rejects_unconverted_kernel(program);
++    printf("ssm_conv with an unconverted F16 kernel: %s\n", rejected ? "aborts (OK)" : "FAIL: accepted");
++    all_ok = all_ok && rejected;
++#else
++    (void) program;
++#endif // _WIN32
++
++    struct user_data_t {
++        struct {
++            ggml_log_callback callback;
++            void * user_data;
++        } log_old;
++
++        int verbosity;
++
++        user_data_t(int verbosity) : verbosity(verbosity) {
++            llama_log_get(&log_old.callback, &log_old.user_data);
++        }
++    };
++    user_data_t ud(verbosity);
++
++    llama_log_set([](ggml_log_level level, const char * text, void * user_data) {
++        const user_data_t * ud = (const user_data_t *) user_data;
++        int verbosity = common_log_get_verbosity(level);
++        if (verbosity <= ud->verbosity) {
++            ud->log_old.callback(level, text, ud->log_old.user_data);
++        }
++    }, &ud);
++
++    const std::vector<llama_token> tokens = get_tokens(128, 128, seed);
++
++    int n_tested = 0;
++    for (const llm_arch & arch : llm_arch_all()) {
++        if (arch == LLM_ARCH_UNKNOWN) {
++            continue;
++        }
++        if (target_arch != LLM_ARCH_UNKNOWN && arch != target_arch) {
++            continue;
++        }
++        if (arch == LLM_ARCH_GEMMA4 || arch == LLM_ARCH_GEMMA4_ASSISTANT) {
++            continue; // FIXME: ISWA KV cache initialization needs more fixture params
++        }
++        if (arch == LLM_ARCH_EAGLE3 || arch == LLM_ARCH_DFLASH) {
++            continue;
++        }
++        if (!arch_supported(arch)) {
++            continue;
++        }
++        const bool encode = arch == LLM_ARCH_T5 || arch == LLM_ARCH_DREAM || arch == LLM_ARCH_LLADA || arch == LLM_ARCH_LLADA_MOE || arch == LLM_ARCH_RND1;
++        for (bool moe : {false, true}) {
++            if (moe && !moe_implemented(arch)) {
++                continue;
++            }
++            if (!moe && moe_mandatory(arch)) {
++                continue;
++            }
++            for (const ggml_type kernel_type : {GGML_TYPE_F16, GGML_TYPE_BF16}) {
++                gguf_context_ptr gguf_ref = get_gguf_ctx(arch, moe);
++                gguf_context_ptr gguf_typed = get_gguf_ctx(arch, moe);
++                if (arch == LLM_ARCH_BAILINGMOE3) {
++                    GGML_ASSERT(gguf_remove_key(gguf_ref.get(), "bailingmoe3.kda.safe_gate") >= 0);
++                    GGML_ASSERT(gguf_remove_key(gguf_typed.get(), "bailingmoe3.kda.safe_gate") >= 0);
++                }
++                const int64_t key_n_layer = gguf_find_key(gguf_typed.get(), LLM_KV(arch)(LLM_KV_BLOCK_COUNT).c_str());
++                GGML_ASSERT(key_n_layer >= 0);
++                const uint32_t n_layer = gguf_get_val_u32(gguf_typed.get(), key_n_layer);
++                for (const llm_tensor tensor : conv_kernel_tensors) {
++                    for (uint32_t il = 0; il < n_layer; il++) {
++                        ggml_tensor t;
++                        memset(&t, 0, sizeof(ggml_tensor));
++                        t.type = kernel_type;
++                        ggml_set_name(&t, LLM_TN(arch)(tensor, "weight", il).str().c_str());
++                        gguf_add_tensor(gguf_typed.get(), &t);
++                    }
++                }
++
++                rounded_conv_data rd = { seed, arch, kernel_type };
++                size_t seed_typed = seed;
++                auto ref   = get_model_and_ctx(gguf_ref.get(),   nullptr, seed, {}, LLAMA_SPLIT_MODE_LAYER, encode, set_tensor_data_rounded_conv, &rd);
++                auto typed = get_model_and_ctx(gguf_typed.get(), nullptr, seed, {}, LLAMA_SPLIT_MODE_LAYER, encode, set_tensor_data, &seed_typed);
++                if (rd.n_conv == 0) {
++                    continue; // this graph takes none of the kernels
++                }
++                n_tested++;
++
++                const std::vector<float> logits_ref   = get_logits(ref.first.get(),   ref.second.get(),   tokens, encode);
++                const std::vector<float> logits_typed = get_logits(typed.first.get(), typed.second.get(), tokens, encode);
++                const bool same = logits_ref == logits_typed;
++                all_ok = all_ok && same;
++                printf("%s (%s) %s kernels on CPU: %s (NMSE %.2e)\n", llm_arch_name(arch), moe ? "MoE" : "dense",
++                    ggml_type_name(kernel_type), same ? "identical to F32 (OK)" : "FAIL", nmse(logits_ref, logits_typed));
++
++                for (size_t i = 0; i < ggml_backend_dev_count(); i++) {
++                    ggml_backend_dev_t dev = ggml_backend_dev_get(i);
++                    if (ggml_backend_dev_type(dev) != GGML_BACKEND_DEVICE_TYPE_GPU) {
++                        continue;
++                    }
++                    size_t seed_dev = seed;
++                    auto on_dev = get_model_and_ctx(gguf_typed.get(), nullptr, seed, {dev}, LLAMA_SPLIT_MODE_LAYER, encode, set_tensor_data, &seed_dev);
++                    const double nmse_dev = nmse(logits_ref, get_logits(on_dev.first.get(), on_dev.second.get(), tokens, encode));
++                    all_ok = all_ok && nmse_dev <= 1e-4;
++                    printf("%s (%s) %s kernels on %s: %s (NMSE %.2e vs. CPU)\n", llm_arch_name(arch), moe ? "MoE" : "dense",
++                        ggml_type_name(kernel_type), ggml_backend_dev_description(dev), nmse_dev <= 1e-4 ? "OK" : "FAIL", nmse_dev);
++                }
++            }
++        }
++    }
++    llama_log_set(ud.log_old.callback, ud.log_old.user_data);
++
++    if (n_tested == 0) {
++        printf("no architecture took a typed convolution kernel\n");
++        all_ok = false;
++    }
++    return all_ok ? 0 : 1;
++}
++
+ int main(int argc, char ** argv) {
++#ifndef _WIN32
++    if (argc >= 2 && strcmp(argv[1], "--ssm-conv-unconverted-kernel") == 0) {
++        return ssm_conv_unconverted_kernel();
++    }
++#endif
+     // init the logger at max verbosity. filter with a custom callback respecting the user-configure verbosity
+     common_log_set_verbosity_thold(LOG_LEVEL_DEBUG);
+     common_init();
+@@ -826,6 +1108,7 @@ int main(int argc, char ** argv) {
+     llm_arch arch = LLM_ARCH_UNKNOWN;
+     size_t seed = rd();
+     std::string out;
++    bool conv_kernel_types = false;
+ 
+     int verbosity = LOG_LEVEL_ERROR;
+ 
+@@ -863,6 +1146,9 @@ int main(int argc, char ** argv) {
+                 return 1;
+             }
+         }
++        if (strcmp(argv[i], "--conv-kernel-types") == 0) {
++            conv_kernel_types = true;
++        }
+         if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--out") == 0) {
+             if (i + 1 < argc) {
+                 out = argv[++i];
+@@ -878,6 +1164,9 @@ int main(int argc, char ** argv) {
+         if (!out.empty()) {
+             return save_models(arch, seed, verbosity, out);
+         }
++        if (conv_kernel_types) {
++            return test_conv_kernel_types(arch, seed, verbosity, argv[0]);
++        }
+         return test_backends(arch, seed, verbosity);
+     } catch (const std::exception & err) {
+         fprintf(stderr, "encountered runtime error: %s\n", err.what());
