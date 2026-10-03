@@ -265,9 +265,9 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`docs/HANDOFF-2026-09-07.md`](../../docs/HANDOFF-2026-09-07.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`config/hardware/amdgpu/README.md`](../../config/hardware/amdgpu/README.md) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
 | [`config/hardware/amdgpu/SHA256SUMS`](../../config/hardware/amdgpu/SHA256SUMS) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/amdgpu-custom-state.card0`](../../config/hardware/amdgpu/amdgpu-custom-state.card0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/amdgpu-custom-state.card1`](../../config/hardware/amdgpu/amdgpu-custom-state.card1) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
-| [`config/hardware/amdgpu/amdgpu-custom-state.card2`](../../config/hardware/amdgpu/amdgpu-custom-state.card2) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/amdgpu-custom-state.pci:0000:03:00.0`](../../config/hardware/amdgpu/amdgpu-custom-state.pci:0000:03:00.0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/amdgpu-custom-state.pci:0000:07:00.0`](../../config/hardware/amdgpu/amdgpu-custom-state.pci:0000:07:00.0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
+| [`config/hardware/amdgpu/amdgpu-custom-state.pci:0000:0a:00.0`](../../config/hardware/amdgpu/amdgpu-custom-state.pci:0000:0a:00.0) | [Reference](CONFIGURATION.md#hardware-profile-backups) |
 | [`docs/decisions/0007-conditional-custom-quantization.md`](../../docs/decisions/0007-conditional-custom-quantization.md) | [Reference](DEVELOPER-GUIDE.md) |
 | [`scripts/qualification_status.py`](../../scripts/qualification_status.py) | [Reference](OPERATIONS.md) |
 | [`verification/qualification-supervisor/qualification_cache.py`](../../verification/qualification-supervisor/qualification_cache.py) | [Reference](ARCHITECTURE.md) |

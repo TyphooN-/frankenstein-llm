@@ -1,5 +1,6 @@
 """Offline documentation link and inventory checks; no services or host probes."""
 import configparser
+import hashlib
 from pathlib import Path
 import json
 import re
@@ -328,28 +329,33 @@ def test_coverage_map_contains_all_outer_tracked_files():
     assert tracked == mapped, {"missing": sorted(tracked - mapped), "obsolete": sorted(mapped - tracked)}
 
 
-def test_amdgpu_profiles_are_one_current_copy_per_card():
-    tracked = [
+def test_amdgpu_profiles_are_one_current_copy_per_pci_identity():
+    directory = ROOT / "config/hardware/amdgpu"
+    profile_names = {
+        "amdgpu-custom-state.pci:0000:03:00.0",
+        "amdgpu-custom-state.pci:0000:07:00.0",
+        "amdgpu-custom-state.pci:0000:0a:00.0",
+    }
+    tracked = {
         path for path in subprocess.check_output(
             ["git", "ls-files", "-z"], cwd=ROOT, text=True).split("\0")
         if path.startswith("config/hardware/amdgpu/")
-    ]
+    }
     expected = {
         "config/hardware/amdgpu/README.md",
         "config/hardware/amdgpu/SHA256SUMS",
-        "config/hardware/amdgpu/amdgpu-custom-state.card0",
-        "config/hardware/amdgpu/amdgpu-custom-state.card1",
-        "config/hardware/amdgpu/amdgpu-custom-state.card2",
+        *(f"config/hardware/amdgpu/{name}" for name in profile_names),
     }
-    assert set(tracked) == expected
-    assert not any("/20" in path for path in tracked)
-    checksums = (ROOT / "config/hardware/amdgpu/SHA256SUMS").read_text().splitlines()
-    names = {line.split("  ", 1)[1] for line in checksums if line}
-    assert names == {
-        "amdgpu-custom-state.card0",
-        "amdgpu-custom-state.card1",
-        "amdgpu-custom-state.card2",
-    }
+    assert tracked == expected
+    assert {path.name for path in directory.glob("amdgpu-custom-state.*")} == profile_names
+    checksums = (directory / "SHA256SUMS").read_text().splitlines()
+    assert len(checksums) == len(profile_names)
+    names = {line.split("  ", 1)[1] for line in checksums}
+    assert names == profile_names
+    for line in checksums:
+        digest, name = line.split("  ", 1)
+        assert re.fullmatch(r"[0-9a-f]{64}", digest)
+        assert hashlib.sha256((directory / name).read_bytes()).hexdigest() == digest
 
 
 def test_documentation_audit_inventory_and_disposition_counts():

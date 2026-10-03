@@ -481,8 +481,11 @@ in disposable synthetic environments.
 ## Hardware profile backups
 
 `config/hardware/amdgpu/` holds one current byte-for-byte copy of each
-`/etc/default/amdgpu-custom-state.card0`, `.card1`, and `.card2` file, using
-the original filenames, with one `SHA256SUMS` and `README.md`.
+`/etc/default/amdgpu-custom-state.pci:0000:03:00.0`,
+`/etc/default/amdgpu-custom-state.pci:0000:07:00.0`, and
+`/etc/default/amdgpu-custom-state.pci:0000:0a:00.0` file, using the original
+PCI-keyed filenames, with one `SHA256SUMS` and `README.md`. The old
+`amdgpu-custom-state.card0`, `.card1`, and `.card2` copies are superseded.
 
 **These are archives, not inputs.** Nothing in this repository reads them, no
 automation applies them, and copying one back into `/etc` is an operator action

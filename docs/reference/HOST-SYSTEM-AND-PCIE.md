@@ -60,10 +60,11 @@ Gate evidence keeps the logical labels `card0`..`card2` = ROCm0..ROCm2, resolved
   `asrock-fan-100.service` (`~/asrock-fan-100.sh`), not by this repository.
 - V620 (07:00.0): `pwm1` is read-only; no manual override.
 - `amdgpu-clocks.service` applies `/etc/default/amdgpu-custom-state.pci:<BDF>` for all
-  three cards; the repo copies in `config/hardware/amdgpu/` map card0 → 03:00.0,
-  card1 → 07:00.0, card2 → 0a:00.0. Overdrive needs `amdgpu.ppfeaturemask=0xfff7ffff`
-  on the kernel command line. The driver may round an offset (ASRock reads back
-  −40 mV for a −45 mV profile).
+  three cards; the repo copies in `config/hardware/amdgpu/` use the same PCI-keyed
+  filenames for 0000:03:00.0, 0000:07:00.0, and 0000:0a:00.0, not DRM card numbers.
+  Overdrive needs `amdgpu.ppfeaturemask=0xfff7ffff` on the kernel command line.
+  The driver may round an offset (historically, ASRock read back −40 mV for a
+  −45 mV profile); persisted profiles alone do not establish effective settings.
 - All amdgpu devices are kept out of PCI runtime suspend (udev
   `ATTR{power/control}="on"`); a suspended card hid its sensors from ROCm SMI.
 
