@@ -142,6 +142,44 @@ def test_configuration_alias_table_matches_the_router_presets():
     assert errors == [], errors
 
 
+def test_blackfrost_glm53_request_is_queued_once_without_admission():
+    """A literal research request remains pending, not a download or verdict."""
+    from urllib.parse import urlsplit
+
+    url = "https://huggingface.co/Blackfrost-Research/GLM-5.3-F.U-AnthraClaud-Edition-BF16"
+    repository = "Blackfrost-Research/GLM-5.3-F.U-AnthraClaud-Edition-BF16"
+    inventory = json.loads((ROOT / "docs/reference/candidate-research-inventory.json").read_text())
+    queue = inventory["additional_research_queue"]
+    sections = {"additional_research_queue": queue["entries"],
+                "repositories": inventory["repositories"],
+                "submitted_intake": inventory["submitted_intake"]["entries"]}
+
+    def identity(row):
+        # Historical assessments store only repository IDs; intake rows also
+        # store URLs. Preserve the source-host distinction for both schemas.
+        host = (urlsplit(row["url"]).hostname if "url" in row else
+                {"huggingface": "huggingface.co", "github": "github.com"}[
+                    row.get("source_host", "huggingface")])
+        return host, row["repository"].casefold()
+
+    requested = "huggingface.co", repository.casefold()
+    matches = [(name, row) for name, rows in sections.items() for row in rows
+               if identity(row) == requested]
+    assert [name for name, _ in matches] == ["additional_research_queue"], matches
+    row = matches[0][1]
+    assert row["url"] == url and row["repository"] == repository
+    assert (row["state"], row["investigated"], row["qualified"]) == ("queued", False, False)
+    assert row["download_admission"] == "not-requested"
+    assert "download_request" not in row
+    assert not ({"revision", "checked_at", "architecture", "license", "runtime_route"} & row.keys())
+    assert row["research_question"] and row["research_scope"]
+    identities = [identity(entry) for entry in queue["entries"]]
+    assert len(identities) == len(set(identities)) == queue["unique_repository_count"]
+    for path in (ROOT / "verification/local-coverage-foundation").glob("download-queue*.json"):
+        artifacts = json.loads(path.read_text())["artifacts"]
+        assert not any(item["repository"].casefold() == requested[1] for item in artifacts), path
+
+
 def test_candidate_research_closeout_covers_queued_repositories():
     closeout = (ROOT / "docs/reference/CANDIDATE-RESEARCH-CLOSEOUT.md").read_text()
     missing = [repo for repo in QUEUED_ADDITIONS if repo not in closeout]

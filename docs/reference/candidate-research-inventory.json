@@ -1,7 +1,7 @@
 {
   "additional_research_queue": {
     "integrity": "User-submitted identifiers. An entry marked investigated carries its recorded research; entries researched in an intake batch cite the revision they were read at, with no weight download or remote code execution. Integrated entries name the router alias that loads them. An entry with a license_review stays download_admission blocked until that review records acceptance. No entry is qualified. Separate from the historical assessed-inventory and submission-batch counts.",
-    "unique_repository_count": 67,
+    "unique_repository_count": 68,
     "intake_batches": [
       {
         "batch": "2026-09-29-ista",
@@ -2520,6 +2520,30 @@
             }
           ]
         }
+      },
+      {
+        "url": "https://huggingface.co/Blackfrost-Research/GLM-5.3-F.U-AnthraClaud-Edition-BF16",
+        "repository": "Blackfrost-Research/GLM-5.3-F.U-AnthraClaud-Edition-BF16",
+        "source_host": "huggingface",
+        "state": "queued",
+        "investigated": false,
+        "qualified": false,
+        "submitted": "2026-10-03",
+        "user_priority": {
+          "requested_by": "operator",
+          "basis": "Exact user-submitted research-queue request; appended in submission order without implying urgency.",
+          "caveat": "F.U, AnthraClaud-Edition and BF16 are repository-name labels, not verified lineage, quality or artifact-format findings."
+        },
+        "research_question": "Establish the exact model lineage, architecture, derivation, license, artifact formats and sizes from pinned primary metadata; then assess hardware fit and maintained runtime compatibility without assuming what the repository name implies.",
+        "research_scope": [
+          "Pin the revision and read the model card, config and complete file tree as data; no weight download or trust_remote_code.",
+          "Separate publisher claims from verified derivation, capability and uncensoring evidence.",
+          "Check license and gating, custom code and unsafe artifact formats before any acquisition decision.",
+          "Assess per-device and host-memory fit and compatible GGUF/runtime availability; local conversion or adoption needs separate authorization."
+        ],
+        "next_gate": "pinned metadata research; no download or runtime trial",
+        "notes": "Intake only. The URL is preserved exactly; no publisher retrieval, weight download, remote-code execution, qualification or model adoption was performed.",
+        "download_admission": "not-requested"
       }
     ]
   },
