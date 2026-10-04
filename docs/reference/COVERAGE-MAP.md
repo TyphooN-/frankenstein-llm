@@ -4,6 +4,11 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 
 | Tracked file | Documentation |
 |---|---|
+| [`docs/reference/MODEL-TORRENT-SIDECARS.md`](MODEL-TORRENT-SIDECARS.md) | [Model torrent workflow](MODEL-TORRENT-SIDECARS.md) |
+| [`scripts/model-torrent-sidecars.py`](../../scripts/model-torrent-sidecars.py) | [Model torrent workflow](MODEL-TORRENT-SIDECARS.md) |
+| [`services/systemd/model-torrent-sidecars.service`](../../services/systemd/model-torrent-sidecars.service) | [Hourly automation](MODEL-TORRENT-SIDECARS.md#hourly-automation) |
+| [`services/systemd/model-torrent-sidecars.timer`](../../services/systemd/model-torrent-sidecars.timer) | [Hourly automation](MODEL-TORRENT-SIDECARS.md#hourly-automation) |
+| [`verification/model-torrents/test_sidecars.py`](../../verification/model-torrents/test_sidecars.py) | [Model torrent workflow](MODEL-TORRENT-SIDECARS.md) |
 | [`config/gpu-placement.json`](../../config/gpu-placement.json) | [Reference](GPU-EXECUTION-AND-MODEL-LOADING.md) |
 | [`config/chat-templates/qwen2.5-tools.jinja`](../../config/chat-templates/qwen2.5-tools.jinja) | [Reference](CONFIGURATION.md#chat-templates) |
 | [`config/chat-templates/qwen3.8-27b-tools.jinja`](../../config/chat-templates/qwen3.8-27b-tools.jinja) | [Reference](CONFIGURATION.md#chat-templates) |

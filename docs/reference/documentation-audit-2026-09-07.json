@@ -23,14 +23,21 @@
     "Every 127.0.0.1:<port> in documentation matches a port in a tracked unit, env file or script.",
     "The CONFIGURATION.md alias table is compared field by field against llama-models.ini by an added test."
   ],
-  "inventory_count": 65,
+  "inventory_count": 66,
   "disposition_counts": {
-    "added": 6,
+    "added": 7,
     "updated": 11,
     "historical": 22,
     "aligned": 26
   },
   "entries": [
+    {
+      "path": "docs/reference/MODEL-TORRENT-SIDECARS.md",
+      "disposition": "added",
+      "finding": "Operator requested portable per-weight torrent/magnet sidecars and automatic future generation, without automatic public seeding.",
+      "source_evidence": "scripts/model-torrent-sidecars.py; verification/model-torrents/test_sidecars.py; independent torf 4.3.1 interoperability fixture; services/systemd/model-torrent-sidecars.service and .timer.",
+      "change": "Documented the metadata-only scope, source preservation, cached scans, user timer, NAS import/recheck and redistribution/provenance boundaries. Earlier audit entries and unrelated baseline gaps are unchanged."
+    },
     {
       "path": "docs/decisions/0008-local-frankenstein-artwork-and-animation.md",
       "disposition": "added",

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check hourly for new local model files needing torrent sidecars
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=5m
+Persistent=true
+Unit=model-torrent-sidecars.service
+
+[Install]
+WantedBy=timers.target
