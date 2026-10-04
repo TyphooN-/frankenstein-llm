@@ -202,12 +202,19 @@ model than the router does, under the same alias.
 | `submodule_path` | `upstream/llama.cpp` | `.gitmodules`, pin suite |
 | `branch` | `master`; the lock has no release `tag` field | pin suite |
 | `commit` | 40-hex | build script (worktree `HEAD`), pin suite (staged gitlink) |
-| `build.backend` | `ROCm/HIP` | pin suite |
-| `build.gpu_targets` | `["gfx1030"]` | build script, pin suite |
+| `build.backends` | `hip: build`, `cuda: build-cuda`, `vulkan: build-vulkan`, `cpu: build-cpu` | build script, pin suite |
+| `build.reference.backend` | `hip` (reference host only) | pin suite |
+| `build.reference.gpu_targets` | `["gfx1030"]` (reference host only) | pin suite |
 | `build.build_type` | `Release` | pin suite |
 | `build.generator` | `Ninja` | pin suite |
 | `build.parallelism` | `"nproc"` | pin suite — a fixed job count outlives its machine |
 | `build.targets` | `llama-server`, `llama-cli`, `llama-quantize`, `llama-gguf` | build script, pin suite |
+
+Build targets are detected by `scripts/detect_backends.py` rather than selected
+from the reference host record. `HIP_GPU_TARGETS` and `CUDA_ARCHITECTURES`
+override detection using comma- or semicolon-separated values. These affect
+compilation only; existing sidecar and router presets are not translated to
+another backend automatically.
 
 ## Sidecar environment files
 

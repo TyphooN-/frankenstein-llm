@@ -15,11 +15,13 @@ tracked-file coverage. Downloaded weights alone are not functional proof.
 
 Private local-AI workspace for the X99 host: llama.cpp routing, capability qualification, ComfyUI media, and serialized download/gates.
 
-**This repository is AMD ROCm only.** Every GPU in it is an AMD card, the pinned
-llama.cpp submodule is built for the HIP/ROCm backend by `scripts/build-llama-cpp.sh`,
-device selectors are spelled `ROCm0,ROCm1,ROCm2` throughout the presets, and
-ComfyUI is launched with `HIP_VISIBLE_DEVICES`. There is no CUDA path here and
-none is planned; NVIDIA-specific advice does not transfer. See
+**The qualified reference runtime is AMD ROCm; portability is in progress.**
+`scripts/build-llama-cpp.sh` supports separate HIP, CUDA, Vulkan and CPU build
+directories, with host detection and explicit target overrides. Existing router
+presets, placement, qualification and ComfyUI configuration still target the AMD
+reference host; building CUDA does **not** make those presets NVIDIA-ready.
+See [portable host profiles](docs/decisions/0009-portable-host-profiles.md) for
+the phased migration and remaining work, and
 [GPU execution and model loading](docs/reference/GPU-EXECUTION-AND-MODEL-LOADING.md).
 
 Canonical checkout: `/home/typhoon/git/frankenstein-llm`
@@ -99,6 +101,15 @@ workflows, and all candidate load/behavior/unload checks still require their liv
 serialized gates.
 
 ## Runtime
+
+To inspect build targets without compiling, run `python3 scripts/detect_backends.py`.
+The build script selects detected HIP/CUDA backends automatically (CPU when
+neither is detected), or accepts explicit `hip`, `cuda`, `vulkan`, or `cpu`
+arguments. A detected GPU without its toolchain fails with installation guidance.
+For an RTX 3060 cross-build, use
+`CUDA_ARCHITECTURES=86 scripts/build-llama-cpp.sh cuda` with a compatible CUDA
+toolkit installed. CUDA binaries go into `upstream/llama.cpp/build-cuda/bin`;
+the existing service units still use the HIP `build/bin` directory.
 
 User systemd units live in `~/.config/systemd/user/` and are copied here under `services/systemd/`. After clone or path changes:
 

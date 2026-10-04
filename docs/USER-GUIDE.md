@@ -152,7 +152,10 @@ a capability that is downloaded and one that actually works.
 **This is an AMD ROCm workspace.** All three GPUs are AMD, the pinned llama.cpp is
 built with `-DGGML_HIP=ON` for `gfx1030`, presets address devices as `ROCm0`,
 `ROCm1` and `ROCm2`, and ComfyUI runs under `HIP_VISIBLE_DEVICES`. Instructions
-written for CUDA/NVIDIA do not apply, and no CUDA build exists here.
+written for CUDA/NVIDIA do not apply to those reference-host presets. The build
+script now has a separate CUDA build path, but NVIDIA placement, installation
+and qualification remain pending under
+[ADR 0009](decisions/0009-portable-host-profiles.md).
 
 Undated. Where something depends on what the host is running right now, this
 guide gives you the command rather than an answer.

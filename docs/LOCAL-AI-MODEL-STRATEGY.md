@@ -188,7 +188,7 @@ The router exposes only one resident model. Switching models incurs a first-prom
 
 ### Radeon/ROCm MTP tuning: authorized, not yet measured
 
-This repository targets Radeon hardware and ROCm only. Results from CUDA,
+This tuning baseline targets the Radeon/ROCm reference host. Results from CUDA,
 RTX 5090/Blackwell, or other vendors are investigation leads, not local tuning
 evidence. The [qwen38-mtp investigation](https://github.com/sudoingX/qwen38-mtp)
 motivates testing confidence gating and draft depth together; it does not
