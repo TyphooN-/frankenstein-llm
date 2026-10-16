@@ -1,0 +1,3080 @@
+diff --git a/agent/auxiliary_client.py b/agent/auxiliary_client.py
+index 4df052c093..6c1f22fbac 100644
+--- a/agent/auxiliary_client.py
++++ b/agent/auxiliary_client.py
+@@ -2563,7 +2563,8 @@ def _relay_aux_call_scope(args: tuple, kwargs: dict):
+     try:
+         yield
+     except BaseException as exc:
+-        _fail_relay_auxiliary_call(exc)
++        if not (_RELAY_AUX_CALL_CONTEXT.get() or {}).get("local_only"):
++            _fail_relay_auxiliary_call(exc)
+         raise
+     finally:
+         _RELAY_AUX_CALL_CONTEXT.reset(token)
+@@ -6186,18 +6187,8 @@ def _resolve_task_provider_model(
+     """
+     cfg_provider = cfg_model = cfg_base_url = cfg_api_key = resolved_api_mode = None
+     if task:
+-        task_config = _get_auxiliary_task_config(task)
+-        cfg_provider = str(task_config.get("provider", "")).strip() or None
+-        cfg_model = str(task_config.get("model", "")).strip() or None
+-        cfg_base_url = str(task_config.get("base_url", "")).strip() or None
+-        cfg_api_key = str(task_config.get("api_key", "")).strip() or None
+-        if not cfg_api_key:  # key_env → env var when api_key is not set directly
+-            cfg_key_env = str(task_config.get("key_env") or task_config.get("api_key_env") or "").strip()
+-            if cfg_key_env:
+-                cfg_api_key = _scoped_key_env(cfg_key_env) or None
+-        # User-facing spellings (``responses``, ``anthropic``, …) canonicalize here so every
+-        # branch downstream compares against the transport names only (#39750).
+-        resolved_api_mode = _canonical_api_mode(str(task_config.get("api_mode") or "")).lower() or None
++        from agent.auxiliary_task_config import resolve_auxiliary_task_fields
++        cfg_provider, cfg_model, cfg_base_url, cfg_api_key, resolved_api_mode = resolve_auxiliary_task_fields(task)
+     # 'auto' is a sentinel ("inherit / auto-detect"), not a model id — leaking it to the wire
+     # yields a 200 with an error-text body that consumers accept as output. The explicit `model`
+     # kwarg needs the same normalization: MoA slots forward preset `model:` fields through it.
+@@ -8034,6 +8025,10 @@ def call_llm(
+     latency_info: Optional[dict[str, int]] = None,
+ ) -> Any:
+     """Run an auxiliary LLM request, applying the configured task limit."""
++    from agent.qualified_local_helper import call_local_if_enabled
++    local = call_local_if_enabled(locals())
++    if local is not None:
++        return local
+     queue_started_at = time.monotonic()
+     semaphore = _acquire_sync_aux_semaphore(task)
+     if semaphore is not None:
+@@ -8329,6 +8324,10 @@ async def async_call_llm(
+     route_info: Optional[dict[str, str]] = None,
+ ) -> Any:
+     """Run an asynchronous auxiliary LLM request under the configured limit."""
++    from agent.qualified_local_helper import acall_local_if_enabled
++    local = await acall_local_if_enabled(locals())
++    if local is not None:
++        return local
+     semaphore = _acquire_async_aux_semaphore(task)
+     if semaphore is not None:
+         await semaphore.acquire()
+diff --git a/agent/auxiliary_hooks.py b/agent/auxiliary_hooks.py
+index 30008bf13d..bd2554dee0 100644
+--- a/agent/auxiliary_hooks.py
++++ b/agent/auxiliary_hooks.py
+@@ -92,7 +92,10 @@ class _AuxCallHooks:
+     def __init__(
+         self, *, aux_task: str, metadata: dict[str, Any], client: Any, kwargs: dict[str, Any],
+         provider: str, model: str, api_mode: str, streaming: bool,
++        emit: Optional[Callable[..., None]] = None, consumes: Optional[Callable[[str], bool]] = None,
+     ) -> None:
++        self.emit = emit
++        self.consumes = consumes
+         self.provider = provider
+         self.api_mode = api_mode
+         self.streaming = streaming
+@@ -114,7 +117,7 @@ class _AuxCallHooks:
+         )
+ 
+     def pre(self) -> None:
+-        if not _has_hook(PRE_AUXILIARY_CALL):
++        if not (self.consumes or _has_hook)(PRE_AUXILIARY_CALL):
+             return
+         from agent.api_request_hooks import ApiRequestHooksMixin as _Sanitize
+ 
+@@ -126,7 +129,7 @@ class _AuxCallHooks:
+             messages = []
+         body = {k: v for k, v in kwargs.items() if k not in {"timeout", "http_client"}}
+         total_chars = sum(len(str(_field(m, "content") or "")) for m in messages)
+-        _fire(
++        (self.emit or _fire)(
+             PRE_AUXILIARY_CALL, **self.base,
+             request_messages=list(messages),
+             system_prompt=_system_prompt(messages, kwargs),
+@@ -138,7 +141,7 @@ class _AuxCallHooks:
+         )
+ 
+     def post(self, response: Any = None, error: Optional[BaseException] = None) -> None:
+-        if not _has_hook(POST_AUXILIARY_CALL):
++        if not (self.consumes or _has_hook)(POST_AUXILIARY_CALL):
+             return
+         from agent.api_request_hooks import ApiRequestHooksMixin as _Sanitize
+ 
+@@ -174,7 +177,7 @@ class _AuxCallHooks:
+                 assistant_content_chars=len(content) if isinstance(content, str) else 0,
+                 assistant_tool_call_count=len(tool_calls),
+             )
+-        _fire(POST_AUXILIARY_CALL, **payload)
++        (self.emit or _fire)(POST_AUXILIARY_CALL, **payload)
+ 
+ 
+ def _has_hook(name: str) -> bool:
+diff --git a/agent/auxiliary_task_config.py b/agent/auxiliary_task_config.py
+index d673053352..e331b06978 100644
+--- a/agent/auxiliary_task_config.py
++++ b/agent/auxiliary_task_config.py
+@@ -30,6 +30,17 @@ def _get_auxiliary_task_config(task: str, _seen: frozenset = frozenset()) -> dic
+     task_config = aux.get(task, {}) if isinstance(aux, dict) else {}
+     if not isinstance(task_config, dict):
+         task_config = {}
++    # Guard at the real loader boundary, before plugin defaults or inheritance
++    # can erase a failed read or a present malformed bounded-helper policy.
++    # Other tasks keep their upstream last-known-good/default read behavior.
++    from hermes_cli.config_read_errors import FailedConfigRead
++    guarded = task in {"title_generation", "profile_describer", "local_helper"}
++    if isinstance(config, FailedConfigRead) and guarded:
++        return FailedConfigRead(task_config, error=config.read_error)
++    if guarded and not isinstance(aux, dict):
++        return FailedConfigRead(error=TypeError("auxiliary must be a mapping"))
++    if guarded and task in aux and not isinstance(aux[task], dict):
++        return FailedConfigRead(error=TypeError(f"auxiliary.{task} must be a mapping"))
+     try:
+         from hermes_cli.plugins import get_plugin_auxiliary_tasks
+         for _entry in get_plugin_auxiliary_tasks():
+@@ -77,3 +88,29 @@ def _layer_over_inherited(inherited: dict[str, Any], user: dict[str, Any]) -> di
+             continue
+         merged[key] = value
+     return merged
++
++
++def resolve_auxiliary_task_fields(task):
++    """Read ordinary-route fields only after bounded-helper policy refusal.
++
++    Late-bind the facade seams so callers' config and scoped-key bindings survive.
++    """
++    from agent import auxiliary_client as aux
++    from agent.qualified_local_helper import LocalHelperError
++    from hermes_cli.config_read_errors import FailedConfigRead
++
++    task_config = aux._get_auxiliary_task_config(task)
++    if isinstance(task_config, FailedConfigRead):
++        raise LocalHelperError("local helper policy cannot be read; refusing ordinary fallback")
++    if task_config.get("fallback_enabled", True) is not True:
++        raise LocalHelperError("no-fallback tasks require the bounded call_llm helper API")
++    provider, model, base_url, api_key = (
++        str(task_config.get(key, "")).strip() or None
++        for key in ("provider", "model", "base_url", "api_key")
++    )
++    if not api_key:
++        key_env = str(task_config.get("key_env") or task_config.get("api_key_env") or "").strip()
++        if key_env:
++            api_key = aux._scoped_key_env(key_env) or None
++    api_mode = aux._canonical_api_mode(str(task_config.get("api_mode") or "")).lower() or None
++    return provider, model, base_url, api_key, api_mode
+diff --git a/agent/local_helper_observers.py b/agent/local_helper_observers.py
+new file mode 100644
+index 0000000000..1122442d33
+--- /dev/null
++++ b/agent/local_helper_observers.py
+@@ -0,0 +1,149 @@
++"""Deadline-aware observer delivery ONLY for qualified local text helpers.
++
++Four process-wide delivery slots; queued envelopes retain admission until consumed.
++Python callbacks cannot be killed: expired/cancelled envelopes stop between
++subscribers, and a running subscriber keeps its slot until it actually exits.
++Saturation drops notifications, not transport. Daemon workers never join at
++process exit. Ordinary auxiliary hooks retain their existing dispatch contract.
++"""
++from __future__ import annotations
++
++import asyncio
++import contextvars
++import copy
++import logging
++import threading
++import time
++from concurrent.futures import Future
++
++from agent.auxiliary_hooks import _AuxCallHooks
++from hermes_constants import set_hermes_home_override
++from tools.daemon_pool import DaemonThreadPoolExecutor
++
++logger = logging.getLogger(__name__)
++_MAX_DELIVERIES = 4
++_slots = threading.BoundedSemaphore(_MAX_DELIVERIES)
++_executor = DaemonThreadPoolExecutor(max_workers=_MAX_DELIVERIES, thread_name_prefix="local-helper-observer")
++
++
++def _profile_context(home):
++    # Do not copy the caller's live turn, cancellation closures, runtime provider,
++    # or arbitrary task ContextVars: these can retain its loop and full prompt.
++    # Turn/request identity is a value snapshot in the standard event payload.
++    from agent.secret_scope import _MULTIPLEX_CONTEXT, _SECRET_SCOPE
++
++    context = contextvars.Context()
++    context.run(set_hermes_home_override, home)
++    context.run(_MULTIPLEX_CONTEXT.set, _MULTIPLEX_CONTEXT.get())
++    context.run(_SECRET_SCOPE.set, _SECRET_SCOPE.get())
++    return context
++
++
++def _deliver(name, payload, deadline, stopped):
++    from hermes_cli import lifecycle, plugins
++    from hermes_cli.middleware import OBSERVER_SCHEMA_VERSION
++
++    def expired():
++        return stopped.is_set() or time.monotonic() >= deadline
++
++    if expired():
++        return
++    lifecycle._observe(name, **copy.deepcopy(payload))
++    if expired():
++        return
++    # Discovery and all user callbacks stay off the caller/event loop. Do not
++    # invoke the ordinary timeout dispatcher here: that spawns nested workers.
++    manager = plugins._delivery_manager()
++    payload.setdefault("telemetry_schema_version", OBSERVER_SCHEMA_VERSION)
++    for callback in manager.iter_hook_callbacks(name):
++        if expired():
++            break
++        try:
++            manager._invoke_hook_callback(callback, copy.deepcopy(payload))
++        except BaseException:
++            # No retained traceback/result: observers cannot veto local work.
++            logger.warning("%s local helper observer failed; continuing", name, exc_info=True)
++
++
++def _run_delivery(*args, slot):
++    try:
++        _deliver(*args)
++    except BaseException:
++        logger.warning("local helper observer delivery failed; continuing", exc_info=True)
++    finally:
++        slot.release()
++
++
++def _submit(name, payload, home, deadline):
++    slot = _slots
++    if time.monotonic() >= deadline or not slot.acquire(blocking=False):
++        logger.debug("%s local helper notification dropped (deadline or saturation)", name)
++        return None
++    stopped = threading.Event()
++    try:
++        future = _profile_context(home).run(_executor.submit, _run_delivery, name, copy.deepcopy(payload), deadline, stopped, slot=slot)
++    except Exception:
++        # Executor submission can fail AFTER enqueue (e.g. thread-start failure).
++        # Only actual consumption can release the slot without unbounded queued
++        # tombstones. A pre-enqueue failure conservatively loses one slot until
++        # process restart; notifications fail open and transport remains usable.
++        stopped.set()
++        logger.warning("%s local helper notification could not be scheduled", name, exc_info=True)
++        return None
++    return future, stopped
++
++
++class LocalObserverHooks:
++    """Copied payloads, bounded waits, and no caller-loop references in workers."""
++
++    def __init__(self, home, deadline, **kwargs):
++        self.home = home
++        self.deadline = deadline
++        self.pending: tuple[Future, threading.Event] | None = None
++        self.hooks = _AuxCallHooks(**kwargs, streaming=False, emit=self._emit, consumes=lambda _: True)
++
++    def _emit(self, name, **payload):
++        self.pending = _submit(name, payload, self.home, self.deadline)
++
++    def notify(self, *, response=None, error=None, pre=False):
++        self.pending = None
++        try:
++            if pre:
++                self.hooks.pre()
++            else:
++                self.hooks.post(response, error)
++        except Exception:
++            logger.warning("local helper observer payload failed; continuing", exc_info=True)
++
++    def abandon(self):
++        if self.pending is not None:
++            _, stopped = self.pending
++            stopped.set()
++            # Future.cancel leaves its WorkItem/payload in the executor queue.
++            # Let the worker consume the stopped envelope and release admission.
++            self.pending = None
++
++    def wait(self, remaining):
++        if self.pending is None:
++            return
++        future, _ = self.pending
++        sleeper = threading.Event()
++        try:
++            while not future.done():
++                # Event.wait avoids a retained Future exception/traceback and
++                # polls host cancellation with the same quantum as transport.
++                sleeper.wait(min(0.05, remaining()))
++            remaining()
++        finally:
++            self.abandon()
++
++    async def await_delivery(self, remaining):
++        if self.pending is None:
++            return
++        future, _ = self.pending
++        try:
++            while not future.done():
++                await asyncio.sleep(min(0.01, remaining()))
++            remaining()
++        finally:
++            self.abandon()
+diff --git a/agent/oneshot.py b/agent/oneshot.py
+index 9a5e12ecba..bb587053ab 100644
+--- a/agent/oneshot.py
++++ b/agent/oneshot.py
+@@ -83,7 +83,7 @@ def run_oneshot(
+     user_input: str = "",
+     template: Optional[str] = None,
+     variables: Optional[dict[str, Any]] = None,
+-    task: str = "title_generation",
++    task: str = "oneshot",
+     max_tokens: int = 1024,
+     temperature: Optional[float] = 0.3,
+     timeout: float = 60.0,
+@@ -93,6 +93,8 @@ def run_oneshot(
+ 
+     Raises RuntimeError when no provider is configured (from :func:`call_llm`),
+     KeyError for an unknown template, ValueError when the prompt is empty.
++    The dedicated auxiliary.oneshot route is independent of title_generation;
++    explicit task overrides still obey that task's routing and request policy.
+     """
+     if template:
+         instructions, user_input = render_template(template, variables)
+diff --git a/agent/qualified_local_helper.py b/agent/qualified_local_helper.py
+new file mode 100644
+index 0000000000..c05f84a6cc
+--- /dev/null
++++ b/agent/qualified_local_helper.py
+@@ -0,0 +1,530 @@
++"""Opt-in, tool-free auxiliary requests with no provider discovery or fallback.
++
++This is a protocol boundary, not a model-quality/admission check. The parent
++chooses an already qualified model and treats all returned text as untrusted.
++"""
++from __future__ import annotations
++
++import asyncio
++import contextlib
++import copy
++import errno
++import functools
++import json
++import math
++import re
++import selectors
++import socket
++import threading
++import time
++import weakref
++from dataclasses import dataclass
++from types import SimpleNamespace
++from typing import Callable, cast
++
++import httpcore
++
++from hermes_constants import hermes_home_key
++
++_TASKS = frozenset({"title_generation", "profile_describer", "local_helper"})
++_PROVIDERS = frozenset({"llama.cpp", "llama-cpp", "llamacpp"})
++_ENDPOINT = re.compile(r"http://(127\.0\.0\.1|\[::1\]):([1-9][0-9]{0,4})(/|/v1/?)?\Z")
++_DEFAULT_CAPS = {"timeout": 15.0, "max_tokens": 512,
++                 "max_input_chars": 16384, "max_response_bytes": 65536}
++_HEADERS = [(b"Content-Type", b"application/json"), (b"Accept", b"application/json"),
++            (b"Accept-Encoding", b"identity"), (b"Connection", b"close")]
++
++# Only active callers/waiters own a permit. Weak values release idle entries,
++# including loop-bound semaphores; weak loop identity cannot alias a recycled id.
++_async_semaphores = weakref.WeakValueDictionary()
++_async_sem_lock = threading.Lock()
++
++
++class LocalHelperError(RuntimeError):
++    """Local policy, protocol or content refusal; never retry/fallback eligible."""
++
++
++class _LocalAsyncSemaphore(asyncio.BoundedSemaphore):
++    def __init__(self, limit):
++        super().__init__(limit)
++        self.limit = limit
++
++
++def _async_semaphore(call):
++    key = (call.home, call.task, weakref.ref(asyncio.get_running_loop()))
++    with _async_sem_lock:
++        semaphore = _async_semaphores.get(key)
++        if semaphore is None or semaphore.limit != call.concurrency:
++            semaphore = _LocalAsyncSemaphore(call.concurrency)
++            _async_semaphores[key] = semaphore
++        return semaphore
++
++
++@dataclass(frozen=True)
++class LocalCall:
++    task: str
++    home: str
++    provider: str
++    model: str
++    url: str
++    timeout: float
++    max_tokens: int
++    max_response_bytes: int
++    concurrency: int
++    payload: bytes
++    title_json: bool
++    cancel_check: Callable | None
++
++
++def _integer(value, label, maximum):
++    if type(value) is not int or not 1 <= value <= maximum:
++        raise LocalHelperError(f"local helper {label} must be a bounded positive integer")
++    return value
++
++
++def _seconds(value):
++    if type(value) not in (float, int) or not 0.05 <= value <= 30 or not math.isfinite(value):
++        raise LocalHelperError("local helper timeout must be finite and between 0.05 and 30 seconds")
++    return float(value)
++
++
++def _local_identity(cfg, provider, model, base_url):
++    pinned_provider, pinned_model, endpoint = (cfg.get(k) for k in ("provider", "model", "base_url"))
++    if not isinstance(pinned_provider, str) or pinned_provider not in _PROVIDERS:
++        raise LocalHelperError("local helper requires an explicit supported llama.cpp provider")
++    if (not isinstance(pinned_model, str) or not pinned_model or len(pinned_model) > 256
++            or pinned_model.lower() == "auto" or any(c.isspace() or ord(c) < 32 for c in pinned_model)):
++        raise LocalHelperError("local helper requires a literal pinned model")
++    match = _ENDPOINT.fullmatch(endpoint) if isinstance(endpoint, str) else None
++    if match is None or int(match[2]) > 65535:
++        raise LocalHelperError("local helper requires an explicit literal loopback HTTP endpoint")
++    for override, pinned in ((provider, pinned_provider), (model, pinned_model), (base_url, endpoint)):
++        if override is not None and override != pinned:
++            raise LocalHelperError("local helper request cannot override its pinned identity")
++    return pinned_provider, pinned_model, match
++
++
++def _caller_controls(task, extra_body, reasoning_config, temperature):
++    # These are fixed controls from the REAL callers, not a general extra_body
++    # escape hatch. Enforce title JSON locally; never forward either control.
++    title_json = False
++    if extra_body is not None:
++        if task != "title_generation":
++            raise LocalHelperError("local helper forbids extra_body")
++        from agent.title_generator import _TITLE_RESPONSE_FORMAT
++        if extra_body != {"response_format": _TITLE_RESPONSE_FORMAT}:
++            raise LocalHelperError("local helper only accepts the fixed title response contract")
++        title_json = True
++    if reasoning_config is not None and not (
++            task == "title_generation" and isinstance(reasoning_config, dict)
++            and set(reasoning_config) == {"enabled"} and reasoning_config["enabled"] is False):
++        raise LocalHelperError("local helper forbids reasoning overrides")
++    if temperature is not None and not (task == "profile_describer" and type(temperature) is float and temperature == 0.3):
++        raise LocalHelperError("local helper forbids temperature overrides")
++    return title_json
++
++
++# Only the fixed protocol inputs cross this boundary; ordinary SDK controls and
++# diagnostic mappings stay out. Both public wrappers retain their own signatures.
++_LOCAL_REQUEST_FIELDS = (
++    "task", "messages", "provider", "model", "base_url", "api_key", "temperature",
++    "max_tokens", "tools", "timeout", "extra_body", "reasoning_config",
++    "extra_headers", "api_mode", "stream", "stream_options",
++)
++
++
++def _prepare_request(request):
++    return prepare_local_call(**{field: request[field] for field in _LOCAL_REQUEST_FIELDS if field in request})
++
++
++def call_local_if_enabled(request):
++    call = _prepare_request(request)
++    if call is None:
++        return None
++    return call_local(call, route_info=request.get("route_info"), latency_info=request.get("latency_info"))
++
++
++async def acall_local_if_enabled(request):
++    call = _prepare_request(request)
++    if call is None:
++        return None
++    return await acall_local(call, route_info=request.get("route_info"))
++
++
++def prepare_local_call(task, *, messages, provider=None, model=None, base_url=None,
++                       api_key=None, temperature=None, max_tokens=None, tools=None,
++                       timeout=None, extra_body=None, reasoning_config=None,
++                       extra_headers=None, api_mode=None, stream=False, stream_options=None):
++    """One copied task-policy snapshot, used for validation, queueing and transport."""
++    from agent import auxiliary_client as aux
++
++    cfg = copy.deepcopy(aux._get_auxiliary_task_config(task))
++    from hermes_cli.config_read_errors import FailedConfigRead
++    if task in _TASKS and isinstance(cfg, FailedConfigRead):
++        context = aux._RELAY_AUX_CALL_CONTEXT.get()
++        if context is not None:
++            context["local_only"] = True
++        raise LocalHelperError("local helper policy cannot be read; refusing ordinary fallback")
++    fallback = cfg.get("fallback_enabled", True)
++    if type(fallback) is not bool:
++        raise LocalHelperError("fallback_enabled must be a boolean")
++    if fallback:
++        if task == "local_helper":
++            raise LocalHelperError("local_helper requires explicit fallback_enabled=false")
++        return None
++    context = aux._RELAY_AUX_CALL_CONTEXT.get()
++    if context is not None:
++        context["local_only"] = True
++    if task not in _TASKS:
++        raise LocalHelperError("no-fallback local helpers are restricted to low-risk text tasks")
++    pinned_provider, pinned_model, match = _local_identity(cfg, provider, model, base_url)
++    if (api_key is not None or cfg.get("api_key") not in (None, "")
++            or cfg.get("key_env") not in (None, "") or cfg.get("api_key_env") not in (None, "")
++            or extra_headers is not None or tools is not None or stream or stream_options is not None
++            or cfg.get("extra_body") not in (None, {})
++            or cfg.get("api_mode") not in (None, "", "chat_completions")
++            or api_mode not in (None, "chat_completions")
++            or cfg.get("reasoning_effort") not in (None, "", "none")
++            or any(cfg.get(k) for k in ("extra_headers", "headers", "default_headers", "tools", "stream"))):
++        raise LocalHelperError("local helper forbids credentials, tools and wire overrides")
++    title_json = _caller_controls(task, extra_body, reasoning_config, temperature)
++    caps = cfg.get("local_helper_caps", {})
++    if not isinstance(caps, dict) or set(caps) - _DEFAULT_CAPS.keys():
++        raise LocalHelperError("invalid local_helper_caps")
++    caps = {**_DEFAULT_CAPS, **caps}
++    seconds = _seconds(caps["timeout"])
++    output_limit = _integer(caps["max_tokens"], "max_tokens", 1024)
++    input_limit = _integer(caps["max_input_chars"], "max_input_chars", 32768)
++    response_limit = _integer(caps["max_response_bytes"], "max_response_bytes", 131072)
++    concurrency = _integer(cfg.get("max_concurrency", 1), "max_concurrency", 8)
++    if timeout is not None:
++        if _seconds(timeout) > seconds:
++            raise LocalHelperError("request timeout exceeds local helper cap")
++        seconds = float(timeout)
++    if max_tokens is not None:
++        if _integer(max_tokens, "max_tokens", 1024) > output_limit:
++            raise LocalHelperError("request max_tokens exceeds local helper cap")
++        output_limit = max_tokens
++    if not isinstance(messages, list) or not 1 <= len(messages) <= 32:
++        raise LocalHelperError("local helper requires a bounded list of text messages")
++    clean = []
++    total = 0
++    for message in messages:
++        if (not isinstance(message, dict) or set(message) != {"role", "content"}
++                or message["role"] not in ("system", "user", "assistant")
++                or not isinstance(message["content"], str)):
++            raise LocalHelperError("local helper accepts only tool-free text messages")
++        total += len(message["content"])
++        if total > input_limit:
++            raise LocalHelperError("local helper input exceeds its cap")
++        clean.append(dict(message))
++    try:
++        payload = json.dumps({"model": pinned_model, "messages": clean, "max_tokens": output_limit},
++                             ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
++    except (ValueError, UnicodeError) as exc:
++        raise LocalHelperError("local helper input is not valid UTF-8 JSON") from exc
++    if len(payload) > 131072:
++        raise LocalHelperError("local helper request exceeds its byte cap")
++    return LocalCall(task, hermes_home_key(), pinned_provider, pinned_model,
++                     f"http://{match[1]}:{match[2]}/v1/chat/completions", seconds,
++                     output_limit, response_limit, concurrency, payload, title_json,
++                     aux._capture_aux_cancel_check())
++
++
++def _remaining(call, deadline):
++    from agent import auxiliary_client as aux
++    if call.cancel_check is not None and aux._captured_aux_cancel_requested(call.cancel_check):
++        raise aux.AuxiliaryExplicitCancellation()
++    remaining = deadline - time.monotonic()
++    if remaining <= 0:
++        raise TimeoutError("local helper absolute deadline expired")
++    return remaining
++
++
++def _check_headers(response, call):
++    if response.status != 200:
++        raise LocalHelperError("local helper refused HTTP status (redirects are never followed)")
++    for name, value in response.headers:
++        name = name.lower()
++        if name == b"content-encoding" and value.strip().lower() != b"identity":
++            raise LocalHelperError("local helper refuses compressed responses")
++        if name == b"content-type" and value.split(b";", 1)[0].strip().lower() != b"application/json":
++            raise LocalHelperError("local helper requires JSON responses")
++        if name == b"content-length":
++            if not value.isdigit() or int(value) > call.max_response_bytes:
++                raise LocalHelperError("local helper response exceeds its raw byte cap")
++
++
++def _append(raw, part, call):
++    if len(raw) + len(part) > call.max_response_bytes:
++        raise LocalHelperError("local helper response exceeds its raw byte cap")
++    raw.extend(part)
++
++
++def _unique_object(pairs):
++    result = {}
++    for key, value in pairs:
++        if key in result:
++            raise ValueError("duplicate JSON field")
++        result[key] = value
++    return result
++
++
++def _finite_json_float(value):
++    number = float(value)
++    if not math.isfinite(number):
++        raise ValueError("nonfinite JSON number")
++    return number
++
++
++def _decode(raw, call):
++    try:
++        data = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_object, parse_float=_finite_json_float,
++                          parse_constant=lambda _: (_ for _ in ()).throw(ValueError("nonfinite JSON")))
++        if not isinstance(data, dict) or data.get("error") or data.get("model", call.model) != call.model:
++            raise ValueError("invalid completion")
++        choices = data["choices"]
++        if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
++            raise ValueError("invalid choices")
++        choice = choices[0]
++        message = choice["message"]
++        if (choice.get("finish_reason") != "stop" or not isinstance(message, dict)
++                or message.get("role") != "assistant"
++                or message.get("tool_calls") not in (None, []) or message.get("function_call") is not None
++                or message.get("refusal") is not None):
++            raise ValueError("refused or tool-bearing completion")
++        content = message["content"]
++        if not isinstance(content, str) or not content.strip() or len(content) > call.max_tokens * 16:
++            raise ValueError("empty or oversized content")
++        if call.title_json:
++            title = json.loads(content, object_pairs_hook=_unique_object)
++            if (not isinstance(title, dict) or set(title) != {"title"}
++                    or not isinstance(title["title"], str) or not title["title"].strip()):
++                raise ValueError("invalid fixed title contract")
++    except (ValueError, UnicodeError, KeyError, TypeError, RecursionError) as exc:
++        raise LocalHelperError("local helper returned invalid, refused or oversized text") from exc
++    return SimpleNamespace(model=call.model, usage=None, choices=[SimpleNamespace(
++        finish_reason="stop", message=SimpleNamespace(role="assistant", content=content, tool_calls=None))])
++
++
++def _extensions(call, deadline):
++    remaining = _remaining(call, deadline)
++    return {"timeout": dict.fromkeys(("connect", "read", "write", "pool"), remaining)}
++
++
++def _headers(call):
++    # httpcore otherwise drops IPv6 brackets when constructing its Host header.
++    authority = call.url.removeprefix("http://").split("/", 1)[0]
++    return [*_HEADERS, (b"Host", authority.encode("ascii"))]
++
++
++class _DeadlineSocket(httpcore.NetworkStream):
++    """Nonblocking I/O against ONE deadline, even inside a running event loop.
++
++    No alarm/signal manipulation or abandoned timeout worker. Polling also
++    observes explicit host cancellation while a peer sends nothing.
++    """
++
++    def __init__(self, sock, call, deadline):
++        self.sock, self.call, self.deadline = sock, call, deadline
++
++    def _wait(self, *, write=False):
++        # The gateway raises its nofile limit above FD_SETSIZE. Use the host's
++        # epoll/kqueue/poll implementation rather than select's descriptor cap.
++        with selectors.DefaultSelector() as selector:
++            selector.register(self.sock, selectors.EVENT_WRITE if write else selectors.EVENT_READ)
++            while True:
++                timeout = min(0.05, _remaining(self.call, self.deadline))
++                if selector.select(timeout):
++                    _remaining(self.call, self.deadline)
++                    return
++
++    def read(self, max_bytes, timeout=None):
++        while True:
++            self._wait()
++            try:
++                return self.sock.recv(max_bytes)
++            except (BlockingIOError, InterruptedError):
++                continue
++
++    def write(self, buffer, timeout=None):
++        pending = memoryview(buffer)
++        while pending:
++            self._wait(write=True)
++            try:
++                sent = self.sock.send(pending)
++            except (BlockingIOError, InterruptedError):
++                continue
++            if not sent:
++                raise httpcore.WriteError("local helper socket closed during send")
++            pending = pending[sent:]
++
++    def close(self):
++        self.sock.close()
++
++    def get_extra_info(self, info):
++        if info == "is_readable":
++            with selectors.DefaultSelector() as selector:
++                selector.register(self.sock, selectors.EVENT_READ)
++                return bool(selector.select(0))
++        if info == "socket":
++            return self.sock
++        return None
++
++
++class _DeadlineBackend(httpcore.NetworkBackend):
++    def __init__(self, call, deadline):
++        self.call, self.deadline = call, deadline
++
++    def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
++        if host not in ("127.0.0.1", "::1"):
++            raise LocalHelperError("local helper transport refuses nonliteral hosts")
++        sock = socket.socket(socket.AF_INET6 if host == "::1" else socket.AF_INET, socket.SOCK_STREAM)
++        stream = _DeadlineSocket(sock, self.call, self.deadline)
++        try:
++            sock.setblocking(False)
++            _remaining(self.call, self.deadline)
++            result = sock.connect_ex((host, port))
++            if result not in (0, errno.EINPROGRESS, errno.EWOULDBLOCK, errno.EINTR):
++                raise httpcore.ConnectError("local helper loopback connection failed")
++            if result:
++                stream._wait(write=True)
++                if sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR):
++                    raise httpcore.ConnectError("local helper loopback connection failed")
++            return stream
++        except BaseException:
++            stream.close()
++            raise
++
++
++def _send(call, deadline):
++    from agent import auxiliary_client as aux
++    raw = bytearray()
++    # httpcore streams RAW entity bytes and has no decompression, credential,
++    # proxy-env, cookie, redirect, SDK retry or request-rewrite machinery.
++    with httpcore.ConnectionPool(max_connections=1, max_keepalive_connections=0, retries=0,
++                                 network_backend=_DeadlineBackend(call, deadline)) as pool:
++        aux._notify_aux_dispatch()
++        with pool.stream("POST", call.url, headers=_headers(call), content=call.payload,
++                         extensions=_extensions(call, deadline)) as response:
++            _check_headers(response, call)
++            for part in response.iter_stream():
++                _remaining(call, deadline)
++                _append(raw, part, call)
++                aux._notify_aux_provider_response()
++    _remaining(call, deadline)
++    return _decode(raw, call)
++
++
++async def _asend(call, deadline):
++    from agent import auxiliary_client as aux
++    raw = bytearray()
++    async with httpcore.AsyncConnectionPool(max_connections=1, max_keepalive_connections=0, retries=0) as pool:
++        aux._notify_aux_dispatch()
++        async with pool.stream("POST", call.url, headers=_headers(call), content=call.payload,
++                               extensions=_extensions(call, deadline)) as response:
++            _check_headers(response, call)
++            async for part in response.aiter_stream():
++                _remaining(call, deadline)
++                _append(raw, part, call)
++                aux._notify_aux_provider_response()
++    _remaining(call, deadline)
++    return _decode(raw, call)
++
++
++def _observer_kwargs(call):
++    from agent import auxiliary_client as aux
++    context = aux._RELAY_AUX_CALL_CONTEXT.get() or {}
++    return dict(aux_task=call.task, metadata={"api_request_id": context.get("request_id", ""), "retry_count": 0},
++                client=SimpleNamespace(base_url=call.url.rsplit("/chat/completions", 1)[0]),
++                kwargs=json.loads(call.payload), provider=call.provider, model=call.model, api_mode="chat_completions")
++
++
++def call_local(call, *, route_info=None, latency_info=None):
++    from agent import auxiliary_client as aux
++    from agent.local_helper_observers import LocalObserverHooks
++    start = time.monotonic()
++    deadline = start + call.timeout
++    semaphore = aux._cached_semaphore(aux._aux_sync_semaphores, (call.home, call.task),
++                                      call.concurrency, threading.BoundedSemaphore)
++    while not semaphore.acquire(timeout=min(0.05, _remaining(call, deadline))):
++        pass
++    dispatched = time.monotonic()
++    try:
++        if latency_info is not None:
++            latency_info["queue_wait_ms"] = aux._elapsed_ms(start, dispatched)
++        aux._record_route_info(route_info, call.provider, call.model)
++        with (
++            aux._aux_thread_local_hook(aux._aux_dispatch, functools.partial(
++                aux._stamp_latency_once, latency_info, "provider_dispatch_ms", dispatched)),
++            aux._aux_thread_local_hook(aux._aux_provider_response, functools.partial(
++                aux._stamp_latency_once, latency_info, "time_to_first_progress_ms", dispatched)),
++        ):
++            hooks = LocalObserverHooks(call.home, deadline, **_observer_kwargs(call))
++            try:
++                hooks.notify(pre=True)
++                hooks.wait(lambda: _remaining(call, deadline))
++                response = _send(call, deadline)
++            except BaseException as exc:
++                hooks.notify(error=exc)  # Best effort only: never wait on an error/cancellation.
++                raise
++            hooks.notify(response=response)
++            hooks.wait(lambda: _remaining(call, deadline))
++        _remaining(call, deadline)
++        return response
++    finally:
++        if latency_info is not None:
++            latency_info["summary_generation_ms"] = aux._elapsed_ms(dispatched)
++        semaphore.release()
++
++
++async def acall_local(call, *, route_info=None):
++    from agent import auxiliary_client as aux
++    from agent.local_helper_observers import LocalObserverHooks
++    deadline = time.monotonic() + call.timeout
++    semaphore = _async_semaphore(call)
++    owner = cast(asyncio.Task, asyncio.current_task())
++    initial_cancelling = owner.cancelling()
++    host_cancelled = False
++
++    async def watch_cancel():
++        nonlocal host_cancelled
++        while not aux._captured_aux_cancel_requested(call.cancel_check):
++            await asyncio.sleep(0.05)
++        host_cancelled = True
++        owner.cancel()
++
++    # Native async cancellation closes the pool before returning. The optional
++    # host-event watcher is always cancelled AND joined; no abandoned workers.
++    watcher = asyncio.create_task(watch_cancel()) if call.cancel_check is not None else None
++    try:
++        async with asyncio.timeout(_remaining(call, deadline)):
++            await semaphore.acquire()
++            try:
++                aux._record_route_info(route_info, call.provider, call.model)
++                hooks = LocalObserverHooks(call.home, deadline, **_observer_kwargs(call))
++                try:
++                    hooks.notify(pre=True)
++                    await hooks.await_delivery(lambda: _remaining(call, deadline))
++                    response = await _asend(call, deadline)
++                except BaseException as exc:
++                    hooks.notify(error=exc)  # Do not delay native/host cancellation cleanup.
++                    raise
++                hooks.notify(response=response)
++                await hooks.await_delivery(lambda: _remaining(call, deadline))
++                _remaining(call, deadline)
++                return response
++            finally:
++                semaphore.release()
++    except asyncio.CancelledError:
++        if host_cancelled:
++            # Remove only the cancellation issued by our watcher. Preserve a
++            # concurrent external cancellation instead of swallowing it.
++            if owner.uncancel() <= initial_cancelling:
++                raise aux.AuxiliaryExplicitCancellation() from None
++        raise
++    finally:
++        if watcher is not None:
++            watcher.cancel()
++            with contextlib.suppress(asyncio.CancelledError):
++                await watcher
+diff --git a/hermes_cli/config.py b/hermes_cli/config.py
+index ca35d36c02..59c1f7e036 100644
+--- a/hermes_cli/config.py
++++ b/hermes_cli/config.py
+@@ -50,7 +50,7 @@ from utils import atomic_replace, fast_safe_load, file_signature, mkstemp_beside
+ from hermes_cli.config_read_errors import (
+     _CONFIG_PARSE_FAILURES, _FIX_PERMS, _FIX_YAML, FailedConfigRead, _backups_dir_display,
+     _refuse_failed_read, _refuse_overwrite, _warn_config_parse_failure, _yaml_error_details,
+-    _yaml_error_location)
++    _yaml_error_location, config_or_empty, require_config_mapping)
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -1915,7 +1915,7 @@ def _read_raw_config_impl(*, want_deepcopy: bool) -> dict[str, Any]:
+ 
+         try:
+             with open(config_path, encoding="utf-8-sig") as f:
+-                data = fast_safe_load(f) or {}
++                data = config_or_empty(fast_safe_load(f))
+         except Exception as e:
+             _warn_config_parse_failure(config_path, e)
+             return FailedConfigRead(error=e)
+@@ -2335,7 +2335,7 @@ def _load_config_impl(*, want_deepcopy: bool) -> dict[str, Any]:
+         if user_sig is not None:
+             try:
+                 with open(config_path, encoding="utf-8-sig") as f:
+-                    user_config = fast_safe_load(f) or {}
++                    user_config = require_config_mapping(fast_safe_load(f))
+                 _CONFIG_PARSE_FAILURES.pop(path_key, None)  # the file reads now (a transient error left the record)
+ 
+                 if "max_turns" in user_config:
+diff --git a/hermes_cli/config_defaults.py b/hermes_cli/config_defaults.py
+index 76b6fbd23a..1d368be1ff 100644
+--- a/hermes_cli/config_defaults.py
++++ b/hermes_cli/config_defaults.py
+@@ -17,17 +17,7 @@ DEFAULT_VERCEL_IMAGE = "vercel/sandbox/universal:latest"
+ LEGACY_VERCEL_RUNTIME = "node24"  # the seeded pre-49 default, never a user choice
+ 
+ 
+-def _aux(timeout, *, reasoning_effort=True, **extra):
+-    """Standard auxiliary-task model block (see DEFAULT_CONFIG["auxiliary"]).
+-
+-    reasoning_effort=False omits that key (MoA blocks configure depth per slot);
+-    ``extra`` keys are appended after the standard ones.
+-    """
+-    d = {"provider": "auto", "model": "", "base_url": "", "api_key": "", "timeout": timeout, "extra_body": {}}
+-    if reasoning_effort:
+-        d["reasoning_effort"] = ""
+-    d.update(extra)
+-    return d
++from hermes_cli.config_defaults_auxiliary import auxiliary_defaults
+ 
+ 
+ DEFAULT_CONFIG = {
+@@ -735,85 +725,7 @@ DEFAULT_CONFIG = {
+     #         plugins: [{id: pareto-router, min_coding_score: 0.5}]
+     # Each task is independent — main-agent provider_routing and openrouter.min_coding_score
+     # do NOT propagate to aux calls by design.
+-    "auxiliary": {
+-        # Same-provider retries for a transient blip (reset/timeout/5xx/408) on ANY aux call before
+-        # falling back; clamped [0,6]. Matters for pinned calls (MoA advisors) where provider
+-        # fallback is not meaningful recovery.
+-        "transient_retries": 2,
+-        # When true, the auto-chain's OpenRouter step is skipped unless the fallback model ends in
+-        # ":free" — a PAID lane is never used for background aux traffic even with
+-        # OPENROUTER_API_KEY set.
+-        "free_only": False,
+-        # Override the auto-chain's OpenRouter fallback model (default google/gemini-3.6-flash,
+-        # PAID). Pair e.g. "nvidia/nemotron-3-ultra-550b-a55b:free" with free_only: true. A one-time
+-        # WARNING is logged whenever a non-":free" model is engaged.
+-        "openrouter_model": "",
+-        # Endpoints that reject NON-streaming chat (HTTP 400): aux calls are sent with stream=True
+-        # and aggregated. Case-insensitive URL substrings; copilot.tencent.com is always
+-        # stream-only.
+-        "stream_only_base_urls": [],
+-        # Per-task blocks share one shape (_aux): provider "auto" = inherit the main model; base_url
+-        # overrides provider; api_key falls back to OPENAI_API_KEY; reasoning_effort:
+-        # none|minimal|low|medium|high|xhigh|max|ultra ("" = provider default); extra_body =
+-        # OpenAI-compatible request fields. Vision: download_timeout = image HTTP download (s).
+-        "vision": _aux(120, download_timeout=30),
+-        # web_extract and session_search no longer use an aux LLM; leftover blocks in user config
+-        # are ignored. Compression: raise timeout for local models. no_progress_timeout:
+-        # seconds a streamed call goes without a substantive chunk before it fails fast into
+-        # retry/fallback; None = built-in 60s default. Independent of "timeout" (the overall request
+-        # budget) — raising "timeout" alone does not widen this window. See #108104.
+-        "compression": _aux(120, no_progress_timeout=None),
+-        "skills_hub": _aux(30),
+-        "approval": _aux(30),   # classifier — a fast/cheap model is recommended
+-        # /review reviewer: a full subagent on the async delegation rail, credentials resolved like
+-        # delegation.provider pins. "auto" + "" = main agent's model. api_mode forces transport:
+-        # chat_completions | anthropic_messages | codex_responses.
+-        "review": {"provider": "auto", "model": "", "base_url": "", "api_key": "", "api_mode": ""},
+-        "mcp": _aux(30),
+-        # prefer_fast_model opts in to the provider fast tier; auto otherwise = main model.
+-        "title_generation": {
+-            "enabled": True,
+-            "model_upgrade_enabled": True,  # False = keep the instant derived title, never call a model
+-            # session_search no longer uses an aux LLM (#27590); leftover auxiliary.session_search is ignored.
+-            "provider": "auto",
+-            "model": "",
+-            "prefer_fast_model": False,
+-            "base_url": "",
+-            "api_key": "",
+-            "timeout": 30,
+-            "extra_body": {},
+-            "reasoning_effort": "",
+-            "language": "",
+-        },
+-        "memory_query_rewrite": _aux(8, reasoning_effort=False),
+-        "tts_audio_tags": _aux(30),
+-        "voice_chat": {**_aux(120), "reasoning_effort": "none"},  # agent/voice_turn_route.py; off = lowest valid
+-        # Kanban: triage_specifier expands a Triage one-liner into a spec (cheap model OK);
+-        # kanban_decomposer emits a JSON graph of child tasks (more tokens).
+-        "triage_specifier": _aux(120),
+-        "kanban_decomposer": _aux(180),
+-        "profile_describer": _aux(60),   # 1-2 sentence profile blurb; short, cheap
+-        "goal_judge": _aux(60),          # /goal satisfaction + contract drafting; JSON calls
+-        # Curator skill-usage review can take minutes on reasoning models (umbrellas over hundreds
+-        # of skills); route cheaper via `hermes model` → auxiliary → Curator.
+-        "curator": _aux(600),
+-        "monitor": _aux(60),   # important-mail 0-10 scorer; high-volume, small model fine
+-        # Post-turn self-improvement fork (save memory / patch skill). "auto" = main model replaying
+-        # the full conversation (warm cache); other models replay a compact digest (~3-5x cheaper).
+-        # enabled=false skips auto spawns (/refine still works). An explicit max_input_tokens caps
+-        # the SUM of replayed input tokens over the review loop (iterations capped at 16); the loop
+-        # stops before crossing it. When unset, the runtime derives a budget from the active model
+-        # context window. <= 0 = unlimited.
+-        # reasoning_effort is IGNORED while the review stays on the main model: the fork inherits the
+-        # conversation's reasoning config verbatim so its request bytes keep the parent's warm
+-        # prompt-cache prefix (#30532). Set provider/model below to route the review to another model
+-        # if you want a different effort level; a one-time warning says so when the key is set.
+-        "background_review": {"enabled": True, **_aux(120)},
+-        # No reasoning_effort on MoA blocks by design — configured PER SLOT in the preset
+-        # (moa.presets.<name>.reference_models[].reasoning_effort / aggregator.reasoning_effort).
+-        "moa_reference": _aux(900, reasoning_effort=False),
+-        "moa_aggregator": _aux(900, reasoning_effort=False),
+-    },
++    "auxiliary": auxiliary_defaults(),
+ 
+     "display": {
+         "compact": False,
+diff --git a/hermes_cli/config_defaults_auxiliary.py b/hermes_cli/config_defaults_auxiliary.py
+new file mode 100644
+index 0000000000..3480230a90
+--- /dev/null
++++ b/hermes_cli/config_defaults_auxiliary.py
+@@ -0,0 +1,108 @@
++"""Pure auxiliary-task defaults, kept out of the configuration facade."""
++
++_LOCAL_HELPER_CAPS = {"timeout": 15, "max_tokens": 512,
++                      "max_input_chars": 16384, "max_response_bytes": 65536}
++
++
++def _aux(timeout, *, reasoning_effort=True, **extra):
++    """Standard auxiliary-task model block (see DEFAULT_CONFIG["auxiliary"]).
++
++    reasoning_effort=False omits that key (MoA blocks configure depth per slot);
++    ``extra`` keys are appended after the standard ones.
++    """
++    d = {"provider": "auto", "model": "", "base_url": "", "api_key": "", "timeout": timeout, "extra_body": {}}
++    if reasoning_effort:
++        d["reasoning_effort"] = ""
++    d.update(extra)
++    return d
++
++
++
++def auxiliary_defaults():
++    """Create independent task dictionaries and bounded-helper cap mappings."""
++    return {
++        # Same-provider retries for a transient blip (reset/timeout/5xx/408) on ANY aux call before
++        # falling back; clamped [0,6]. Matters for pinned calls (MoA advisors) where provider
++        # fallback is not meaningful recovery.
++        "transient_retries": 2,
++        # When true, the auto-chain's OpenRouter step is skipped unless the fallback model ends in
++        # ":free" — a PAID lane is never used for background aux traffic even with
++        # OPENROUTER_API_KEY set.
++        "free_only": False,
++        # Override the auto-chain's OpenRouter fallback model (default google/gemini-3.6-flash,
++        # PAID). Pair e.g. "nvidia/nemotron-3-ultra-550b-a55b:free" with free_only: true. A one-time
++        # WARNING is logged whenever a non-":free" model is engaged.
++        "openrouter_model": "",
++        # Endpoints that reject NON-streaming chat (HTTP 400): aux calls are sent with stream=True
++        # and aggregated. Case-insensitive URL substrings; copilot.tencent.com is always
++        # stream-only.
++        "stream_only_base_urls": [],
++        # Per-task blocks share one shape (_aux): provider "auto" = inherit the main model; base_url
++        # overrides provider; api_key falls back to OPENAI_API_KEY; reasoning_effort:
++        # none|minimal|low|medium|high|xhigh|max|ultra ("" = provider default); extra_body =
++        # OpenAI-compatible request fields. Vision: download_timeout = image HTTP download (s).
++        "vision": _aux(120, download_timeout=30),
++        # web_extract and session_search no longer use an aux LLM; leftover blocks in user config
++        # are ignored. Compression: raise timeout for local models. no_progress_timeout:
++        # seconds a streamed call goes without a substantive chunk before it fails fast into
++        # retry/fallback; None = built-in 60s default. Independent of "timeout" (the overall request
++        # budget) — raising "timeout" alone does not widen this window. See #108104.
++        "compression": _aux(120, no_progress_timeout=None),
++        "skills_hub": _aux(30),
++        # Stateless commit messages/ideas must not borrow the title-only policy.
++        "oneshot": _aux(60),
++        "approval": _aux(30),   # classifier — a fast/cheap model is recommended
++        # /review reviewer: a full subagent on the async delegation rail, credentials resolved like
++        # delegation.provider pins. "auto" + "" = main agent's model. api_mode forces transport:
++        # chat_completions | anthropic_messages | codex_responses.
++        "review": {"provider": "auto", "model": "", "base_url": "", "api_key": "", "api_mode": ""},
++        "mcp": _aux(30),
++        # prefer_fast_model opts in to the provider fast tier; auto otherwise = main model.
++        "title_generation": {
++            "enabled": True,
++            # false opts this task into the credential-free, pinned-loopback helper.
++            "fallback_enabled": True,
++            "local_helper_caps": dict(_LOCAL_HELPER_CAPS),
++            "model_upgrade_enabled": True,  # False = keep the instant derived title, never call a model
++            # session_search no longer uses an aux LLM (#27590); leftover auxiliary.session_search is ignored.
++            "provider": "auto",
++            "model": "",
++            "prefer_fast_model": False,
++            "base_url": "",
++            "api_key": "",
++            "timeout": 30,
++            "extra_body": {},
++            "reasoning_effort": "",
++            "language": "",
++        },
++        "memory_query_rewrite": _aux(8, reasoning_effort=False),
++        "tts_audio_tags": _aux(30),
++        "voice_chat": {**_aux(120), "reasoning_effort": "none"},  # agent/voice_turn_route.py; off = lowest valid
++        # Kanban: triage_specifier expands a Triage one-liner into a spec (cheap model OK);
++        # kanban_decomposer emits a JSON graph of child tasks (more tokens).
++        "triage_specifier": _aux(120),
++        "kanban_decomposer": _aux(180),
++        "profile_describer": _aux(60, fallback_enabled=True, local_helper_caps=dict(_LOCAL_HELPER_CAPS)),
++        # Script-only tool-free text work; requires an explicitly qualified pin and false fallback.
++        "local_helper": _aux(15, fallback_enabled=True, local_helper_caps=dict(_LOCAL_HELPER_CAPS), max_concurrency=1),
++        "goal_judge": _aux(60),          # /goal satisfaction + contract drafting; JSON calls
++        # Curator skill-usage review can take minutes on reasoning models (umbrellas over hundreds
++        # of skills); route cheaper via `hermes model` → auxiliary → Curator.
++        "curator": _aux(600),
++        "monitor": _aux(60),   # important-mail 0-10 scorer; high-volume, small model fine
++        # Post-turn self-improvement fork (save memory / patch skill). "auto" = main model replaying
++        # the full conversation (warm cache); other models replay a compact digest (~3-5x cheaper).
++        # enabled=false skips auto spawns (/refine still works). An explicit max_input_tokens caps
++        # the SUM of replayed input tokens over the review loop (iterations capped at 16); the loop
++        # stops before crossing it. When unset, the runtime derives a budget from the active model
++        # context window. <= 0 = unlimited.
++        # reasoning_effort is IGNORED while the review stays on the main model: the fork inherits the
++        # conversation's reasoning config verbatim so its request bytes keep the parent's warm
++        # prompt-cache prefix (#30532). Set provider/model below to route the review to another model
++        # if you want a different effort level; a one-time warning says so when the key is set.
++        "background_review": {"enabled": True, **_aux(120)},
++        # No reasoning_effort on MoA blocks by design — configured PER SLOT in the preset
++        # (moa.presets.<name>.reference_models[].reasoning_effort / aggregator.reasoning_effort).
++        "moa_reference": _aux(900, reasoning_effort=False),
++        "moa_aggregator": _aux(900, reasoning_effort=False),
++    }
+diff --git a/hermes_cli/config_read_errors.py b/hermes_cli/config_read_errors.py
+index d5c78a531e..2b2dbdac4e 100644
+--- a/hermes_cli/config_read_errors.py
++++ b/hermes_cli/config_read_errors.py
+@@ -17,6 +17,19 @@ from utils import file_signature
+ 
+ logger = logging.getLogger(__name__)
+ 
++
++def config_or_empty(value):
++    """Only a genuinely blank YAML document is an empty configuration."""
++    return {} if value is None else value
++
++
++def require_config_mapping(value):
++    """Reject present scalar/list roots rather than losing a fail-closed policy."""
++    value = config_or_empty(value)
++    if not isinstance(value, dict):
++        raise TypeError(f"top-level YAML must be a mapping, got {type(value).__name__}")
++    return value
++
+ # (config_path, mtime_ns, size) tuples already warned about, so concurrent CLI/gateway
+ # loads of a broken config.yaml don't spam stderr. A changed file (new mtime) warns again.
+ _CONFIG_PARSE_WARNED: set = set()
+diff --git a/hermes_cli/main_provider_setup.py b/hermes_cli/main_provider_setup.py
+index cbf0ae8083..d5dfffe207 100644
+--- a/hermes_cli/main_provider_setup.py
++++ b/hermes_cli/main_provider_setup.py
+@@ -175,7 +175,7 @@ def _save_aux_choice(task: str, *, provider: str, model: str = "", base_url: str
+ 
+ def _aux_task_takes_reasoning(task: str) -> bool:
+     """Whether the task's config block honours ``reasoning_effort``. MoA slots and
+-    ``memory_query_rewrite`` omit the key by design (``config_defaults._aux``); ``review``
++    ``memory_query_rewrite`` omit the key by design (``config_defaults_auxiliary._aux``); ``review``
+     routes through delegation which reads ``delegation.reasoning_effort``, not its own block."""
+     if task == _DELEGATION_TASK_KEY:
+         return True
+diff --git a/hermes_cli/profile_describer.py b/hermes_cli/profile_describer.py
+index fa60a6c904..ec66824774 100644
+--- a/hermes_cli/profile_describer.py
++++ b/hermes_cli/profile_describer.py
+@@ -155,7 +155,8 @@ def describe_profile(profile_name: str, *, overwrite: bool = False, timeout: Opt
+             messages=[{"role": "system", "content": _SYSTEM_PROMPT}, {"role": "user", "content": user_msg}],
+             temperature=0.3,
+             max_tokens=400,
+-            timeout=timeout or 60,
++            # None honors the task's timeout (including qualified-local caps).
++            timeout=timeout,
+         )
+     except Exception as exc:
+         logger.info("describe: API call failed for %s (%s)", canon, exc)
+diff --git a/scripts/local_helper.py b/scripts/local_helper.py
+new file mode 100644
+index 0000000000..d3e0afdf3d
+--- /dev/null
++++ b/scripts/local_helper.py
+@@ -0,0 +1,48 @@
++#!/usr/bin/env python3
++"""One bounded, tool-free local text request; no inference until explicitly invoked.
++
++Use only after the supervising parent qualifies and pins auxiliary.local_helper.
++Returned text is untrusted; this is not an approval or security-review agent.
++"""
++from __future__ import annotations
++
++import argparse
++from pathlib import Path
++import sys
++
++# Match other standalone repository scripts, without loading CLI credentials.
++sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
++
++
++def _terminal_text(text: str) -> str:
++    """Render untrusted controls as visible escapes, not terminal commands."""
++    return "".join(f"\\u{ord(character):04x}" if (
++        character not in "\n\t" and (ord(character) < 32 or 127 <= ord(character) <= 159
++                                    or 0xD800 <= ord(character) <= 0xDFFF))
++        else character for character in text)
++
++
++def main(argv=None) -> int:
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--instruction", required=True, help="Bounded text transformation instruction")
++    args = parser.parse_args(argv)
++    if not 1 <= len(args.instruction) <= 4096:
++        parser.error("instruction must contain 1–4096 characters")
++    try:
++        text = sys.stdin.read(32769)
++        if not text.strip() or len(text) > 32768:
++            parser.error("stdin must contain 1–32768 characters")
++        from agent.auxiliary_client import call_llm
++        response = call_llm(task="local_helper", messages=[
++            {"role": "system", "content": args.instruction}, {"role": "user", "content": text},
++        ])
++        print(_terminal_text(response.choices[0].message.content), flush=True)
++    except Exception as exc:  # health: allow BLE001 -- CLI boundary sanitizes every failure without leaking input or provider errors
++        # Do not echo provider errors, credentials, or supplied data into logs.
++        print(f"Local helper failed ({type(exc).__name__}); check the explicit local policy.", file=sys.stderr)
++        return 1
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/agent/test_local_helper_current_base.py b/tests/agent/test_local_helper_current_base.py
+new file mode 100644
+index 0000000000..7f56bcee4f
+--- /dev/null
++++ b/tests/agent/test_local_helper_current_base.py
+@@ -0,0 +1,49 @@
++"""Current-base helper admission and ordinary gateway-envelope coexistence."""
++from types import SimpleNamespace
++
++import pytest
++
++from agent import auxiliary_client as aux
++
++
++def test_malformed_title_policy_refuses_before_ordinary_dispatch(tmp_path, monkeypatch):
++    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
++    (tmp_path / "config.yaml").write_text(
++        "auxiliary:\n  title_generation: []\n", encoding="utf-8"
++    )
++
++    def forbidden(*args, **kwargs):
++        pytest.fail("malformed policy reached ordinary provider dispatch")
++
++    monkeypatch.setattr(aux, "resolve_provider_client", forbidden)
++    monkeypatch.setattr(aux, "_get_cached_client", forbidden)
++    monkeypatch.setattr(aux, "_resolve_auto_route", forbidden)
++    monkeypatch.setattr(aux, "_scoped_key_env", forbidden)
++    with pytest.raises(RuntimeError, match="policy cannot be read"):
++        aux.get_text_auxiliary_client("title_generation")
++
++
++def test_ordinary_title_policy_preserves_upstream_data_envelope(tmp_path, monkeypatch):
++    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
++    (tmp_path / "config.yaml").write_text(
++        "auxiliary:\n  title_generation:\n    fallback_enabled: true\n",
++        encoding="utf-8",
++    )
++    response = SimpleNamespace(
++        choices=None,
++        success=True,
++        data={
++            "model": "offline-ordinary",
++            "choices": [{"message": {"role": "assistant", "content": "offline title"}}],
++        },
++    )
++
++    def ordinary(**kwargs):
++        return aux._validate_llm_response(response, kwargs["task"])
++
++    monkeypatch.setattr(aux, "_call_llm_impl", ordinary)
++    result = aux.call_llm(
++        task="title_generation", messages=[{"role": "user", "content": "offline input"}]
++    )
++    assert result.choices[0].message.content == "offline title"
++    assert result.model == "offline-ordinary"
+diff --git a/tests/agent/test_local_helper_inheritance.py b/tests/agent/test_local_helper_inheritance.py
+new file mode 100644
+index 0000000000..8e9d8c67eb
+--- /dev/null
++++ b/tests/agent/test_local_helper_inheritance.py
+@@ -0,0 +1,162 @@
++"""Current real loader and plugin inheritance at the bounded helper boundary."""
++import asyncio
++import copy
++import json
++
++import pytest
++
++from agent import auxiliary_client as aux, qualified_local_helper as helper
++from hermes_cli import config, plugins
++from hermes_cli.config_read_errors import FailedConfigRead
++from hermes_constants import reset_hermes_home_override, set_hermes_home_override
++
++MESSAGES = [{"role": "user", "content": "Offline fixture"}]
++POLICY = {"provider": "llama.cpp", "model": "offline-fixture",
++          "base_url": "http://127.0.0.1:1/v1", "fallback_enabled": False}
++
++
++@pytest.fixture
++def inherited_home(tmp_path, monkeypatch):
++    home = tmp_path / "home"
++    home.mkdir()
++    token = set_hermes_home_override(home)
++    manager = plugins.PluginManager()
++    manager._discovered = True
++    monkeypatch.setattr(plugins, "_PLUGIN_MANAGER", manager, raising=False)
++    monkeypatch.setattr(plugins, "get_plugin_manager", lambda: manager)
++    monkeypatch.setattr(plugins, "_ensure_plugins_discovered", lambda: manager)
++    ctx = plugins.PluginContext(plugins.PluginManifest(name="offline"), manager)
++    ctx.register_auxiliary_task("ordinary_fixture", display_name="Ordinary", description="fixture",
++                                inherit_from="compression", defaults={"timeout": 9})
++    ctx.register_auxiliary_task("local_helper", display_name="Local", description="fixture",
++                                inherit_from="compression")
++    try:
++        yield home
++    finally:
++        reset_hermes_home_override(token)
++
++
++def write(home, value):
++    (home / "config.yaml").write_text(json.dumps(value), encoding="utf-8")
++
++
++def consume(mode):
++    if mode == "raw":
++        return aux.get_text_auxiliary_client("local_helper")
++    if mode == "async":
++        return asyncio.run(aux.async_call_llm(task="local_helper", messages=MESSAGES))
++    return aux.call_llm(task="local_helper", messages=MESSAGES)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async", "raw"])
++@pytest.mark.parametrize("warm", [False, True])
++@pytest.mark.parametrize("bad", ["root", "auxiliary", "task", "syntax", "unreadable"])
++def test_inherited_helper_loader_failures_refuse_before_dispatch(inherited_home, monkeypatch, mode, warm, bad):
++    home = inherited_home
++    valid = {"auxiliary": {"compression": POLICY,
++                           "local_helper": {**POLICY, "model": "", "base_url": "", "provider": "auto"}}}
++    if warm:
++        write(home, valid)
++        assert helper.prepare_local_call("local_helper", messages=MESSAGES).model == "offline-fixture"
++    if bad == "syntax":
++        (home / "config.yaml").write_text("auxiliary: [\n", encoding="utf-8")
++    elif bad == "unreadable":
++        path = home / "config.yaml"
++        if path.exists():
++            path.unlink()
++        path.mkdir()
++    else:
++        write(home, {"root": [], "auxiliary": {"auxiliary": []},
++                     "task": {"auxiliary": {"compression": POLICY, "local_helper": []}}}[bad])
++    loaded = config.load_config_readonly()
++    if bad in {"root", "syntax", "unreadable"}:
++        assert isinstance(loaded, FailedConfigRead)
++    else:
++        assert not isinstance(loaded, FailedConfigRead)
++
++    def forbidden(*args, **kwargs):
++        pytest.fail("malformed inheritance reached provider, credentials, Relay or local transport")
++
++    for name in ("_resolve_task_provider_model", "resolve_provider_client", "_get_cached_client",
++                 "_resolve_auto_route", "_scoped_key_env", "_try_payment_fallback",
++                 "_try_main_agent_model_fallback", "_call_llm_impl", "_async_call_llm_impl"):
++        # Raw resolution itself must run to exercise its FailedConfigRead consumer.
++        if name != "_resolve_task_provider_model" or mode != "raw":
++            monkeypatch.setattr(aux, name, forbidden)
++    monkeypatch.setattr(helper, "call_local", forbidden)
++    monkeypatch.setattr(helper, "acall_local", forbidden)
++    with pytest.raises(helper.LocalHelperError, match="policy cannot be read"):
++        consume(mode)
++    resolved = aux._get_auxiliary_task_config("local_helper")
++    assert isinstance(resolved, FailedConfigRead)
++    assert resolved.read_error is not None
++
++
++def test_non_helper_inheritance_preserves_read_time_and_atomic_route_pins(inherited_home):
++    home = inherited_home
++    base = {"provider": "custom", "model": "fixture/a", "base_url": "https://fixture.invalid",
++            "api_key": "synthetic-key", "extra_body": {"fixture": True}}
++    write(home, {"auxiliary": {"compression": base,
++                               "ordinary_fixture": {"provider": "auto", "model": "", "base_url": "",
++                                                    "api_key": "", "timeout": 4}}})
++    snapshot = copy.deepcopy(config.load_config_readonly())
++    result = aux._get_auxiliary_task_config("ordinary_fixture")
++    assert result["model"] == "fixture/a" and result["api_key"] == "synthetic-key"
++    assert result["timeout"] == 4 and result["extra_body"] == {"fixture": True}
++    assert config.load_config_readonly() == snapshot
++    write(home, {"auxiliary": {"compression": {**base, "model": "fixture/b"}}})
++    assert aux._get_auxiliary_task_config("ordinary_fixture")["model"] == "fixture/b"
++    write(home, {"auxiliary": {"compression": base,
++                               "ordinary_fixture": {"provider": "anthropic", "model": "fixture/pinned",
++                                                    "base_url": "", "api_key": ""}}})
++    result = aux._get_auxiliary_task_config("ordinary_fixture")
++    assert (result["provider"], result["model"]) == ("anthropic", "fixture/pinned")
++    assert not result.get("base_url") and not result.get("api_key")
++    assert result["timeout"] == 9
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_selected_helper_inherits_literal_route_without_ordinary_dispatch(inherited_home, monkeypatch, mode):
++    write(inherited_home, {"auxiliary": {"compression": POLICY,
++                                         "local_helper": {"provider": "auto", "model": "", "base_url": "",
++                                                          "fallback_enabled": False}}})
++    snapshot = copy.deepcopy(config.load_config_readonly())
++    calls = []
++
++    def local(call, **kwargs):
++        calls.append(call)
++        return "offline-local"
++
++    async def alocal(call, **kwargs):
++        return local(call, **kwargs)
++
++    def forbidden(*args, **kwargs):
++        pytest.fail("selected inherited helper reached ordinary dispatch")
++
++    monkeypatch.setattr(helper, "call_local", local)
++    monkeypatch.setattr(helper, "acall_local", alocal)
++    monkeypatch.setattr(aux, "_call_llm_impl", forbidden)
++    monkeypatch.setattr(aux, "_async_call_llm_impl", forbidden)
++    assert consume(mode) == "offline-local"
++    assert len(calls) == 1
++    assert calls[0].url == "http://127.0.0.1:1/v1/chat/completions"
++    assert json.loads(calls[0].payload) == {"model": "offline-fixture", "messages": MESSAGES, "max_tokens": 512}
++    assert config.load_config_readonly() == snapshot
++
++
++@pytest.mark.parametrize("value", [[], ["invalid"], "", "invalid", False, True, 0, 1])
++def test_wrong_shaped_raw_root_retains_failure_marker(inherited_home, value):
++    write(inherited_home, value)
++    assert isinstance(config.read_raw_config_readonly(), FailedConfigRead)
++    assert isinstance(config.load_config_readonly(), FailedConfigRead)
++    assert isinstance(aux._get_auxiliary_task_config("local_helper"), FailedConfigRead)
++    # The ordinary auxiliary resolver keeps the existing readable fallback mapping.
++    assert not isinstance(aux._get_auxiliary_task_config("compression"), FailedConfigRead)
++
++
++@pytest.mark.parametrize("content", ["", "null\n", "{}\n"])
++def test_blank_null_mapping_roots_keep_ordinary_defaults(inherited_home, content):
++    (inherited_home / "config.yaml").write_text(content, encoding="utf-8")
++    assert not isinstance(config.read_raw_config_readonly(), FailedConfigRead)
++    assert not isinstance(config.load_config_readonly(), FailedConfigRead)
++    assert aux._get_auxiliary_task_config("compression")["provider"] == "auto"
+diff --git a/tests/agent/test_local_helper_nonfinite_json.py b/tests/agent/test_local_helper_nonfinite_json.py
+new file mode 100644
+index 0000000000..f0fd24fe96
+--- /dev/null
++++ b/tests/agent/test_local_helper_nonfinite_json.py
+@@ -0,0 +1,29 @@
++"""Strict wire-number decoding, not model qualification."""
++import json
++
++import pytest
++
++from agent.qualified_local_helper import LocalHelperError
++from tests.agent.test_qualified_local_helper import assert_wire, completion, configure, invoke
++
++pytest_plugins = ["tests.agent.test_qualified_local_helper"]
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("number", ["1e999", "-1e999", "NaN", "Infinity", "-Infinity"])
++def test_nonfinite_wire_numbers_are_refused(loopback, mode, number):
++    configure(loopback)
++    raw = json.dumps(completion()).removesuffix("}")
++    loopback["raw"] = (raw + ', "metadata": {"nested": [' + number + "]}}").encode()
++    with pytest.raises(LocalHelperError, match="invalid, refused or oversized"):
++        invoke(mode)
++    assert_wire(loopback)
++    assert len(loopback["requests"]) == 1
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_finite_numbers_and_numeric_strings_remain_valid(loopback, mode):
++    configure(loopback)
++    loopback["payload"]["metadata"] = {"nested": [1.25, "1e999", "Infinity"]}
++    assert invoke(mode).choices[0].message.content
++    assert_wire(loopback)
+diff --git a/tests/agent/test_local_helper_observer_delivery.py b/tests/agent/test_local_helper_observer_delivery.py
+new file mode 100644
+index 0000000000..c288240f37
+--- /dev/null
++++ b/tests/agent/test_local_helper_observer_delivery.py
+@@ -0,0 +1,281 @@
++"""Offline behavioral controls for the corrected local observer scheduler.
++
++These are protocol/lifetime regressions, not independent acceptance or inference.
++Use actual registered callbacks and the maintained loopback fixture.
++"""
++from __future__ import annotations
++
++import asyncio
++import contextvars
++import gc
++import threading
++import time
++import weakref
++
++import pytest
++
++from agent import auxiliary_client as aux
++from agent import local_helper_observers as observers
++from hermes_cli import plugins
++from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
++from hermes_constants import get_hermes_home
++from tests.agent.test_qualified_local_helper import assert_wire, configure, invoke
++
++pytest_plugins = ("tests.agent.test_qualified_local_helper",)
++
++
++@pytest.fixture
++def subscriber(monkeypatch):
++    manager = PluginManager()
++    manager._discovered = True
++    monkeypatch.setattr(plugins, "_plugin_manager", manager)
++    monkeypatch.setattr(plugins, "_plugin_managers_by_home", {})
++    monkeypatch.setattr(plugins, "get_plugin_manager", lambda: manager)
++    monkeypatch.setattr(plugins, "_ensure_plugins_discovered", lambda: manager)
++    return PluginContext(PluginManifest(name="offline-observer-controls"), manager)
++
++
++def bounded_blocker(entered, release, finished):
++    def callback(**kwargs):
++        entered.set()
++        try:
++            release.wait(3)
++        finally:
++            finished.set()
++    return callback
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_slow_post_observer_shares_the_absolute_deadline(loopback, subscriber, mode):
++    configure(loopback, local_helper_caps={"timeout": 0.8})
++    entered, release, finished = (threading.Event() for _ in range(3))
++    subscriber.register_hook("post_auxiliary_call", bounded_blocker(entered, release, finished))
++    started = time.monotonic()
++    try:
++        with pytest.raises(TimeoutError):
++            invoke(mode)
++        assert time.monotonic() - started < 2, "post observer expanded the caller deadline"
++        assert entered.is_set()
++        assert_wire(loopback)
++    finally:
++        release.set()
++        assert finished.wait(2), "controlled observer was not cleaned up"
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_registered_observers_cannot_mutate_the_wire_or_each_other(loopback, subscriber, mode):
++    configure(loopback)
++    seen = []
++    post_seen = []
++    expected_home = get_hermes_home()
++
++    def mutator(**payload):
++        payload["request"]["body"]["model"] = "observer-poison"
++        payload["request_messages"][0]["content"] = "observer-poison"
++
++    def witness(**payload):
++        seen.append((get_hermes_home(), payload["api_request_id"],
++                     payload["request"]["body"]["model"],
++                     payload["request_messages"][0]["content"]))
++
++    def post_witness(**payload):
++        post_seen.append((get_hermes_home(), payload["api_request_id"]))
++
++    subscriber.register_hook("pre_auxiliary_call", mutator)
++    subscriber.register_hook("pre_auxiliary_call", witness)
++    subscriber.register_hook("post_auxiliary_call", post_witness)
++    outer = {"request_id": "offline-parent-request"}
++    token = aux._RELAY_AUX_CALL_CONTEXT.set(outer)
++    try:
++        assert invoke(mode).choices[0].message.content
++        assert aux._RELAY_AUX_CALL_CONTEXT.get() is outer
++    finally:
++        aux._RELAY_AUX_CALL_CONTEXT.reset(token)
++    assert len(seen) == 1
++    home, request_id, model, content = seen[0]
++    assert (home, model, content) == (expected_home, "fixture-model", "Name cache fix")
++    assert isinstance(request_id, str) and request_id
++    assert post_seen == [(expected_home, request_id)]
++    assert_wire(loopback)
++    assert loopback["requests"][0][2]["messages"][0]["content"] == "Name cache fix"
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_failing_registered_observers_do_not_veto_transport(loopback, subscriber, mode):
++    configure(loopback)
++    seen = []
++
++    def pre(**payload):
++        seen.append("pre")
++        raise ValueError("controlled observer failure")
++
++    def post(**payload):
++        seen.append("post")
++        raise ValueError("controlled observer failure")
++
++    subscriber.register_hook("pre_auxiliary_call", pre)
++    subscriber.register_hook("post_auxiliary_call", post)
++    assert invoke(mode).choices[0].message.content
++    assert seen == ["pre", "post"]
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("cause", ["native", "host"])
++def test_cancellation_during_observers_releases_the_helper_permit(loopback, subscriber, cause):
++    configure(loopback, local_helper_caps={"timeout": 5})
++    entered, release, finished = (threading.Event() for _ in range(3))
++    host_cancel = threading.Event()
++    subscriber.register_hook("pre_auxiliary_call", bounded_blocker(entered, release, finished))
++
++    async def run():
++        with aux.aux_interrupt_protection(cancel_event=host_cancel):
++            task = asyncio.create_task(aux.async_call_llm(
++                task="title_generation", messages=[{"role": "user", "content": "cancel me"}]))
++            end = time.monotonic() + 2
++            # A scheduled event-loop heartbeat must run while the callback waits.
++            while not entered.is_set():
++                assert time.monotonic() < end, "observer never started"
++                await asyncio.sleep(0.01)
++            started = time.monotonic()
++            if cause == "native":
++                task.cancel()
++                expected = asyncio.CancelledError
++            else:
++                host_cancel.set()
++                expected = aux.AuxiliaryExplicitCancellation
++            try:
++                with pytest.raises(expected):
++                    await task
++                assert time.monotonic() - started < 2
++                assert not loopback["requests"], "cancelled pre-observer dispatched transport"
++            finally:
++                release.set()
++                if not task.done():
++                    task.cancel()
++                    with pytest.raises(asyncio.CancelledError):
++                        await task
++        host_cancel.clear()
++        # Same loop, task and concurrency-one profile: a leaked permit stalls this.
++        assert (await aux.async_call_llm(
++            task="title_generation", messages=[{"role": "user", "content": "recover"}])).choices[0].message.content
++
++    try:
++        asyncio.run(run())
++        assert_wire(loopback)
++    finally:
++        release.set()
++        assert finished.wait(2)
++
++
++def test_saturation_drops_observers_without_queueing_or_blocking_transport(loopback, subscriber):
++    configure(loopback)
++    condition = threading.Condition()
++    release = threading.Event()
++    entered = []
++
++    def observer(**payload):
++        with condition:
++            entered.append(payload.get("api_request_id"))
++            condition.notify_all()
++        release.wait(3)
++
++    subscriber.register_hook("pre_auxiliary_call", observer)
++    pending = []
++    try:
++        for index in range(observers._MAX_DELIVERIES):
++            delivery = observers._submit("pre_auxiliary_call",
++                {"api_request_id": f"saturation-{index}"}, get_hermes_home(), time.monotonic() + 5)
++            assert delivery is not None
++            pending.append(delivery)
++        with condition:
++            assert condition.wait_for(lambda: len(entered) == observers._MAX_DELIVERIES, timeout=2)
++        assert observers._submit("pre_auxiliary_call", {}, get_hermes_home(), time.monotonic() + 5) is None
++        assert invoke().choices[0].message.content
++        assert_wire(loopback)
++        assert len(entered) == observers._MAX_DELIVERIES
++    finally:
++        release.set()
++        for future, _ in pending:
++            future.result(timeout=2)
++
++
++def test_observer_workers_do_not_inherit_arbitrary_caller_context(subscriber):
++    class CallerState:
++        pass
++
++    variable: contextvars.ContextVar[CallerState | None] = contextvars.ContextVar(
++        "offline-unrelated-caller-state", default=None)
++    state = CallerState()
++    reference = weakref.ref(state)
++    token = variable.set(state)
++    entered, release, finished = (threading.Event() for _ in range(3))
++    seen = []
++
++    def observer(**payload):
++        seen.append(variable.get())
++        entered.set()
++        try:
++            release.wait(3)
++        finally:
++            finished.set()
++
++    subscriber.register_hook("pre_auxiliary_call", observer)
++    pending = None
++    try:
++        pending = observers._submit("pre_auxiliary_call", {}, get_hermes_home(), time.monotonic() + 5)
++        assert pending is not None
++        assert entered.wait(2)
++        variable.reset(token)
++        token = None
++        del state
++        gc.collect()
++        assert seen == [None]
++        assert reference() is None, "running observer retained arbitrary caller state"
++    finally:
++        if token is not None:
++            variable.reset(token)
++        release.set()
++        assert finished.wait(2)
++        if pending is not None:
++            pending[0].result(timeout=2)
++
++
++@pytest.mark.parametrize("phase", ["abandon", "submit_exception"])
++def test_abandoned_queued_envelopes_keep_capacity_until_consumed(monkeypatch, phase):
++    """Cancellation must not turn the executor queue into unbounded tombstones."""
++    from tools.daemon_pool import DaemonThreadPoolExecutor
++
++    release = threading.Event()
++    # Deterministically delay dequeue, as a stalled/scheduling-delayed worker can.
++    pool = DaemonThreadPoolExecutor(max_workers=observers._MAX_DELIVERIES,
++                                  initializer=lambda: release.wait(5))
++    monkeypatch.setattr(observers, "_executor", pool)
++    monkeypatch.setattr(observers, "_slots", threading.BoundedSemaphore(observers._MAX_DELIVERIES))
++    adjustment = pool._adjust_thread_count
++
++    def failed_start():
++        raise RuntimeError("controlled failure after enqueue, before thread start")
++
++    if phase == "submit_exception":
++        monkeypatch.setattr(pool, "_adjust_thread_count", failed_start)
++    try:
++        for _ in range(observers._MAX_DELIVERIES * 8):
++            hooks = observers.LocalObserverHooks(get_hermes_home(), time.monotonic() + 10,
++                aux_task="local_helper", metadata={}, client=None, kwargs={},
++                provider="llama.cpp", model="fixture-model", api_mode="chat_completions")
++            hooks.notify(pre=True)
++            hooks.abandon()
++        queued = pool._work_queue.qsize()
++        assert queued <= observers._MAX_DELIVERIES, (
++            f"abandoned envelopes retained {queued} queued payloads for "
++            f"{observers._MAX_DELIVERIES} slots")
++    finally:
++        release.set()
++        monkeypatch.setattr(pool, "_adjust_thread_count", adjustment)
++        # A real executor barrier drains queued work; all threads are test-owned.
++        pool.submit(lambda: None).result(timeout=2)
++        assert observers._slots._value == observers._MAX_DELIVERIES
++        pool.shutdown(wait=False)
++        for thread in pool._threads:
++            thread.join(timeout=2)
++            assert not thread.is_alive(), "owned observer worker did not finish"
+diff --git a/tests/agent/test_local_helper_observers.py b/tests/agent/test_local_helper_observers.py
+new file mode 100644
+index 0000000000..8abe91a7e6
+--- /dev/null
++++ b/tests/agent/test_local_helper_observers.py
+@@ -0,0 +1,72 @@
++"""Independent acceptance: observers cannot expand the helper deadline.
++
++No endpoint is launched or contacted. An actual registered observer returns
++normally after 3 seconds; the configured helper budget is 1 second. Production
++hooks/config/wrapper code is used, not a mocked hook runner or transport.
++"""
++import asyncio
++import json
++import threading
++import time
++
++import pytest
++
++from agent import auxiliary_client as aux
++from hermes_cli import plugins
++from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
++from hermes_constants import get_hermes_home
++
++
++@pytest.mark.parametrize('mode', ['sync','async'])
++def test_registered_observer_cannot_extend_absolute_local_deadline(monkeypatch, mode):
++    home = get_hermes_home()
++    policy = {'provider':'llama.cpp','model':'offline-fixture',
++              'base_url':'http://127.0.0.1:1/v1','fallback_enabled':False,
++              'local_helper_caps':{'timeout':1.0},'max_concurrency':1}
++    (home/'config.yaml').write_text(json.dumps({'auxiliary':{'local_helper':policy}}))
++    manager = PluginManager()
++    manager._discovered = True
++    monkeypatch.setattr(plugins,'_plugin_manager',manager)
++    monkeypatch.setattr(plugins,'_plugin_managers_by_home',{})
++    monkeypatch.setattr(plugins,'get_plugin_manager',lambda:manager)
++    monkeypatch.setattr(plugins,'_ensure_plugins_discovered',lambda:manager)
++    ctx = PluginContext(PluginManifest(name='independent-offline-observer'),manager)
++    finished = threading.Event()
++    observations = []
++
++    def observer(**kwargs):
++        observations.append(kwargs['aux_task'])
++        time.sleep(3.0)
++        finished.set()
++
++    ctx.register_hook('pre_auxiliary_call',observer)
++
++    def forbidden(*args, **kwargs):
++        pytest.fail('helper reached generic provider, credential, fallback or Relay dispatch')
++
++    for name in ('_resolve_task_provider_model','resolve_provider_client','_get_cached_client',
++                 '_resolve_auto_route','_scoped_key_env','_try_payment_fallback',
++                 '_try_main_agent_model_fallback','_call_llm_impl','_async_call_llm_impl'):
++        monkeypatch.setattr(aux,name,forbidden)
++    from agent import relay_llm, secret_scope
++    monkeypatch.setattr(relay_llm,'execute_current',forbidden)
++    monkeypatch.setattr(relay_llm,'execute_current_async',forbidden)
++    monkeypatch.setattr(secret_scope,'get_secret',forbidden)
++    started = time.monotonic()
++    try:
++        with pytest.raises(TimeoutError):
++            request = dict(task='local_helper',messages=[{'role':'user','content':'offline synthetic text'}])
++            if mode == 'async':
++                asyncio.run(aux.async_call_llm(**request))
++            else:
++                aux.call_llm(**request)
++        elapsed = time.monotonic()-started
++        print(json.dumps({'mode':mode,'configured_deadline_seconds':1.0,
++                          'observer_delay_seconds':3.0,'elapsed_seconds':elapsed,
++                          'observer_finished_at_return':finished.is_set(),
++                          'observed_tasks':observations,'network_dispatch_permitted':False}),flush=True)
++        assert elapsed < 2.0, 'registered observer expanded the absolute helper deadline'
++    finally:
++        # Bound cleanup even if a future executor repairs the deadline path.
++        assert finished.wait(4.0), 'bounded observer did not finish'
++        aux._reset_aux_semaphores()
+diff --git a/tests/agent/test_local_helper_policy_shapes.py b/tests/agent/test_local_helper_policy_shapes.py
+new file mode 100644
+index 0000000000..8acee763b7
+--- /dev/null
++++ b/tests/agent/test_local_helper_policy_shapes.py
+@@ -0,0 +1,152 @@
++"""Real-loader shape refusals; downstream seams are offline sentinels only."""
++import asyncio
++import json
++import socket
++
++import pytest
++
++from agent import auxiliary_client as aux, qualified_local_helper as helper, secret_scope
++from hermes_cli import config
++from hermes_cli.config_read_errors import FailedConfigRead
++from hermes_constants import set_hermes_home_override, reset_hermes_home_override
++
++TASKS = ("title_generation", "profile_describer", "local_helper")
++SHAPES = [[], ["broken"], "", "broken", False, True, 0, 1, 1.5]
++MESSAGES = [{"role": "user", "content": "Offline synthetic text"}]
++POLICY = {"provider": "llama.cpp", "model": "offline-fixture",
++          "base_url": "http://127.0.0.1:1/v1", "fallback_enabled": False}
++
++
++@pytest.fixture
++def offline_seams(monkeypatch):
++    seen = []
++
++    def ordinary(**kwargs):
++        seen.append(("sync", kwargs["task"]))
++        return "ordinary"
++
++    async def async_ordinary(**kwargs):
++        seen.append(("async", kwargs["task"]))
++        return "ordinary"
++
++    def provider(provider, **kwargs):
++        seen.append(("raw", provider))
++        return "ordinary", "offline-fixture"
++
++    def forbidden(*args, **kwargs):
++        pytest.fail("shape validation reached transport, credentials or fallback")
++
++    monkeypatch.setattr(aux, "_call_llm_impl", ordinary)
++    monkeypatch.setattr(aux, "_async_call_llm_impl", async_ordinary)
++    monkeypatch.setattr(aux, "resolve_provider_client", provider)
++    for name in ("_get_cached_client", "_resolve_auto_route", "_scoped_key_env",
++                 "_try_payment_fallback", "_try_main_agent_model_fallback"):
++        monkeypatch.setattr(aux, name, forbidden)
++    monkeypatch.setattr(helper, "call_local", forbidden)
++    monkeypatch.setattr(helper, "acall_local", forbidden)
++    monkeypatch.setattr(socket, "create_connection", forbidden)
++    monkeypatch.setattr(secret_scope, "get_secret", forbidden)
++    aux._reset_aux_semaphores()
++    yield seen
++    aux._reset_aux_semaphores()
++
++
++def consume(task, mode):
++    if mode == "raw":
++        return aux.get_text_auxiliary_client(task)[0]
++    if mode == "async":
++        return asyncio.run(aux.async_call_llm(task=task, messages=MESSAGES))
++    return aux.call_llm(task=task, messages=MESSAGES)
++
++
++def write(home, value):
++    home.mkdir(parents=True, exist_ok=True)
++    (home / "config.yaml").write_text(json.dumps(value))
++
++
++@pytest.mark.parametrize("task", TASKS)
++@pytest.mark.parametrize("level", ["auxiliary", "task"])
++@pytest.mark.parametrize("shape", SHAPES)
++@pytest.mark.parametrize("warm", [False, True])
++@pytest.mark.parametrize("mode", ["sync", "async", "raw"])
++def test_real_loader_malformed_shapes_refuse_a_b_a(tmp_path, offline_seams, task, level, shape, warm, mode):
++    homes = [tmp_path / "a", tmp_path / "b"]
++    if warm:
++        write(homes[0], {"auxiliary": {task: POLICY}})
++        token = set_hermes_home_override(homes[0])
++        try:
++            assert helper.prepare_local_call(task, messages=MESSAGES) is not None
++        finally:
++            reset_hermes_home_override(token)
++    invalid = {"auxiliary": shape if level == "auxiliary" else {task: shape}}
++    write(homes[0], invalid)
++    write(homes[1], {})
++    previous = secret_scope._MULTIPLEX_ACTIVE
++    secret_scope.set_multiplex_active(True)
++    try:
++        for home in (homes[0], homes[1], homes[0]):
++            token = set_hermes_home_override(home)
++            try:
++                if home == homes[1]:
++                    # B must not inherit A's malformed policy or a historical latch.
++                    cfg = aux._get_auxiliary_task_config(task)
++                    assert not isinstance(cfg, FailedConfigRead)
++                    assert cfg["fallback_enabled"] is True
++                    if task == "local_helper" and mode != "raw":
++                        with pytest.raises(helper.LocalHelperError, match="requires explicit"):
++                            consume(task, mode)
++                    else:
++                        assert consume(task, mode) == "ordinary"
++                    offline_seams.clear()
++                    continue
++                loaded = config.load_config_readonly()
++                assert not isinstance(loaded, FailedConfigRead), "exercise valid YAML, not syntax failure"
++                value = loaded["auxiliary"] if level == "auxiliary" else loaded["auxiliary"][task]
++                assert type(value) is type(shape) and value == shape
++                # Public consumers must refuse, not merely produce a config marker.
++                with pytest.raises(helper.LocalHelperError, match="policy cannot be read"):
++                    consume(task, mode)
++                assert offline_seams == []
++                task_cfg = aux._get_auxiliary_task_config(task)
++                assert isinstance(task_cfg, FailedConfigRead)
++                assert isinstance(task_cfg.read_error, TypeError)
++            finally:
++                reset_hermes_home_override(token)
++    finally:
++        secret_scope.set_multiplex_active(previous)
++
++
++@pytest.mark.parametrize("task", [*TASKS, "oneshot", "compression", "plugin-fixture"])
++@pytest.mark.parametrize("mode", ["sync", "async", "raw"])
++@pytest.mark.parametrize("form", ["absent-file", "empty-file", "absent", "aux-empty", "task-empty",
++                                  "aux-null", "task-null", "aux-blank", "task-blank", "fallback-true",
++                                  "other-task-malformed", "aux-malformed-unguarded", "task-malformed-unguarded"])
++def test_real_loader_shape_defaults_preserve_ordinary_contract(tmp_path, offline_seams, task, mode, form):
++    home = tmp_path / "defaults"
++    home.mkdir()
++    path = home / "config.yaml"
++    values = {"absent": {}, "aux-empty": {"auxiliary": {}},
++              "task-empty": {"auxiliary": {task: {}}}, "aux-null": {"auxiliary": None},
++              "task-null": {"auxiliary": {task: None}},
++              "fallback-true": {"auxiliary": {task: {"fallback_enabled": True}}},
++              "other-task-malformed": {"auxiliary": {"unrelated-fixture": []}},
++              "aux-malformed-unguarded": {"auxiliary": []},
++              "task-malformed-unguarded": {"auxiliary": {task: "broken"}}}
++    if form.endswith("unguarded") and task in TASKS:
++        pytest.skip("guarded shape refusals are covered by the malformed matrix")
++    raw_forms = {"empty-file": "", "aux-blank": "auxiliary:\n", "task-blank": f"auxiliary:\n  {task}:\n"}
++    if form != "absent-file":
++        content = raw_forms[form] if form in raw_forms else json.dumps(values[form])
++        path.write_text(content)
++    token = set_hermes_home_override(home)
++    try:
++        assert not isinstance(aux._get_auxiliary_task_config(task), FailedConfigRead)
++        if task == "local_helper" and mode != "raw":
++            with pytest.raises(helper.LocalHelperError, match="requires explicit"):
++                consume(task, mode)
++            assert not offline_seams
++        else:
++            assert consume(task, mode) == "ordinary"
++            assert len(offline_seams) == 1
++    finally:
++        reset_hermes_home_override(token)
+diff --git a/tests/agent/test_local_helper_review_regressions.py b/tests/agent/test_local_helper_review_regressions.py
+new file mode 100644
+index 0000000000..bf27852bf5
+--- /dev/null
++++ b/tests/agent/test_local_helper_review_regressions.py
+@@ -0,0 +1,176 @@
++"""Behavioral regressions from independent local-helper acceptance review."""
++import asyncio
++import gc
++import os
++import threading
++import weakref
++from types import SimpleNamespace
++
++import pytest
++
++pytest_plugins = ["tests.agent.test_qualified_local_helper"]
++
++from tests.agent.test_qualified_local_helper import (
++    assert_wire, configure, invoke,
++)
++
++from agent import auxiliary_client as aux
++
++
++@pytest.mark.platforms("posix")
++def test_real_title_entrypoint_handles_high_socket_fd(loopback):
++    import resource
++    from agent.title_generator import generate_title
++
++    soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
++    if soft_limit <= 1150:
++        pytest.skip("requires an existing file descriptor limit above 1150")
++    configure(loopback)
++    descriptors = []
++    try:
++        while not descriptors or descriptors[-1] < 1100:
++            descriptors.append(os.open(os.devnull, os.O_RDONLY))
++        errors = []
++        assert generate_title("Repair cache invalidation", failure_callback=lambda *e: errors.append(e)) == "Repair cache invalidation", errors
++        assert not errors
++        assert_wire(loopback)
++    finally:
++        for descriptor in descriptors:
++            os.close(descriptor)
++
++
++@pytest.mark.parametrize("entrypoint", ["api", "rpc"])
++def test_default_oneshot_is_not_captured_by_local_title_policy(loopback, monkeypatch, entrypoint):
++    configure(loopback)
++    seen = []
++
++    def ordinary_call(**kwargs):
++        seen.append(kwargs)
++        message = SimpleNamespace(content="fix: repair cache", reasoning=None,
++                                  reasoning_content=None, reasoning_details=None)
++        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
++
++    # Never make an upstream request. Exercise the real public routing wrapper
++    # and entrypoint while replacing only the ordinary implementation seam.
++    monkeypatch.setattr(aux, "_call_llm_impl", ordinary_call)
++    if entrypoint == "api":
++        from agent.oneshot import run_oneshot
++        assert run_oneshot(instructions="Write a commit message", user_input="Repair cache") == "fix: repair cache"
++    else:
++        from tui_gateway import server
++        result = server._methods["llm.oneshot"]("review-regression", {
++            "instructions": "Write a commit message", "input": "Repair cache",
++        })
++        assert result.get("result", {}).get("text") == "fix: repair cache", result
++    assert len(seen) == 1
++    assert seen[0]["task"] == "oneshot"
++    assert seen[0]["max_tokens"] == 1024
++    assert seen[0]["temperature"] == 0.3
++    assert seen[0]["timeout"] == 60.0
++    assert not loopback["requests"]
++
++
++def test_host_cancellation_does_not_poison_callers_task(loopback):
++    configure(loopback)
++    loopback["slow_headers"] = True
++    event = threading.Event()
++
++    async def run():
++        owner = asyncio.current_task()
++        assert owner is not None
++        assert owner.cancelling() == 0
++
++        async def signal_host_cancel():
++            deadline = asyncio.get_running_loop().time() + 2
++            while not loopback["received"].is_set():
++                assert asyncio.get_running_loop().time() < deadline
++                await asyncio.sleep(0.01)
++            event.set()
++
++        signaler = asyncio.create_task(signal_host_cancel())
++        try:
++            with aux.aux_interrupt_protection(cancel_event=event):
++                with pytest.raises(aux.AuxiliaryExplicitCancellation):
++                    # Await in the owner's long-lived task, not a throwaway one.
++                    await aux.async_call_llm(task="title_generation", messages=[{
++                        "role": "user", "content": "Repair cache",
++                    }])
++            assert owner.cancelling() == 0
++
++            async def child_failure():
++                raise ValueError("expected child error")
++
++            with pytest.raises(ExceptionGroup):
++                async with asyncio.TaskGroup() as group:
++                    group.create_task(child_failure())
++            await asyncio.sleep(0)  # No stale/spurious CancelledError.
++        finally:
++            signaler.cancel()
++            await asyncio.gather(signaler, return_exceptions=True)
++
++    asyncio.run(run())
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("task", ["title_generation", "profile_describer", "local_helper"])
++@pytest.mark.parametrize("warm", [False, True])
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_unreadable_policy_never_reverts_to_ordinary_routing(loopback, task, warm, mode):
++    from agent.qualified_local_helper import LocalHelperError
++    from hermes_constants import get_hermes_home
++
++    configure(loopback, task=task)
++    if warm:
++        assert aux._get_auxiliary_task_config(task)["fallback_enabled"] is False
++    (get_hermes_home() / "config.yaml").write_text("auxiliary: [unterminated\n")
++    with pytest.raises(LocalHelperError, match="policy cannot be read"):
++        invoke(mode, task=task)
++    assert not loopback["requests"]
++
++
++def test_closed_async_loops_are_collectible_after_contended_helpers(loopback):
++    configure(loopback)
++
++    async def run():
++        messages = [{"role": "user", "content": "Repair cache"}]
++        replies = await asyncio.gather(*(aux.async_call_llm(
++            task="title_generation", messages=messages) for _ in range(2)))
++        assert all(reply.choices[0].message.content for reply in replies)
++        return weakref.ref(asyncio.get_running_loop())
++
++    references = [asyncio.run(run()) for _ in range(3)]
++    gc.collect()
++    assert all(reference() is None for reference in references), "global helper permits retain closed loops"
++    assert len(loopback["requests"]) == 2 * len(references)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("loopback", ["::1"], indirect=True)
++def test_ipv6_host_header_preserves_bracketed_authority(loopback, mode):
++    configure(loopback)
++    assert invoke(mode).choices[0].message.content
++    assert_wire(loopback)
++    assert loopback["requests"][0][1]["Host"] == loopback["url"].removeprefix("http://").removesuffix("/v1")
++
++
++@pytest.mark.parametrize("field", ["key_env", "api_key_env"])
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_configured_credential_selectors_are_refused_without_lookup(loopback, field, mode):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback, **{field: "OPENAI_API_KEY"})
++    with pytest.raises(LocalHelperError, match="credentials"):
++        invoke(mode)
++    assert not loopback["requests"]
++
++
++def test_raw_client_api_also_refuses_unreadable_local_policy(loopback, monkeypatch):
++    from agent.qualified_local_helper import LocalHelperError
++    from hermes_constants import get_hermes_home
++    from tests.agent.test_qualified_local_helper import _ORIGINAL_TASK_RESOLVER
++
++    configure(loopback)
++    (get_hermes_home() / "config.yaml").write_text("auxiliary: [unterminated\n")
++    monkeypatch.setattr(aux, "_resolve_task_provider_model", _ORIGINAL_TASK_RESOLVER)
++    with pytest.raises(LocalHelperError, match="policy cannot be read"):
++        aux.get_text_auxiliary_client("title_generation")
++    assert not loopback["requests"]
+diff --git a/tests/agent/test_qualified_local_helper.py b/tests/agent/test_qualified_local_helper.py
+new file mode 100644
+index 0000000000..413c983928
+--- /dev/null
++++ b/tests/agent/test_qualified_local_helper.py
+@@ -0,0 +1,677 @@
++"""Offline loopback proof for credential-free, bounded auxiliary helpers.
++
++These fixtures are protocol tests, NOT inference or model qualification.
++"""
++from __future__ import annotations
++
++import asyncio
++import gc
++import gzip
++import json
++import socket
++import threading
++import time
++import weakref
++import zlib
++from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
++
++import pytest
++import hermes_yaml as yaml
++
++from agent import auxiliary_client as aux
++from agent import qualified_local_helper as local_helper
++from hermes_constants import get_hermes_home
++
++_ORIGINAL_TASK_RESOLVER = aux._resolve_task_provider_model
++
++
++def completion(content='{"title":"Repair cache invalidation"}', **message_fields):
++    return {"model": "fixture-model", "choices": [{"finish_reason": "stop", "message": {
++        "role": "assistant", "content": content, **message_fields,
++    }}]}
++
++
++@pytest.fixture
++def loopback(request):
++    bind = getattr(request, "param", "127.0.0.1")
++    state = {"requests": [], "payload": completion(), "status": 200, "headers": {},
++             "raw": None, "trickle": False, "slow_headers": False, "disconnect": False, "chunked": False,
++             "received": threading.Event(), "closed": threading.Event()}
++
++    class Handler(BaseHTTPRequestHandler):
++        protocol_version = "HTTP/1.1"
++
++        def log_message(self, format, *args):
++            pass
++
++        def do_POST(self):
++            body = self.rfile.read(int(self.headers["Content-Length"]))
++            state["requests"].append((self.path, dict(self.headers), json.loads(body)))
++            state["received"].set()
++            if state["disconnect"]:
++                self.connection.shutdown(socket.SHUT_RDWR)
++                state["closed"].set()
++                return
++            raw = state["raw"]
++            if raw is None:
++                raw = json.dumps(state["payload"]).encode()
++            if state["slow_headers"]:
++                header = (b"HTTP/1.1 200 OK\r\nX-Padding: " + b"x" * 140 +
++                          f"\r\nContent-Length: {len(raw)}\r\n\r\n".encode())
++                try:
++                    for byte in header:
++                        self.wfile.write(bytes([byte]))
++                        self.wfile.flush()
++                        if state["closed"].wait(0.025):
++                            return
++                    self.wfile.write(raw)
++                except (BrokenPipeError, ConnectionResetError):
++                    state["closed"].set()
++                finally:
++                    self.close_connection = True
++                return
++            self.send_response(state["status"])
++            self.send_header("Content-Type", "application/json")
++            if state["chunked"]:
++                self.send_header("Transfer-Encoding", "chunked")
++            else:
++                self.send_header("Content-Length", str(len(raw)))
++            for name, value in state["headers"].items():
++                self.send_header(name, value)
++            self.end_headers()
++            try:
++                if state["trickle"]:
++                    # A response byte well inside each read timeout, indefinitely.
++                    for byte in raw:
++                        self.wfile.write(bytes([byte]))
++                        self.wfile.flush()
++                        if state["closed"].wait(0.025):
++                            break
++                elif state["chunked"]:
++                    for offset in range(0, len(raw), 1024):
++                        part = raw[offset:offset + 1024]
++                        self.wfile.write(f"{len(part):x}\r\n".encode() + part + b"\r\n")
++                        self.wfile.flush()
++                    self.wfile.write(b"0\r\n\r\n")
++                else:
++                    self.wfile.write(raw)
++                    self.wfile.flush()
++                self.connection.settimeout(3)
++                if self.connection.recv(1) == b"":
++                    state["closed"].set()
++            except (BrokenPipeError, ConnectionResetError):
++                state["closed"].set()
++            finally:
++                self.close_connection = True
++
++    class Server(ThreadingHTTPServer):
++        address_family = socket.AF_INET6 if bind == "::1" else socket.AF_INET
++    server = Server((bind, 0), Handler)
++    server.daemon_threads = True
++    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.02})
++    thread.start()
++    host = "[::1]" if bind == "::1" else bind
++    state["url"] = f"http://{host}:{server.server_port}/v1"
++    try:
++        yield state
++    finally:
++        state["closed"].set()
++        server.shutdown()
++        server.server_close()
++        thread.join(3)
++        assert not thread.is_alive()
++
++
++def configure(loopback, task="title_generation", home=None, **changes):
++    home = home or get_hermes_home()
++    home.mkdir(parents=True, exist_ok=True)
++    policy = {"provider": "llama.cpp", "model": "fixture-model", "base_url": loopback["url"],
++              "fallback_enabled": False, "max_concurrency": 1,
++              "local_helper_caps": {"timeout": 0.8, "max_tokens": 512,
++                                    "max_input_chars": 16384, "max_response_bytes": 65536}}
++    policy.update(changes)
++    (home / "config.yaml").write_text(yaml.safe_dump({"auxiliary": {task: policy}}))
++    return policy
++
++
++@pytest.fixture(autouse=True)
++def no_generic_dispatch(monkeypatch):
++    def forbidden(*args, **kwargs):
++        pytest.fail("qualified helper reached generic routing/credentials/Relay")
++    for name in ("_resolve_task_provider_model", "_get_cached_client", "_resolve_auto_route",
++                 "_try_payment_fallback", "_try_main_agent_model_fallback",
++                 "_with_custom_endpoint_extra_body"):
++        monkeypatch.setattr(aux, name, forbidden)
++    from agent import relay_llm, secret_scope
++    monkeypatch.setattr(relay_llm, "execute_current", forbidden)
++    monkeypatch.setattr(relay_llm, "execute_current_async", forbidden)
++    monkeypatch.setattr(secret_scope, "get_secret", forbidden)
++    monkeypatch.setenv("OPENAI_API_KEY", "offline-cloud-sentinel")
++    monkeypatch.setenv("OPENROUTER_API_KEY", "offline-cloud-sentinel")
++    aux._reset_aux_semaphores()
++    yield
++    aux._reset_aux_semaphores()
++
++
++def invoke(mode="sync", **kwargs):
++    request = {"task": "title_generation", "messages": [{"role": "user", "content": "Name cache fix"}],
++               **kwargs}
++    if mode == "async":
++        return asyncio.run(aux.async_call_llm(**request))
++    if mode == "sync_in_loop":
++        async def run():
++            return aux.call_llm(**request)
++        return asyncio.run(run())
++    return aux.call_llm(**request)
++
++
++def assert_wire(loopback):
++    assert len(loopback["requests"]) == 1
++    path, headers, body = loopback["requests"][0]
++    assert path == "/v1/chat/completions"
++    assert set(body) == {"model", "messages", "max_tokens"}
++    assert body["model"] == "fixture-model"
++    assert body["max_tokens"] <= 512
++    assert not ({k.lower() for k in headers} & {"authorization", "cookie", "x-api-key"})
++    assert headers["Accept-Encoding"] == "identity"
++    assert loopback["closed"].wait(3), "helper did not close its connection"
++
++
++def test_real_title_entrypoint_accepts_only_fixed_title_controls(loopback):
++    configure(loopback)
++    from agent.title_generator import generate_title
++    errors = []
++    assert generate_title("Repair broken cache invalidation", failure_callback=lambda *e: errors.append(e)) == "Repair cache invalidation"
++    assert not errors
++    assert_wire(loopback)
++
++
++def test_real_profile_describer_respects_local_caps(loopback, monkeypatch, tmp_path):
++    from pathlib import Path
++    from hermes_cli import profile_describer, profiles
++    monkeypatch.setattr(Path, "home", lambda: tmp_path)
++    configure(loopback, task="profile_describer")
++    loopback["payload"] = completion('{"description":"Reviews and tests Python code."}')
++    outcome = profile_describer.describe_profile("default")
++    assert outcome.ok, outcome.reason
++    assert profiles.read_profile_meta(get_hermes_home())["description"] == outcome.description
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async", "sync_in_loop"])
++def test_absolute_deadline_closes_slow_header_connection(loopback, mode):
++    configure(loopback, local_helper_caps={"timeout": 0.2})
++    loopback["slow_headers"] = True
++    start = time.monotonic()
++    with pytest.raises(TimeoutError):
++        invoke(mode)
++    assert time.monotonic() - start < 2, "per-read timeout allowed an unbounded header trickle"
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async", "sync_in_loop"])
++def test_absolute_deadline_closes_body_trickle_and_releases_permit(loopback, mode):
++    configure(loopback, local_helper_caps={"timeout": 0.2})
++    loopback["trickle"] = True
++    start = time.monotonic()
++    with pytest.raises(TimeoutError):
++        invoke(mode)
++    assert time.monotonic() - start < 2
++    assert_wire(loopback)
++    loopback["trickle"] = False
++    loopback["closed"].clear()
++    loopback["requests"].clear()
++    assert invoke(mode).choices[0].message.content
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("encoding", ["gzip", "GZip", "deflate", "br", "zstd", "identity, gzip", "unknown"])
++def test_compressed_bomb_is_refused_without_any_decompression(loopback, monkeypatch, mode, encoding):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback)
++    bomb = gzip.compress(json.dumps(completion("x" * 1200000)).encode())
++    assert len(bomb) < 2048
++    loopback["raw"] = bomb
++    loopback["headers"]["Content-Encoding"] = encoding
++    def never_decompress(*args, **kwargs):
++        pytest.fail("compressed helper response was decompressed before refusal")
++    monkeypatch.setattr(zlib, "decompressobj", never_decompress)
++    monkeypatch.setattr(gzip, "decompress", never_decompress)
++    import httpx._decoders
++    monkeypatch.setattr(httpx._decoders.GZipDecoder, "decode", never_decompress)
++    with pytest.raises(LocalHelperError, match="compressed"):
++        invoke(mode)
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("payload", [
++    {}, {"choices": []}, {"choices": "bad"}, {"error": "refused"},
++    completion(""), completion(123), completion(refusal="No"),
++    completion(tool_calls=[{"function": {"name": "read_file"}}]),
++    completion(function_call={"name": "read_file"}), completion("x" * 8193),
++    {"choices": [{"finish_reason": "length", "message": {"role": "assistant", "content": "x"}}]},
++    {"choices": [{"finish_reason": "stop", "message": {"role": "tool", "content": "x"}}]},
++    {**completion(), "model": "different-model"},
++])
++def test_refused_malformed_or_tool_call_output_never_retries(loopback, mode, payload):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback)
++    loopback["payload"] = payload
++    with pytest.raises(LocalHelperError):
++        invoke(mode)
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("raw", [b"not-json", b"\xff", b'{"choices":[],"choices":[]}', b'{"x":NaN}'])
++def test_invalid_raw_json_is_refused(loopback, mode, raw):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback)
++    loopback["raw"] = raw
++    with pytest.raises(LocalHelperError):
++        invoke(mode)
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("chunked", [False, True])
++def test_oversized_raw_response_closes_before_decoding(loopback, mode, chunked):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback, local_helper_caps={"max_response_bytes": 512})
++    loopback["chunked"] = chunked
++    loopback["raw"] = b"x" * 65536
++    with pytest.raises(LocalHelperError, match="raw byte cap"):
++        invoke(mode)
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_disconnect_has_no_retry_or_fallback(loopback, mode):
++    import httpcore
++    configure(loopback)
++    loopback["disconnect"] = True
++    with pytest.raises(httpcore.RemoteProtocolError):
++        invoke(mode)
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("status", [302, 307, 401, 429, 500])
++def test_http_refusal_does_not_follow_redirect_or_retry(loopback, mode, status):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback)
++    loopback["status"] = status
++    loopback["headers"]["Location"] = "http://127.0.0.1:1/cloud"
++    with pytest.raises(LocalHelperError):
++        invoke(mode)
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_proxy_environment_is_ignored(loopback, monkeypatch, mode):
++    configure(loopback)
++    for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
++        monkeypatch.setenv(key, "http://offline-cloud-sentinel@127.0.0.1:1")
++    monkeypatch.setenv("NO_PROXY", "")
++    monkeypatch.setenv("no_proxy", "")
++    assert invoke(mode).choices[0].message.content
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("change", [
++    {"provider": "auto"}, {"provider": "custom"}, {"provider": "openrouter"}, {"provider": "unknown"},
++    {"model": ""}, {"model": "AUTO"}, {"model": " padded "}, {"model": "model\n"},
++    {"base_url": ""}, {"base_url": "http://localhost:8080/v1"},
++    {"base_url": "http://127.1:8080/v1"}, {"base_url": "http://2130706433:8080/v1"},
++    {"base_url": "http://127.0.0.1.evil:8080/v1"}, {"base_url": "http://user@127.0.0.1:8080/v1"},
++    {"base_url": "http://127.0.0.1:8080/v1?x=1"}, {"base_url": "http://127.0.0.1:8080/v1#x"},
++    {"base_url": "http://127.0.0.1:8080/../v1"}, {"base_url": "http://127.0.0.1:8080/v1/%2e"},
++    {"base_url": "https://127.0.0.1:8080/v1"}, {"base_url": "http://127.0.0.1:08080/v1"},
++    {"base_url": "http://127.0.0.1:99999/v1"}, {"base_url": "http://[::ffff:127.0.0.1]:8080/v1"},
++    {"api_key": "offline-cloud-sentinel"}, {"extra_body": {"model": "different"}},
++    {"extra_headers": {"Authorization": "offline-cloud-sentinel"}}, {"api_mode": "codex_responses"},
++    {"local_helper_caps": {"timeout": float("inf")}}, {"local_helper_caps": {"timeout": 0}},
++    {"local_helper_caps": {"timeout": 31}}, {"local_helper_caps": {"max_tokens": 1025}},
++    {"local_helper_caps": {"max_input_chars": 32769}}, {"local_helper_caps": {"max_response_bytes": 131073}},
++    {"local_helper_caps": {"timeout": True}}, {"max_concurrency": 0},
++])
++def test_unsafe_policy_fails_before_dispatch(loopback, mode, change):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback, **change)
++    with pytest.raises(LocalHelperError):
++        invoke(mode)
++    assert not loopback["requests"]
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("task", ["approval", "review", "compression", "vision", "unknown"])
++def test_sensitive_or_unsupported_no_fallback_task_fails_before_resolver(loopback, mode, task):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback, task=task)
++    with pytest.raises(LocalHelperError, match="low-risk"):
++        invoke(mode, task=task)
++    assert not loopback["requests"]
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("override", [
++    {"provider": "openrouter"}, {"model": "different"}, {"base_url": "http://127.0.0.1:1/v1"},
++    {"api_key": "offline-cloud-sentinel"}, {"tools": []}, {"extra_body": {"model": "different"}},
++    {"reasoning_config": {"enabled": True}}, {"max_tokens": 513}, {"timeout": 1.0},
++    {"messages": [{"role": "tool", "content": "hello"}]},
++    {"messages": [{"role": "user", "content": [{"type": "image_url"}]}]},
++    {"messages": [{"role": "user", "content": "x", "tool_calls": []}]},
++    {"messages": [{"role": "user", "content": "x" * 16385}]},
++])
++def test_request_overrides_cannot_change_identity_caps_or_tool_free_contract(loopback, mode, override):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback)
++    with pytest.raises(LocalHelperError):
++        invoke(mode, **override)
++    assert not loopback["requests"]
++
++
++def test_raw_client_api_refuses_no_fallback_before_reading_key_env(loopback, monkeypatch):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback, task="approval", key_env="OPENAI_API_KEY")
++    monkeypatch.setattr(aux, "_resolve_task_provider_model", _ORIGINAL_TASK_RESOLVER)
++    with pytest.raises(LocalHelperError):
++        aux.get_text_auxiliary_client("approval")
++    assert not loopback["requests"]
++
++
++def test_local_helper_defaults_are_registered_but_do_not_enable_routes():
++    for task in ("title_generation", "profile_describer", "local_helper"):
++        cfg = aux._get_auxiliary_task_config(task)
++        assert cfg.get("fallback_enabled") is True
++        assert cfg["local_helper_caps"]["max_response_bytes"] <= 131072
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_one_policy_snapshot_survives_observer_and_config_mutation(loopback, monkeypatch, mode):
++    from agent.qualified_local_helper import LocalHelperError
++    from hermes_cli import plugins
++    from hermes_cli.plugins import PluginContext, PluginManager, PluginManifest
++    policy = configure(loopback)
++    reads, events = [], []
++    def get_policy(task):
++        reads.append(task)
++        return policy
++    monkeypatch.setattr(aux, "_get_auxiliary_task_config", get_policy)
++    manager = PluginManager()
++    manager._discovered = True
++    monkeypatch.setattr(plugins, "_plugin_manager", manager)
++    monkeypatch.setattr(plugins, "_plugin_managers_by_home", {})
++    monkeypatch.setattr(plugins, "get_plugin_manager", lambda: manager)
++    monkeypatch.setattr(plugins, "_ensure_plugins_discovered", lambda: manager)
++    context = PluginContext(PluginManifest(name="offline-snapshot-observer"), manager)
++    def observe(name, **payload):
++        events.append((name, payload))
++        if name == "pre_auxiliary_call":
++            policy["provider"] = "openrouter"
++            policy["model"] = "different"
++            policy["local_helper_caps"]["max_tokens"] = 1
++            policy["local_helper_caps"]["max_response_bytes"] = 1
++            payload["request_messages"][0]["content"] = "rewritten"
++            payload["request"]["body"]["model"] = "different"
++    # Exercise real registered subscribers, including the deadline-aware lane;
++    # intercepting the ordinary dispatcher's private _fire no longer tests it.
++    context.register_hook("pre_auxiliary_call", lambda **payload: observe("pre_auxiliary_call", **payload))
++    context.register_hook("post_auxiliary_call", lambda **payload: observe("post_auxiliary_call", **payload))
++    route = {}
++    assert invoke(mode, route_info=route).choices[0].message.content
++    assert reads == ["title_generation"]
++    assert route == {"provider": "llama.cpp", "model": "fixture-model"}
++    assert [name for name, _ in events] == ["pre_auxiliary_call", "post_auxiliary_call"]
++    assert events[1][1]["error"] is None
++    assert loopback["requests"][0][2]["messages"][0]["content"] == "Name cache fix"
++    assert_wire(loopback)
++    with pytest.raises(LocalHelperError):
++        invoke(mode)
++    assert len(loopback["requests"]) == 1
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_multiplex_home_a_b_a_uses_own_policy_and_budget(loopback, tmp_path, mode):
++    from hermes_constants import set_hermes_home_override, reset_hermes_home_override
++    from agent import secret_scope
++    homes = [tmp_path / "a", tmp_path / "b"]
++    for home, model in zip(homes, ("model-a", "model-b")):
++        configure(loopback, home=home, model=model)
++    owned = []
++
++    async def run_owned():
++        call = local_helper.prepare_local_call(
++            "title_generation", messages=[{"role": "user", "content": "Name cache fix"}])
++        semaphore = local_helper._async_semaphore(call)
++        loop_ref = weakref.ref(asyncio.get_running_loop())
++        key = (call.home, call.task, loop_ref)
++        assert local_helper._async_semaphores[key] is semaphore
++        reply = await aux.async_call_llm(
++            task="title_generation", messages=[{"role": "user", "content": "Name cache fix"}])
++        assert semaphore._value == semaphore.limit, "helper did not return its permit"
++        return reply, key, weakref.ref(semaphore)
++
++    previous = secret_scope._MULTIPLEX_ACTIVE
++    secret_scope.set_multiplex_active(True)
++    try:
++        for home, model in ((homes[0], "model-a"), (homes[1], "model-b"), (homes[0], "model-a")):
++            token = set_hermes_home_override(home)
++            try:
++                loopback["payload"] = {**completion(), "model": model}
++                loopback["closed"].clear()
++                if mode == "async":
++                    reply, key, semaphore_ref = asyncio.run(run_owned())
++                    owned.append((key, semaphore_ref))
++                    assert reply.model == model
++                else:
++                    assert invoke(mode).model == model
++                assert loopback["closed"].wait(3), "helper did not close its connection"
++            finally:
++                reset_hermes_home_override(token)
++    finally:
++        secret_scope.set_multiplex_active(previous)
++    assert [body["model"] for _, _, body in loopback["requests"]] == ["model-a", "model-b", "model-a"]
++    if mode == "async":
++        # Tracebacks from earlier refusals can survive until cyclic GC. Check
++        # only this test's completed loops/permits, not unrelated live entries.
++        gc.collect()
++        assert all(key[2]() is None and reference() is None for key, reference in owned)
++        assert all(key not in local_helper._async_semaphores for key, _ in owned)
++    else:
++        assert {key[0] for key in aux._aux_sync_semaphores} == {str(home.resolve()) for home in homes}
++        for _, semaphore in aux._aux_sync_semaphores.values():
++            assert semaphore.acquire(blocking=False), "helper did not return its permit"
++            semaphore.release()
++
++
++def test_async_cancellation_closes_connection_and_returns_permit(loopback):
++    configure(loopback)
++    loopback["slow_headers"] = True
++    async def run():
++        request = dict(task="title_generation", messages=[{"role": "user", "content": "x"}])
++        sem = local_helper._async_semaphore(local_helper.prepare_local_call(
++            "title_generation", messages=[{"role": "user", "content": "x"}]))
++        active = asyncio.create_task(aux.async_call_llm(**request))
++        deadline = asyncio.get_running_loop().time() + 2
++        while not loopback["received"].is_set():
++            assert asyncio.get_running_loop().time() < deadline
++            await asyncio.sleep(0.01)
++        active.cancel()
++        with pytest.raises(asyncio.CancelledError):
++            await active
++        assert sem._value == 1
++    asyncio.run(run())
++    assert_wire(loopback)
++
++
++def test_sync_host_cancellation_closes_connection_without_worker_threads(loopback):
++    configure(loopback)
++    loopback["slow_headers"] = True
++    event = threading.Event()
++    errors = []
++    def cancel():
++        if not loopback["received"].wait(2):
++            errors.append("not dispatched")
++        event.set()
++    timer = threading.Thread(target=cancel)
++    timer.start()
++    try:
++        with aux.aux_interrupt_protection(cancel_event=event):
++            with pytest.raises(aux.AuxiliaryExplicitCancellation):
++                invoke()
++    finally:
++        timer.join(3)
++    assert not timer.is_alive() and not errors
++    assert all(entry[1].acquire(blocking=False) for entry in aux._aux_sync_semaphores.values())
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_queue_deadline_never_dispatches_or_leaks_permits(loopback, mode):
++    from hermes_constants import hermes_home_key
++    configure(loopback, local_helper_caps={"timeout": 0.1})
++    if mode == "sync":
++        sem = aux._cached_semaphore(aux._aux_sync_semaphores, (hermes_home_key(), "title_generation"), 1,
++                                    threading.BoundedSemaphore)
++        sem.acquire()
++        try:
++            with pytest.raises(TimeoutError):
++                invoke()
++            assert not sem.acquire(blocking=False)
++        finally:
++            sem.release()
++    else:
++        async def run():
++            sem = local_helper._async_semaphore(local_helper.prepare_local_call(
++                "title_generation", messages=[{"role": "user", "content": "x"}]))
++            await sem.acquire()
++            try:
++                with pytest.raises(TimeoutError):
++                    await aux.async_call_llm(task="title_generation", messages=[{"role": "user", "content": "x"}])
++                assert sem._value == 0
++            finally:
++                sem.release()
++        asyncio.run(run())
++    assert not loopback["requests"]
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("alias", ["llama.cpp", "llamacpp", "llama-cpp"])
++def test_explicit_local_alias_preserves_pinned_payload(loopback, mode, alias):
++    configure(loopback, provider=alias)
++    loopback["headers"]["Content-Encoding"] = "identity"
++    invoke(mode, model="fixture-model", base_url=loopback["url"], provider=alias, max_tokens=400, timeout=0.7)
++    assert_wire(loopback)
++    assert loopback["requests"][0][2]["max_tokens"] == 400
++
++
++@pytest.mark.parametrize("field", ["extra_headers", "stream", "stream_options", "api_mode", "extra_body"])
++def test_sync_wire_controls_are_not_override_escape_hatches(loopback, field):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback)
++    overrides = {"extra_headers": {}, "stream": True, "stream_options": {}, "api_mode": "responses",
++                 "extra_body": {"response_format": {"type": "json_object"}}}
++    with pytest.raises(LocalHelperError):
++        invoke(**{field: overrides[field]})
++    assert not loopback["requests"]
++
++
++def test_config_cli_writes_supported_local_policy_used_by_real_call(loopback, capsys):
++    from hermes_cli.config import set_config_value
++    prefix = "auxiliary.title_generation."
++    values = {"provider": "llama.cpp", "model": "fixture-model", "base_url": loopback["url"],
++              "fallback_enabled": "false", "local_helper_caps.timeout": "0.8"}
++    for field, value in values.items():
++        set_config_value(prefix + field, value)
++    assert "unknown" not in capsys.readouterr().out.lower()
++    assert invoke().choices[0].message.content
++    assert aux._get_auxiliary_task_config("title_generation")["fallback_enabled"] is False
++    assert_wire(loopback)
++
++
++def test_async_host_cancellation_closes_stalled_connection(loopback):
++    configure(loopback)
++    loopback["slow_headers"] = True
++    event = threading.Event()
++    async def run():
++        with aux.aux_interrupt_protection(cancel_event=event):
++            sem = local_helper._async_semaphore(local_helper.prepare_local_call(
++                "title_generation", messages=[{"role": "user", "content": "x"}]))
++            active = asyncio.create_task(aux.async_call_llm(
++                task="title_generation", messages=[{"role": "user", "content": "x"}]))
++            deadline = asyncio.get_running_loop().time() + 2
++            while not loopback["received"].is_set():
++                assert asyncio.get_running_loop().time() < deadline
++                await asyncio.sleep(0.01)
++            event.set()
++            with pytest.raises(aux.AuxiliaryExplicitCancellation):
++                await active
++            assert sem._value == 1
++    asyncio.run(run())
++    assert_wire(loopback)
++
++
++def test_local_call_preserves_latency_observations(loopback):
++    configure(loopback)
++    latency = {}
++    invoke(latency_info=latency)
++    assert set(latency) == {"queue_wait_ms", "provider_dispatch_ms", "time_to_first_progress_ms", "summary_generation_ms"}
++    assert all(type(value) is int and value >= 0 for value in latency.values())
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++@pytest.mark.parametrize("loopback", ["::1"], indirect=True)
++def test_literal_ipv6_loopback_never_resolves_a_hostname(loopback, monkeypatch, mode):
++    configure(loopback)
++    def no_dns(*args, **kwargs):
++        pytest.fail("literal helper endpoint attempted DNS resolution")
++    monkeypatch.setattr(socket, "getaddrinfo", no_dns)
++    assert invoke(mode).choices[0].message.content
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("path", ["", "/", "/v1", "/v1/"])
++def test_only_safe_endpoint_paths_are_accepted(loopback, path):
++    configure(loopback, base_url=loopback["url"].removesuffix("/v1") + path)
++    invoke()
++    assert_wire(loopback)
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_title_reasoning_control_requires_literal_false(loopback, mode):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback)
++    with pytest.raises(LocalHelperError):
++        invoke(mode, reasoning_config={"enabled": 0})
++    assert not loopback["requests"]
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_extreme_timeout_cap_is_a_policy_refusal_before_dispatch(loopback, mode):
++    from agent.qualified_local_helper import LocalHelperError
++    configure(loopback, local_helper_caps={"timeout": 10 ** 1000})
++    with pytest.raises(LocalHelperError):
++        invoke(mode)
++    assert not loopback["requests"]
++
++
++@pytest.mark.parametrize("mode", ["sync", "async"])
++def test_ordinary_fallback_enabled_path_preserves_existing_arguments(loopback, monkeypatch, mode):
++    configure(loopback, fallback_enabled=True)
++    seen = []
++    def existing_impl(**kwargs):
++        seen.append(kwargs)
++        return "ordinary path"
++    async def existing_async_impl(**kwargs):
++        return existing_impl(**kwargs)
++    monkeypatch.setattr(aux, "_call_llm_impl", existing_impl)
++    monkeypatch.setattr(aux, "_async_call_llm_impl", existing_async_impl)
++    assert invoke(mode, provider="openrouter", model="parent-model", max_tokens=3000, tools=[]) == "ordinary path"
++    assert seen[0]["provider"] == "openrouter" and seen[0]["model"] == "parent-model"
++    assert seen[0]["max_tokens"] == 3000 and seen[0]["tools"] == []
++    assert not loopback["requests"]
+diff --git a/tests/scripts/test_local_helper.py b/tests/scripts/test_local_helper.py
+new file mode 100644
+index 0000000000..3a3fe3708a
+--- /dev/null
++++ b/tests/scripts/test_local_helper.py
+@@ -0,0 +1,77 @@
++"""Offline subprocess proof of the tool-free helper entry point."""
++import os
++from pathlib import Path
++import subprocess
++import sys
++
++import pytest
++
++pytest_plugins = ["tests.agent.test_qualified_local_helper"]
++
++from hermes_constants import get_hermes_home
++from tests.agent.test_qualified_local_helper import (
++    assert_wire, completion, configure,
++)
++
++
++def run_script(tmp_path, text: str | bytes = "Cache was invalidated twice", instruction="Summarize the supplied note"):
++    return subprocess.run(
++        [sys.executable, str(Path(__file__).resolve().parents[2] / "scripts/local_helper.py"),
++         "--instruction", instruction], input=text, text=not isinstance(text, bytes), capture_output=True,
++        env={"HOME": str(tmp_path), "HERMES_HOME": str(get_hermes_home()),
++             "PATH": os.defpath, "OPENAI_API_KEY": "offline-cloud-sentinel",
++             "PYTHONIOENCODING": "utf-8:strict"}, timeout=5,
++    )
++
++
++def test_tool_free_script_entrypoint(loopback, tmp_path):
++    configure(loopback, task="local_helper")
++    loopback["payload"] = completion("Cache fix summary")
++    result = run_script(tmp_path)
++    assert result.returncode == 0, result.stderr
++    assert result.stdout.strip() == "Cache fix summary"
++    assert_wire(loopback)
++
++
++def test_unconfigured_script_never_discovers_cloud(loopback, tmp_path):
++    result = run_script(tmp_path)
++    assert result.returncode == 1
++    assert "LocalHelperError" in result.stderr
++    assert not loopback["requests"]
++    assert not result.stdout
++
++
++@pytest.mark.parametrize("text,instruction", [("", "summarize"), ("x" * 32769, "summarize"),
++                                              ("note", "x" * 4097), ("note", "")])
++def test_script_refuses_unbounded_or_empty_input(loopback, tmp_path, text, instruction):
++    configure(loopback, task="local_helper")
++    result = run_script(tmp_path, text, instruction)
++    assert result.returncode == 2
++    assert not loopback["requests"]
++    assert not result.stdout
++
++
++@pytest.mark.parametrize("content", [
++    "Summary\x1b]52;c;bm90ZS10ZXh0\x07", "Summary\x1b[2J", "Summary\x9b2J", "Summary\ud83d",
++])
++def test_script_escapes_untrusted_terminal_controls(loopback, tmp_path, content):
++    configure(loopback, task="local_helper")
++    loopback["payload"] = completion(content)
++    result = run_script(tmp_path)
++    assert result.returncode == 0, result.stderr
++    assert all(character in "\n\t" or (
++        ord(character) >= 32 and not 127 <= ord(character) <= 159
++        and not 0xD800 <= ord(character) <= 0xDFFF) for character in result.stdout)
++    assert "\\u" in result.stdout
++    assert not result.stderr
++    assert_wire(loopback)
++
++
++def test_invalid_utf8_stdin_has_controlled_failure(loopback, tmp_path):
++    configure(loopback, task="local_helper")
++    result = run_script(tmp_path, text=b"invalid UTF-8: \xff")
++    assert result.returncode == 1
++    assert b"UnicodeDecodeError" in result.stderr
++    assert b"Traceback" not in result.stderr
++    assert not result.stdout
++    assert not loopback["requests"]
+diff --git a/tui_gateway/methods_session.py b/tui_gateway/methods_session.py
+index c83b0ef4e4..5a1ce7f75c 100644
+--- a/tui_gateway/methods_session.py
++++ b/tui_gateway/methods_session.py
+@@ -1364,7 +1364,7 @@ def _(rid, params: dict) -> dict:
+         with (_session_profile_runtime_scope(session) if session else contextlib.nullcontext()):
+             return _ok(rid, {"text": run_oneshot(
+                 instructions=instructions, user_input=user_input, template=template, variables=variables,
+-                task=(params.get("task") or "title_generation").strip() or "title_generation",
++                task=(params.get("task") or "oneshot").strip() or "oneshot",
+                 max_tokens=_int_param(params, "max_tokens", 1024) or 1024, temperature=temperature,
+                 main_runtime=_main_runtime_from_agent(session.get("agent")) if session else None)})
+     except (KeyError, ValueError) as e:
+diff --git a/website/docs/user-guide/configuration.md b/website/docs/user-guide/configuration.md
+index 8fff6a72cb..d81d64de4f 100644
+--- a/website/docs/user-guide/configuration.md
++++ b/website/docs/user-guide/configuration.md
+@@ -1444,6 +1444,100 @@ The main model and conversation history still retain the full skill content.
+ Attachment-only turns retain the existing enriched-message title fallback.
+ This affects new title generation; it does not repair previously named sessions.
+ 
++### Qualified local text helpers (opt-in, no fallback)
++
++For already-qualified local models, `title_generation`, `profile_describer` and the
++tool-free `scripts/local_helper.py` entry point support a separate **local-only**
++policy. This does not qualify a model, spawn a child agent, change the parent model,
++or enable a route automatically. Unconfigured users retain the ordinary routing
++and fallback behavior. Have the supervising parent validate the model's suitability
++for each role before enabling it; helper text is untrusted, never an approval or a
++security-review verdict.
++
++Configure a task through the supported CLI (repeat for each accepted task):
++
++```bash
++hermes config set auxiliary.title_generation.provider llama.cpp
++hermes config set auxiliary.title_generation.model YOUR_QUALIFIED_MODEL_ALIAS
++hermes config set auxiliary.title_generation.base_url http://127.0.0.1:8080/v1
++hermes config set auxiliary.title_generation.fallback_enabled false
++```
++
++The pin must name `llama.cpp`, `llama-cpp` or `llamacpp`, a nonempty literal model
++other than `auto`, and an explicit HTTP endpoint at `127.0.0.1` or `[::1]` with a
++canonical port (1–65535). Only the root or `/v1` path (optional trailing slash on
++`/v1`) is supported. Hostnames, alternate IP spellings, HTTPS, credentials in
++URLs, query strings, fragments, redirects and arbitrary paths are refused.
++`custom`, named custom providers, `auto`, managed-server discovery without an
++endpoint, and cloud providers are not supported by this policy.
++When the main model shares the local server, use the same canonical base URL
++spelling for both routes so existing title deferral recognizes the shared endpoint.
++
++`fallback_enabled: false` is a strict boolean opt-in. Invalid pins and unsupported
++tasks fail before generic provider/credential resolution. There are no retries,
++cloud fallbacks, ambient credentials/headers, proxy-environment routing, inherited
++`extra_body`, or Relay request rewrites. Only bounded `model`, text `messages` and
++`max_tokens` fields go on the wire. Configured API keys, credential selectors
++(`key_env`/`api_key_env`), and wire controls are
++refused. The fixed title schema/thinking-off controls are accepted only from the
++title caller, checked locally and not forwarded; the profile caller's fixed
++temperature hint is likewise not forwarded. Choose a model/server whose default
++behavior suits these short tasks; the helper does not change server defaults.
++An unreadable or malformed settings file refuses these three tasks, including
++when the loader offers defaults or last-known-good settings; fix the file rather
++than relying on an implicit return to ordinary routing.
++
++Each supported task registers these defaults under `local_helper_caps`; they
++apply only to local-only calls, independently of the ordinary task `timeout`:
++
++| Setting | Default | Hard limit |
++|---|---:|---:|
++| `timeout` | 15 seconds | finite 0.05–30 seconds, **one absolute deadline**, including queue/send/receive |
++| `max_tokens` | 512 | positive integer, at most 1024 |
++| `max_input_chars` | 16384 | positive integer, at most 32768 across all messages |
++| `max_response_bytes` | 65536 | positive integer, at most 131072 raw bytes |
++
++Requests are also limited to 32 plain-text messages and 128 KiB serialized JSON.
++Response text is additionally limited to 16 characters per requested output
++token (a text-size guard, not a tokenizer). All compressed responses are refused
++before decoding; malformed, empty, truncated, refused, wrong-model or tool-call
++responses fail without fallback. Every connection is closed. Existing profile/task
++concurrency budgets remain in use (sync and async budgets are separate, as before);
++the local-only default is one permit, with `max_concurrency` restricted to integer
++values 1–8 (not strings). Async permits are owned only by live requests/waiters;
++their weak cache neither retains closed event loops nor reuses recycled loop IDs.
++Observers receive copies, not writable transport payloads.
++Per-call limits must fit the task caps. The title caller requests 512 output
++tokens and the profile caller requests 400, so lowering their respective caps
++below those values refuses the calls; limits are never silently widened.
++Profile description now honors its configured task timeout when no explicit
++timeout is supplied, rather than overriding it with a fixed 60 seconds.
++
++Stateless Python `run_oneshot` and `llm.oneshot` RPC requests default to the
++separate `auxiliary.oneshot` task (ordinary routing, parent model by default).
++Local-only title routing therefore does not capture commit-message or idea
++requests with their different temperature/token/time budgets. If you previously
++used `auxiliary.title_generation` to configure one-shots, move those settings to
++`auxiliary.oneshot`; explicit task overrides still obey the selected task's
++policy. `oneshot` is not eligible for this credential-free local-only policy.
++
++Enable `auxiliary.local_helper` separately, then use the script with the installed
++Hermes interpreter from the source checkout:
++
++```bash
++python scripts/local_helper.py --instruction 'Summarize this non-sensitive note' < note.txt
++```
++
++The script reads bounded text from stdin and returns one untrusted text result.
++Terminal controls (except newline/tab) and lone surrogates are rendered as visible
++Unicode escapes; input/output encoding failures return a controlled error without
++echoing the data or a traceback.
++It has no tools, no conversation history, no provider/model override, and no
++fallback when unconfigured. Do not send secrets or use it for compression,
++vision, approval, or security review. Restoring `fallback_enabled: true` restores
++ordinary routing for title/profile calls, including possible cloud traffic; it
++does **not** allow the standalone script to use cloud routing.
++
+ ### Stream-only endpoints
+ 
+ Some OpenAI-compatible endpoints reject non-streaming chat requests outright (e.g. Tencent Copilot returns HTTP 400 `"Non-stream chat request is currently not supported"`). Interactive chat already streams, but auxiliary tasks (title generation, compression, vision) use non-streaming calls and would fail on every attempt. Hermes always treats `copilot.tencent.com` as stream-only; for any other such endpoint, list a URL substring under `auxiliary.stream_only_base_urls`:

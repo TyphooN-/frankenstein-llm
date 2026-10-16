@@ -1,0 +1,3 @@
+# Unified diff context encodes an empty source line as one space.
+# Keep normal source checks; ignore only this patch-container false positive.
+runtime/*.patch whitespace=-blank-at-eol

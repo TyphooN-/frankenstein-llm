@@ -1,0 +1,8 @@
+name: frankenstein-local-worker
+kind: standalone
+version: "0.1.0"
+requires_hermes: ">=0.21.1"
+description: "Supervisor dispatch to the existing bounded, tool-free local text worker; no model manager or cloud fallback."
+author: TyphooN
+provides_tools:
+  - local_worker

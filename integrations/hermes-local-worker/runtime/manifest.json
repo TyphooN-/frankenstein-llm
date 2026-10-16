@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/NousResearch/hermes-agent.git",
+  "base_commit": "d923a5eb487a17c0a68801bba9ef0f56c81040a8",
+  "patch": "hermes-local-helper.patch",
+  "patch_sha256": "1401651737b76840e22fef652d6d6731e878b208db77eb915cef3a3d8e862f47",
+  "files": [
+    {
+      "path": "agent/auxiliary_client.py",
+      "base_sha256": "d86ad24c75ec8d9cd153595f58fede8c321774adaf71b650d380cafd257cfae2",
+      "sha256": "91a98fbe88226e5e9f4773d5982ec284ec9275eb4c0658ce3b6e0cc4d426d2cc",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "agent/auxiliary_hooks.py",
+      "base_sha256": "015ae41cfde029de6a5f14188205f5c7a11d8ce547b39fcec5643222626e2723",
+      "sha256": "985882c1805731698e32cae06f34cfa3fc85973c0c40e601baa0182766c62b96",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "agent/auxiliary_task_config.py",
+      "base_sha256": "63ab07b6bf8ce036b57b8583960c3b57d5a3edf4159cbe9bf47bafa04481fe7a",
+      "sha256": "2e91541e4fd113e5657df496c82a9034a0d496b11d3a2ecdd803d8e54b54e305",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "agent/local_helper_observers.py",
+      "base_sha256": null,
+      "sha256": "fe17357cb94285007e67ad7247591c572ecb631509240f69981603206e8b400a",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "agent/oneshot.py",
+      "base_sha256": "e66787ea78304c9b9ac491420d75ec90009557f0d97110050c7c4cbb0f97553b",
+      "sha256": "e41ceccb305f89eb01f675a53b8f23d1822899a73ceae59e79f4a1ae30a9487f",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "agent/qualified_local_helper.py",
+      "base_sha256": null,
+      "sha256": "d796db7437bb44a1cac97f43fd954a496a3476e51c911048d0f0f3d7d4bdd17d",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "hermes_cli/config.py",
+      "base_sha256": "a1667a958f52aa6201200bde354c3a380d79d49fd7635aeee3a3ebb23533a788",
+      "sha256": "03f1806288274fba613440264e9504604352c74618dc5600ba4984ec28501f47",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "hermes_cli/config_defaults.py",
+      "base_sha256": "3770f92378e37093720040de6d4813202a88edc7a196415dfc7be7b4e88064d7",
+      "sha256": "e4824b3084ecc64cea810bb8627f49c1f8107153577d9513eea1225a420e59b6",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "hermes_cli/config_defaults_auxiliary.py",
+      "base_sha256": null,
+      "sha256": "1f48b0398d00389ed0df0f1793c18a3f760c9b689d32c9d7f7605ffd8be588fa",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "hermes_cli/config_read_errors.py",
+      "base_sha256": "1a623d28712f7f264af2bed8c132f642f7e96a67def3c6380fc1df316d91de7b",
+      "sha256": "7963248b44120e88135833fda0d8750d5e39cb52b0b026af28e62dbb518b8f51",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "hermes_cli/main_provider_setup.py",
+      "base_sha256": "8375d846dcccd88cfb04c2372638101598ae6cb89f46f79a7dcfe4b71383e206",
+      "sha256": "f90a80eae29aff6a9f1c67d8252798f56f06ef2802755b01758619c1d7d67e7b",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "hermes_cli/profile_describer.py",
+      "base_sha256": "c52275202925bc44aca8a07e65f39113104e5e6f51477f60119ec257f38ba8c4",
+      "sha256": "8a0aac49dc472789ba206764d7fbc0186c47d62a1070260771528459aa35d4bd",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/local_helper.py",
+      "base_sha256": null,
+      "sha256": "6f20aeea007188b04243240ddc051fd1febf43f06c1bf9b1ae72a93d8893ee50",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_local_helper_current_base.py",
+      "base_sha256": null,
+      "sha256": "26c47f500225dc8e4fa92b1273ec081361e006f2dc54fddde143ce04929ca90a",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_local_helper_inheritance.py",
+      "base_sha256": null,
+      "sha256": "fb60608c3f2eea9106f7317934eb30d5b807e2b48e7947ba352968fe73e943b1",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_local_helper_nonfinite_json.py",
+      "base_sha256": null,
+      "sha256": "e06980e115b96f7c3d2441df5ac140b4f53c77399e137136e9b1a6e641a614a5",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_local_helper_observer_delivery.py",
+      "base_sha256": null,
+      "sha256": "8e8aa111623a57f33f2072f16f708e653aebaa39744ca344fae471f1e9eb5d78",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_local_helper_observers.py",
+      "base_sha256": null,
+      "sha256": "e69b156405e1d6f10c2a08edf3e4f081683358c317e79271021a5cb6cd1e379e",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_local_helper_policy_shapes.py",
+      "base_sha256": null,
+      "sha256": "9cd859bae5bdc435c039c8b33855c12b7412f0510fb888181de7b7c298545041",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_local_helper_review_regressions.py",
+      "base_sha256": null,
+      "sha256": "3ed604984a42b0c317d8f386db9dcade1b11c3a4cf0bddba13cb6649c89ccb3f",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/agent/test_qualified_local_helper.py",
+      "base_sha256": null,
+      "sha256": "4bc461fab893bf583b0d5460ee14b7be2e448e4cc6f01ba106c831550c0d7dc5",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tests/scripts/test_local_helper.py",
+      "base_sha256": null,
+      "sha256": "73df8ce308e06198110017931f255baf07f79948bea68c1a3df9200702966474",
+      "base_mode": null,
+      "mode": "100644"
+    },
+    {
+      "path": "tui_gateway/methods_session.py",
+      "base_sha256": "29b255c9073cb9c10c9d5963aa59aea7a7e05aaf8e256543c93a830c016a53c9",
+      "sha256": "52763be46d993799c708e53b9b7f16be1223a5810407e0afcf8adc80eab80cd0",
+      "base_mode": "100644",
+      "mode": "100644"
+    },
+    {
+      "path": "website/docs/user-guide/configuration.md",
+      "base_sha256": "c1d0ce81e7ebc61872a9eea682d7afc442b30347d45b1317a01e8ab754dfdc4f",
+      "sha256": "bba766ccc3ee14c3acd9eb11ecc057279886ebb78f395aa71f884a170268343a",
+      "base_mode": "100644",
+      "mode": "100644"
+    }
+  ]
+}
