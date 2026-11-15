@@ -8,8 +8,10 @@ OD_MCLK:
 1: 1000MHz
 
 OD_VDDGFX_OFFSET:
-#-73mV crash
--72mV
+#-76mV dmesg
+#-57mV /////
+#-59mV driver crash/recovery failure dmesg
+-56mV
 
 OD_RANGE:
 SCLK:     500Mhz     3000Mhz
