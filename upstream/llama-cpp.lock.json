@@ -1,25 +1,23 @@
 {
-  "schema": "frankenstein-upstream-dependency/1",
-  "name": "llama.cpp",
-  "repository": "https://github.com/ggml-org/llama.cpp.git",
-  "submodule_path": "upstream/llama.cpp",
   "branch": "master",
-  "commit": "bed0a856606ee4a24a164066f73d2379447033f5",
   "build": {
     "backends": {
-      "hip": {
-        "build_dir": "build"
+      "cpu": {
+        "build_dir": "build-cpu"
       },
       "cuda": {
         "build_dir": "build-cuda"
       },
+      "hip": {
+        "build_dir": "build"
+      },
       "vulkan": {
         "build_dir": "build-vulkan"
-      },
-      "cpu": {
-        "build_dir": "build-cpu"
       }
     },
+    "build_type": "Release",
+    "generator": "Ninja",
+    "parallelism": "nproc",
     "reference": {
       "backend": "hip",
       "gpu_targets": [
@@ -27,9 +25,6 @@
       ],
       "host": "docs/reference/HOST-SYSTEM-AND-PCIE.md"
     },
-    "build_type": "Release",
-    "generator": "Ninja",
-    "parallelism": "nproc",
     "targets": [
       "llama-server",
       "llama-cli",
@@ -37,10 +32,15 @@
       "llama-gguf"
     ]
   },
+  "commit": "ef6bc6f367082338006c8379bc7bcab3e1584766",
   "local_patches": [
     {
-      "path": "upstream/patches/0001-convolution-kernel-types-bed0a8566.patch",
-      "sha256": "24a75e977498cfeeb9a50742c56dd33687d1bd95742c3027b369698f3e35e439"
+      "path": "upstream/patches/0001-convolution-kernel-types-ef6bc6f367.patch",
+      "sha256": "78c9300d0af6bb9c02c0159ea338dbe0b60db3dcef2612ddc2a8c73fb6cbd279"
     }
-  ]
+  ],
+  "name": "llama.cpp",
+  "repository": "https://github.com/ggml-org/llama.cpp.git",
+  "schema": "frankenstein-upstream-dependency/1",
+  "submodule_path": "upstream/llama.cpp"
 }
