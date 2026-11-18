@@ -214,9 +214,15 @@ GGUF, which is every vision sibling: the projector is the difference, and
 The writer refuses rather than approximating:
 
 - **No native JSON, no artifact.** A run whose `report.json` is missing, is not
-  `passed`, recorded no `native_results`, or whose `stdout.log` does not parse
+  `passed`, has no genuine integer-zero child exit status, recorded no
+  `native_results`, or whose `stdout.log` does not parse
   into complete rows produces a refusal and exit status 2. Nothing is estimated
   from a wall clock, and an interrupted run stays a recorded interruption.
+  Both report modes also refuse a non-object `report.json`, a non-string or
+  empty `native_results` path, invalid text encoding, and JSON decoder numeric
+  or recursion-limit errors with the same exit status 2 before publishing.
+  Inputs are not rewritten. This is error handling, not an input-size, memory,
+  path-isolation or whole-publication transaction guarantee.
 - **No ranking across serving-MTP classes.** `ridge`, `heretic`, `obliterated`
   and `fable` serve with `spec-type = draft-mtp`; `llama-bench` applies no draft
   model to any of them. Ordering an MTP-served preset against a non-MTP-served
@@ -250,6 +256,47 @@ rather than reporting the allocation request as though it were.
 Artifacts are tracked, so a newly benchmarked model needs a row in
 [`docs/reference/COVERAGE-MAP.md`](reference/COVERAGE-MAP.md) before the
 documentation suite passes.
+
+## CPU-only diagnostic reports (explicit opt-in)
+
+The normal `bench-reports.sh` wrapper still selects `bench_report.py write` and
+requires the GPU tensor split the alias serves. It must not silently reinterpret
+a CPU run as a serving-preset measurement. For an **already completed, admitted**
+CPU benchmark, use the separate Python subcommand:
+
+```bash
+python3 scripts/bench_report.py cpu-diagnostic \
+  heretic=logs/model-runs/benchmark-XXXXXXXX
+```
+
+This reads existing reports only; it neither authorizes nor executes a benchmark.
+The `model-runs.py benchmark` runner in this checkout still records a ROCm device
+list and a tensor split, even with `--gpu-layers 0`. Its output does not meet the
+explicit CPU-only contract below.
+
+The recorded command must explicitly contain `-dev none -ngl 0 -o json`, the
+maintained `-m/-t/-p/-n/-r` arguments and no tensor split. Optional producer flags
+`-lm`, `-lzm`, `--repack`, `--no-warmup` and `--offline` are retained. Unknown or
+duplicate options refuse rather than permitting a hidden device/offload override.
+Native JSON must be complete, finite/nonnegative measurements remain required,
+recorded token counts must match the native workload, and the report must record
+`passed` with an integer exit code zero. Contradictory native GPU-layer metadata
+also refuses; absent optional backend/device metadata is not guessed.
+Exactly one separate prompt row and one separate generation row are required;
+extra combined-workload rows are refused rather than silently ignored.
+
+The default output is `docs/benchmarks/cpu-diagnostics/`, with
+`ALIAS-cpu-diagnostic.md` and `README-cpu-diagnostics.md`. These distinct names do
+not replace the normal GPU/serving artifacts even when `--out` names their
+directory. The CPU index is alphabetical only: no MTP/weight ranking, functional
+PASS, measured memory-fit or serving-rate claim is inferred. Exact recorded argv
+and native row values remain in the diagnostic, including optional metadata.
+Existing CPU target paths are never replaced; select a new `--out` directory for
+another publication. All targets are checked before any output is written, and
+exclusive file creation also refuses a target appearing during publication.
+Publication is no-clobber, not a multi-file transaction: an I/O failure or late
+conflict can leave earlier newly created CPU files, never replacement artifacts.
+This report does not clear artifact, runtime, exclusion, fit or real-role gates.
 
 ## Asking an agent to operate this
 

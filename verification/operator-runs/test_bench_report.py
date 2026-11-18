@@ -98,8 +98,13 @@ def test_refuses_malformed_or_incomplete_native_rows(tmp_path):
         m.load_run(unparsable, REGISTRY)
 
 
-def test_quotes_the_measured_rate_and_the_exact_argv(tmp_path):
+@pytest.mark.parametrize('inside_checkout', [False, True],
+                         ids=['absolute-citation', 'checkout-relative-citation'])
+def test_quotes_the_measured_rate_and_the_exact_argv(tmp_path, monkeypatch, inside_checkout):
     run = make_run(tmp_path, 'a', '/models/RVN.gguf', '1/1/1', native=rows(97.5, 18.25))
+    if inside_checkout:
+        monkeypatch.setattr(m, 'ROOT', tmp_path)
+    expected_run_dir = 'a' if inside_checkout else str(run.resolve())
     record = m.load_run(run, REGISTRY)
     assert record['alias'] == 'heretic'
     assert (record['prompt_ts'], record['generation_ts']) == (97.5, 18.25)
@@ -108,7 +113,9 @@ def test_quotes_the_measured_rate_and_the_exact_argv(tmp_path):
     body = m.render_model(record, {})
     assert '97.50 tok/s' in body and '18.25 tok/s' in body
     assert '-ts 1/1/1' in body and '-p 512' in body and '-r 3' in body
-    assert record['run_dir'] not in ('', None) or True
+    assert record['run_dir'] == expected_run_dir
+    assert f'| Native report directory | `{expected_run_dir}` |' in body
+    assert f'native JSON in `{expected_run_dir}/stdout.log`' in body
 
 
 def test_split_ratio_compares_proportions_not_gibibytes(tmp_path):
@@ -322,3 +329,564 @@ def test_vision_sibling_discloses_that_the_projector_was_not_benchmarked(tmp_pat
     for line in body.splitlines():
         if line.startswith('| ') and line.count('`') % 2:
             raise AssertionError(f'unbalanced backticks: {line}')
+
+
+def report_write_argv(tmp_path, run, out):
+    presets = tmp_path / 'presets.ini'
+    presets.write_text('[*]\ntensor-split = 1,1,1\n\n'
+                       '[heretic]\nmodel = /models/RVN.gguf\nspec-type = draft-mtp\n')
+    return ['write', str(run), '--out', str(out), '--presets', str(presets),
+            '--functional', str(tmp_path / 'none.json')]
+
+
+@pytest.mark.parametrize('row_index', [0, 1], ids=['prompt', 'generation'])
+@pytest.mark.parametrize(('field', 'value'), [
+    pytest.param(field, value, id=f'{field}-{label}')
+    for field in ('avg_ts', 'stddev_ts')
+    for label, value in (
+        ('bool', True), ('string', '18.25'), ('array', []), ('object', {}),
+        ('nan', float('nan')), ('infinity', float('inf')),
+        ('negative-infinity', -float('inf')), ('negative', -0.25),
+        ('unrepresentable-integer', 10 ** 400),
+    )
+] + [pytest.param('avg_ts', None, id='avg_ts-null')] + [
+    pytest.param(field, value, id=f'{field}-{label}')
+    for field in ('n_prompt', 'n_gen')
+    for label, value in (
+        ('null', None), ('bool', True), ('string', '512'), ('array', []),
+        ('object', {}), ('negative', -1), ('fraction', 0.5),
+        ('float', 512.0), ('nan', float('nan')), ('infinity', float('inf')),
+    )
+])
+def test_cli_refuses_invalid_measured_fields_before_publication(
+        tmp_path, capsys, row_index, field, value):
+    native = rows(97.5, 18.25)
+    native[row_index][field] = value
+    run = make_run(tmp_path, 'invalid-measurement', '/models/RVN.gguf', '1/1/1',
+                   native=native)
+    before = {name: (run / name).read_bytes() for name in ('report.json', 'stdout.log')}
+    out = tmp_path / 'out'
+    assert m.main(report_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+    assert {name: (run / name).read_bytes() for name in before} == before
+
+
+@pytest.mark.parametrize(('measured_rate', 'deviation'), [
+    pytest.param(0, 0, id='zero-integers'),
+    pytest.param(0.0, 0.0, id='zero-floats'),
+    pytest.param(20, None, id='integer-rate-null-deviation'),
+    pytest.param(18.25, 0.5, id='native-floats'),
+    pytest.param(sys.float_info.max, 0.5, id='largest-finite-double'),
+    pytest.param(18.25, 'omitted', id='legacy-omitted-deviation'),
+])
+def test_valid_native_numbers_and_nested_samples_are_preserved(
+        tmp_path, capsys, measured_rate, deviation):
+    native = rows(measured_rate, measured_rate)
+    for row in native:
+        if deviation == 'omitted':
+            del row['stddev_ts']
+        else:
+            row['stddev_ts'] = deviation
+        row.update(samples_ns=[1000000000, 2000000000], samples_ts=[1.0, 2.0],
+                   future_optional_column={'array': ['[log-like content]', 7]})
+    run = make_run(tmp_path, 'valid-measurement', '/models/RVN.gguf', '1/1/1',
+                   native=native)
+    before = {name: (run / name).read_bytes() for name in ('report.json', 'stdout.log')}
+    report, loaded = m.native_rows(run)
+    assert loaded == native
+    record = m.load_run(run, REGISTRY)
+    assert record['command'] == report['command']
+    assert record['prompt_ts'] == record['generation_ts'] == measured_rate
+    assert type(record['generation_ts']) is type(measured_rate)
+    assert record['generation_ts_stddev'] == (None if deviation == 'omitted' else deviation)
+    out = tmp_path / 'out'
+    assert m.main(report_write_argv(tmp_path, run, out)) == 0
+    assert capsys.readouterr().err == ''
+    assert sorted(path.name for path in out.iterdir()) == ['README.md', 'heretic.md']
+    assert m.rate(measured_rate) in (out / 'README.md').read_text()
+    assert {name: (run / name).read_bytes() for name in before} == before
+
+
+def test_legacy_optional_metadata_is_not_a_new_required_schema(tmp_path):
+    native = rows()
+    for row in native:
+        for field in ('stddev_ts', 'gpu_info', 'backends', 'build_commit'):
+            row.pop(field)
+    run = make_run(tmp_path, 'legacy', '/models/RVN.gguf', '1/1/1', native=native)
+    report = json.loads((run / 'report.json').read_text())
+    del report['schema']
+    (run / 'report.json').write_text(json.dumps(report))
+    record = m.load_run(run, REGISTRY)
+    assert record['generation_ts'] == 20.0
+    assert record['generation_ts_stddev'] is None
+    assert record['gpu_info'] is record['backends'] is record['build_commit'] is None
+
+
+@pytest.mark.parametrize('wire_shape', ['leading-log', 'truncated', 'trailing-log'])
+def test_native_json_is_not_salvaged_from_logs_or_truncation(tmp_path, capsys, wire_shape):
+    run = make_run(tmp_path, 'bad-wire', '/models/RVN.gguf', '1/1/1', native=rows())
+    raw = (run / 'stdout.log').read_text()
+    raw = {'leading-log': '[llama] leading log\n' + raw,
+           'truncated': raw[:-1], 'trailing-log': raw + '\n[llama] trailing log'}[wire_shape]
+    (run / 'stdout.log').write_text(raw)
+    out = tmp_path / 'out'
+    assert m.main(report_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+
+
+def make_cpu_run(tmp_path, name='cpu', *, native=None):
+    """The maintained CPU producer's canonical argv, not a missing-GPU guess."""
+    if native is None:
+        native = rows(80.0, 7.5, backends='CPU', gpu_info='')
+        native[0]['n_prompt'] = 16
+        native[1]['n_gen'] = 8
+    run = make_run(tmp_path, name, '/models/RVN.gguf', '1/1/1', native=native)
+    report = json.loads((run / 'report.json').read_text())
+    report['command'] = [
+        '/bin/llama-bench', '-m', '/models/RVN.gguf', '-dev', 'none',
+        '-t', '2', '-ngl', '0', '-p', '16', '-n', '8', '-r', '1', '-o', 'json',
+        '-lm', 'mmap', '-lzm', 'on', '--repack', '0', '--no-warmup', '--offline']
+    (run / 'report.json').write_text(json.dumps(report))
+    return run
+
+
+def cpu_write_argv(tmp_path, run, out):
+    argv = report_write_argv(tmp_path, run, out)
+    return ['cpu-diagnostic', *argv[1:argv.index('--functional')]]
+
+
+def test_cpu_diagnostic_reports_canonical_cpu_without_serving_claim(tmp_path, capsys):
+    run = make_cpu_run(tmp_path)
+    before = {name: (run / name).read_bytes() for name in ('report.json', 'stdout.log')}
+    out = tmp_path / 'out'
+    out.mkdir()
+    (out / 'heretic.md').write_text('existing GPU artifact\n')
+    (out / 'README.md').write_text('existing GPU index\n')
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 0
+    assert capsys.readouterr().err == ''
+    body = (out / 'heretic-cpu-diagnostic.md').read_text()
+    index = (out / 'README-cpu-diagnostics.md').read_text()
+    assert 'CPU-only diagnostic' in body and 'CPU-only diagnostic' in index
+    assert 'not a serving-preset measurement' in body
+    assert '80.00 tok/s' in body and '7.50 tok/s' in body
+    assert 'pp16' in body and 'tg8' in body
+    assert json.dumps(json.loads(before['report.json'])['command']) in body
+    assert 'Ordering within one serving-MTP class' not in index
+    assert '**PASS**' not in body and '**PASS**' not in index
+    assert (out / 'heretic.md').read_text() == 'existing GPU artifact\n'
+    assert (out / 'README.md').read_text() == 'existing GPU index\n'
+    assert {name: (run / name).read_bytes() for name in before} == before
+
+
+@pytest.mark.parametrize('flag', ['-t', '-p', '-n', '-r'])
+@pytest.mark.parametrize('value', [
+    pytest.param('0', id='zero'), pytest.param('-1', id='negative'),
+    pytest.param('1.5', id='fraction'), pytest.param('unknown', id='nonnumeric'),
+    pytest.param('9' * 5000, id='oversized-decimal'),
+])
+def test_cpu_diagnostic_refuses_invalid_workload_before_publication(
+        tmp_path, capsys, flag, value):
+    run = make_cpu_run(tmp_path)
+    report = json.loads((run / 'report.json').read_text())
+    report['command'][report['command'].index(flag) + 1] = value
+    (run / 'report.json').write_text(json.dumps(report))
+    before = {name: (run / name).read_bytes() for name in ('report.json', 'stdout.log')}
+    out = tmp_path / 'out'
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+    assert {name: (run / name).read_bytes() for name in before} == before
+
+
+@pytest.mark.parametrize('mutation', [
+    'non-cpu-device', 'offload', 'missing-device', 'missing-offload',
+    'duplicate-device', 'duplicate-offload', 'tensor-split', 'device-alias',
+    'offload-alias', 'non-json', 'missing-value', 'unknown-flag',
+    'no-command', 'non-string-argument', 'duplicate-switch',
+])
+def test_cpu_diagnostic_refuses_ambiguous_or_gpu_argv(tmp_path, capsys, mutation):
+    run = make_cpu_run(tmp_path)
+    report = json.loads((run / 'report.json').read_text())
+    command = report['command']
+    replacements = {'non-cpu-device': ('-dev', 'ROCm0'),
+                    'offload': ('-ngl', '1'), 'non-json': ('-o', 'csv')}
+    removals = {'missing-device': '-dev', 'missing-offload': '-ngl'}
+    additions = {'duplicate-device': ['-dev', 'none'],
+                 'duplicate-offload': ['-ngl', '999'], 'tensor-split': ['-ts', '1/1/1'],
+                 'device-alias': ['--device', 'ROCm0'],
+                 'offload-alias': ['--n-gpu-layers', '999'],
+                 'unknown-flag': ['--unknown-placement'],
+                 'duplicate-switch': ['--no-warmup']}
+    if mutation in replacements:
+        flag, value = replacements[mutation]
+        command[command.index(flag) + 1] = value
+    elif mutation in removals:
+        index = command.index(removals[mutation])
+        del command[index:index + 2]
+    elif mutation in additions:
+        command.extend(additions[mutation])
+    elif mutation == 'missing-value':
+        del command[command.index('-o') + 1]
+    elif mutation == 'no-command':
+        report['command'] = None
+    else:
+        command[0] = False
+    (run / 'report.json').write_text(json.dumps(report))
+    out = tmp_path / 'out'
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+
+
+@pytest.mark.parametrize('row_index', [0, 1])
+@pytest.mark.parametrize('layers', [1, -1, True, '0', None, 0.0])
+def test_cpu_diagnostic_refuses_contradictory_native_gpu_layers(
+        tmp_path, capsys, row_index, layers):
+    run = make_cpu_run(tmp_path)
+    native = json.loads((run / 'stdout.log').read_text())
+    native[row_index]['n_gpu_layers'] = layers
+    (run / 'stdout.log').write_text(json.dumps(native))
+    out = tmp_path / 'out'
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+
+
+@pytest.mark.parametrize(('status', 'exit_code'), [
+    ('failed', 1), ('interrupted', 124), ('running', None),
+    ('passed', 1), ('passed', None), ('passed', False), ('passed', 0.0),
+])
+def test_cpu_diagnostic_requires_observed_success_before_publication(
+        tmp_path, capsys, status, exit_code):
+    run = make_cpu_run(tmp_path)
+    report = json.loads((run / 'report.json').read_text())
+    report.update(status=status, exit_code=exit_code)
+    (run / 'report.json').write_text(json.dumps(report))
+    out = tmp_path / 'out'
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+
+
+@pytest.mark.parametrize('mutation', [
+    'missing-json', 'leading-log', 'trailing-log', 'truncated', 'empty',
+    'non-object-row', 'missing-rate', 'nan-rate', 'bool-token', 'token-mismatch',
+    'missing-generation',
+])
+def test_cpu_diagnostic_keeps_native_admission_and_workload_checks(
+        tmp_path, capsys, mutation):
+    run = make_cpu_run(tmp_path)
+    path = run / 'stdout.log'
+    raw = path.read_text()
+    native = json.loads(raw)
+    if mutation == 'missing-json':
+        path.unlink()
+    elif mutation in {'leading-log', 'trailing-log', 'truncated'}:
+        path.write_text({'leading-log': '[llama] log\n' + raw,
+                         'trailing-log': raw + '\n[llama] log', 'truncated': raw[:-1]}[mutation])
+    else:
+        if mutation == 'empty':
+            native = []
+        elif mutation == 'non-object-row':
+            native[0] = 'not a row'
+        elif mutation == 'missing-rate':
+            native[0].pop('avg_ts')
+        elif mutation == 'nan-rate':
+            native[1]['avg_ts'] = float('nan')
+        elif mutation == 'bool-token':
+            native[0]['n_prompt'] = True
+        elif mutation == 'token-mismatch':
+            native[0]['n_prompt'] = 32
+        else:
+            native.pop()
+        path.write_text(json.dumps(native))
+    out = tmp_path / 'out'
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+
+
+@pytest.mark.parametrize('metadata', ['legacy', 'compiled-gpu-backend', 'native-zero-layers',
+                                     'minimal-command'])
+def test_cpu_diagnostic_preserves_optional_native_metadata(tmp_path, metadata):
+    run = make_cpu_run(tmp_path)
+    native = json.loads((run / 'stdout.log').read_text())
+    report = json.loads((run / 'report.json').read_text())
+    for row in native:
+        row['future_column'] = {'nested': ['unchanged', 7]}
+        if metadata == 'legacy':
+            for key in ('gpu_info', 'backends', 'build_commit', 'stddev_ts'):
+                row.pop(key)
+        elif metadata == 'compiled-gpu-backend':
+            row['backends'] = 'CPU,ROCm'
+            row['gpu_info'] = 'available GPU, not proof of use'
+        elif metadata == 'native-zero-layers':
+            row['n_gpu_layers'] = 0
+    if metadata == 'legacy':
+        report.pop('schema')
+    if metadata == 'minimal-command':
+        report['command'] = report['command'][:report['command'].index('-lm')]
+    (run / 'stdout.log').write_text(json.dumps(native))
+    (run / 'report.json').write_text(json.dumps(report))
+    before = {name: (run / name).read_bytes() for name in ('report.json', 'stdout.log')}
+    out = tmp_path / 'out'
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 0
+    body = (out / 'heretic-cpu-diagnostic.md').read_text()
+    assert json.dumps(native, indent=2) in body
+    assert 'not treated as evidence that a GPU was used' in body
+    assert {name: (run / name).read_bytes() for name in before} == before
+
+
+def test_cpu_diagnostic_needs_explicit_mode_and_never_queries_host(
+        tmp_path, capsys, monkeypatch):
+    run = make_cpu_run(tmp_path)
+    out = tmp_path / 'out'
+    assert m.main(report_write_argv(tmp_path, run, out)) == 2
+    assert not out.exists()
+    capsys.readouterr()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('CPU reporting must not sample the host or borrow a functional/preset verdict')
+
+    monkeypatch.setattr(m, 'sample_host', forbidden)
+    monkeypatch.setattr(m, 'load_functional', forbidden)
+    monkeypatch.setattr(m, 'load_run', forbidden)
+    monkeypatch.setattr(m.gpu_vram, 'devices', forbidden)
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 0
+    args = m.parser().parse_args(['cpu-diagnostic', str(run)])
+    assert Path(args.out) == m.OUT / 'cpu-diagnostics'
+
+
+def test_cpu_diagnostic_mixed_runs_and_duplicate_aliases_refuse_before_writes(tmp_path, capsys):
+    cpu = make_cpu_run(tmp_path, 'cpu')
+    gpu = make_run(tmp_path, 'gpu', '/models/RVN.gguf', '1/1/1', native=rows())
+    out = tmp_path / 'mixed'
+    argv = cpu_write_argv(tmp_path, cpu, out)
+    argv.insert(2, str(gpu))
+    assert m.main(argv) == 2
+    assert not out.exists()
+    capsys.readouterr()
+    argv = cpu_write_argv(tmp_path, cpu, tmp_path / 'duplicate')
+    argv.insert(2, str(cpu))
+    assert m.main(argv) == 2
+    assert 'same alias' in capsys.readouterr().err
+    assert not (tmp_path / 'duplicate').exists()
+
+
+def test_cpu_diagnostic_rejects_unadmitted_records_and_unsafe_alias_before_writes(tmp_path):
+    gpu = m.load_run(make_run(tmp_path, 'gpu', '/models/RVN.gguf', '1/1/1',
+                              native=rows()), REGISTRY)
+    with pytest.raises(m.ReportRefused, match='admitted CPU-only'):
+        m.write_cpu_diagnostics([gpu], tmp_path / 'gpu-out')
+    record = m.load_cpu_diagnostic(make_cpu_run(tmp_path), REGISTRY)
+    record['alias'] = '../escape'
+    with pytest.raises(m.ReportRefused, match='safe artifact name'):
+        m.write_cpu_diagnostics([record], tmp_path / 'bad-alias')
+    assert not (tmp_path / 'gpu-out').exists()
+    assert not (tmp_path / 'bad-alias').exists()
+
+
+def test_cpu_diagnostic_refuses_an_extra_combined_workload_row(tmp_path, capsys):
+    run = make_cpu_run(tmp_path)
+    native = json.loads((run / 'stdout.log').read_text())
+    native.append({**native[0], 'n_prompt': 16, 'n_gen': 8})
+    (run / 'stdout.log').write_text(json.dumps(native))
+    out = tmp_path / 'out'
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert not out.exists()
+
+
+@pytest.mark.parametrize('filename', ['heretic-cpu-diagnostic.md', 'README-cpu-diagnostics.md'])
+def test_cpu_diagnostic_never_clobbers_existing_artifact(tmp_path, capsys, filename):
+    run = make_cpu_run(tmp_path)
+    out = tmp_path / 'shared'
+    out.mkdir()
+    existing = out / filename
+    existing.write_text('Preexisting serving or diagnostic artifact; preserve exact bytes\n')
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
+
+
+def test_cpu_diagnostic_exclusive_creation_refuses_late_target(tmp_path, capsys, monkeypatch):
+    run = make_cpu_run(tmp_path)
+    out = tmp_path / 'late-target'
+    target = out / 'heretic-cpu-diagnostic.md'
+    original_open = Path.open
+    reached = []
+
+    def inject_target(path, mode='r', *args, **kwargs):
+        if path == target and mode == 'x':
+            reached.append(path)
+            with original_open(path, 'w') as stream:
+                stream.write('Concurrent-owner fixture; do not replace\n')
+        return original_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, 'open', inject_target)
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert reached == [target]
+    assert target.read_text() == 'Concurrent-owner fixture; do not replace\n'
+    assert not (out / 'README-cpu-diagnostics.md').exists()
+
+
+def test_cpu_diagnostic_refuses_dangling_target_symlink(tmp_path, capsys):
+    run = make_cpu_run(tmp_path)
+    out = tmp_path / 'linked-target'
+    out.mkdir()
+    target = tmp_path / 'uncreated-private-target'
+    link = out / 'heretic-cpu-diagnostic.md'
+    link.symlink_to(target)
+    assert m.main(cpu_write_argv(tmp_path, run, out)) == 2
+    assert 'Report refused' in capsys.readouterr().err
+    assert link.is_symlink() and link.readlink() == target
+    assert not target.exists()
+    assert not (out / 'README-cpu-diagnostics.md').exists()
+
+
+@pytest.mark.parametrize(('exit_code', 'expected'), [
+    pytest.param(False, 2, id='boolean-false'),
+    pytest.param(0.0, 2, id='floating-zero'),
+    pytest.param(0, 0, id='observed-integer-zero'),
+])
+def test_cli_exit_status_is_integer_zero_not_just_zero_equivalent(
+        tmp_path, capsys, exit_code, expected):
+    run = make_run(tmp_path, 'exit-status', '/models/RVN.gguf', '1/1/1',
+                   native=rows(97.5, 18.25), exit_code=exit_code)
+    before = {name: (run / name).read_bytes() for name in ('report.json', 'stdout.log')}
+    out = tmp_path / 'out'
+    assert m.main(report_write_argv(tmp_path, run, out)) == expected
+    stderr = capsys.readouterr().err
+    if expected == 2:
+        assert 'unsuccessful run has no rate to quote' in stderr
+        assert not out.exists()
+    else:
+        assert stderr == ''
+        assert '18.25 tok/s' in (out / 'heretic.md').read_text()
+    assert {name: (run / name).read_bytes() for name in before} == before
+
+
+def assert_input_refusal(tmp_path, capsys, run, mode):
+    before = {name: (run / name).read_bytes() for name in ('report.json', 'stdout.log')}
+    out = tmp_path / 'out'
+    argv = cpu_write_argv(tmp_path, run, out) if mode == 'cpu-diagnostic' else (
+        report_write_argv(tmp_path, run, out))
+    assert m.main(argv) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ''
+    assert captured.err.startswith('Report refused: ')
+    assert run.name in captured.err
+    assert not out.exists()
+    assert {name: (run / name).read_bytes() for name in before} == before
+
+
+@pytest.mark.parametrize('mode', ['write', 'cpu-diagnostic'])
+@pytest.mark.parametrize('value', [
+    pytest.param(None, id='null'), pytest.param(True, id='boolean'),
+    pytest.param(0, id='integer'), pytest.param(0.0, id='float'),
+    pytest.param('report', id='string'), pytest.param([], id='array'),
+])
+def test_cli_refuses_non_object_benchmark_report(tmp_path, capsys, mode, value):
+    run = make_cpu_run(tmp_path) if mode == 'cpu-diagnostic' else make_run(
+        tmp_path, 'invalid-input', '/models/RVN.gguf', '1/1/1', native=rows())
+    (run / 'report.json').write_text(json.dumps(value))
+    assert_input_refusal(tmp_path, capsys, run, mode)
+
+
+@pytest.mark.parametrize('mode', ['write', 'cpu-diagnostic'])
+@pytest.mark.parametrize('value', [
+    pytest.param(None, id='null'), pytest.param(True, id='boolean'),
+    pytest.param(0, id='integer'), pytest.param(0.0, id='float'),
+    pytest.param([], id='array'), pytest.param({}, id='object'),
+    pytest.param('', id='empty'), pytest.param('\x00', id='nul'),
+])
+def test_cli_refuses_invalid_native_results_path(tmp_path, capsys, mode, value):
+    run = make_cpu_run(tmp_path) if mode == 'cpu-diagnostic' else make_run(
+        tmp_path, 'invalid-input', '/models/RVN.gguf', '1/1/1', native=rows())
+    report = json.loads((run / 'report.json').read_text())
+    report['native_results'] = value
+    (run / 'report.json').write_text(json.dumps(report))
+    assert_input_refusal(tmp_path, capsys, run, mode)
+
+
+@pytest.mark.parametrize('mode', ['write', 'cpu-diagnostic'])
+@pytest.mark.parametrize('filename', ['report.json', 'stdout.log'])
+@pytest.mark.parametrize('failure', ['invalid-encoding', 'decimal-limit', 'nested-array'])
+def test_cli_refuses_malformed_benchmark_json(tmp_path, capsys, mode, filename, failure):
+    run = make_cpu_run(tmp_path) if mode == 'cpu-diagnostic' else make_run(
+        tmp_path, 'invalid-input', '/models/RVN.gguf', '1/1/1', native=rows())
+    if failure == 'invalid-encoding':
+        raw = b'\xff'
+    elif failure == 'decimal-limit':
+        limit = sys.get_int_max_str_digits()
+        assert 0 < limit <= 10000, 'fixture requires the bounded interpreter decimal limit'
+        raw = b'9' * (limit + 1)
+    else:
+        # Wrong container shape, not proof that this interpreter exhausts its decoder.
+        depth = sys.getrecursionlimit() + 100
+        assert depth < 10000, 'fixture requires a bounded interpreter recursion limit'
+        raw = b'[' * depth + b'0' + b']' * depth
+    (run / filename).write_bytes(raw)
+    assert_input_refusal(tmp_path, capsys, run, mode)
+
+
+@pytest.mark.parametrize('mode', ['write', 'cpu-diagnostic'])
+@pytest.mark.parametrize('existing_output', [False, True], ids=['new-output', 'existing-output'])
+def test_later_malformed_report_publishes_no_earlier_run(
+        tmp_path, capsys, mode, existing_output):
+    first_root = tmp_path / 'first'
+    second_root = tmp_path / 'second'
+    first_root.mkdir()
+    second_root.mkdir()
+    first = make_cpu_run(first_root) if mode == 'cpu-diagnostic' else make_run(
+        first_root, 'healthy', '/models/RVN.gguf', '1/1/1', native=rows(97.5, 18.25))
+    second = make_cpu_run(second_root) if mode == 'cpu-diagnostic' else make_run(
+        second_root, 'malformed', '/models/RVN.gguf', '1/1/1', native=rows())
+    # Establish that the first run really reaches this mode's successful reader.
+    loaded = m.load_cpu_diagnostic(first, REGISTRY) if mode == 'cpu-diagnostic' else (
+        m.load_run(first, REGISTRY))
+    assert loaded['alias'] == 'heretic'
+    (second / 'report.json').write_text('null')
+    before_inputs = {(str(run), name): (run / name).read_bytes()
+                     for run in (first, second) for name in ('report.json', 'stdout.log')}
+    out = tmp_path / 'out'
+    if existing_output:
+        out.mkdir()
+        (out / 'owner.md').write_text('Existing owner bytes; do not alter\n')
+    before_output = {p.name: p.read_bytes() for p in out.iterdir()} if existing_output else {}
+    argv = cpu_write_argv(tmp_path, first, out) if mode == 'cpu-diagnostic' else (
+        report_write_argv(tmp_path, first, out))
+    argv.insert(2, str(second))
+    assert m.main(argv) == 2
+    captured = capsys.readouterr()
+    assert captured.out == '' and captured.err.startswith('Report refused: ')
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before_output if existing_output else (
+        not out.exists())
+    assert {(str(run), name): (run / name).read_bytes()
+            for run in (first, second) for name in ('report.json', 'stdout.log')} == before_inputs
+
+
+@pytest.mark.parametrize('mode', ['write', 'cpu-diagnostic'])
+@pytest.mark.parametrize('filename', ['report.json', 'stdout.log'])
+def test_cli_refuses_json_decoder_recursion_failure(
+        tmp_path, capsys, monkeypatch, mode, filename):
+    """Inject decoder exhaustion; do not stress the native interpreter's stack."""
+    run = make_cpu_run(tmp_path) if mode == 'cpu-diagnostic' else make_run(
+        tmp_path, 'decoder-exhaustion', '/models/RVN.gguf', '1/1/1', native=rows())
+    selected = (run / filename).read_text()
+    original = m.json.loads
+    reached = []
+
+    def decoder(text, *args, **kwargs):
+        if text == selected:
+            reached.append(filename)
+            raise RecursionError('fixture JSON decoder recursion limit')
+        return original(text, *args, **kwargs)
+
+    monkeypatch.setattr(m.json, 'loads', decoder)
+    assert_input_refusal(tmp_path, capsys, run, mode)
+    assert reached == [filename]

@@ -14,7 +14,8 @@ Three refusals carry the honesty of the output:
 * A run whose native JSON is missing, unparsable or incomplete is refused. There
   is no fallback estimate, no "approximately", and no rate derived from a
   smoke-test's wall clock. An artifact either cites a measured row or does not
-  exist.
+  exist. A measured token count must be a nonnegative integer and a rate a
+  nonnegative finite number; anything else is refused, never coerced.
 * A ranking that mixes serving-MTP classes is refused. ``heretic``,
   ``obliterated``, ``ridge`` and ``fable`` serve with ``spec-type = draft-mtp``;
   ``llama-bench`` applies no such preset. Ordering an MTP-served preset against
@@ -28,11 +29,16 @@ argv recorded in ``report.json`` is compared against ``llama-models.ini`` by
 ratio, so ``6/6/6`` and ``1,1,1`` agree and ``1,1,1`` against ``5,8,4`` does
 not: an artifact headed ``qwen3-coder-next`` that measured an equal split
 measured a placement nothing serves.
+
+``cpu-diagnostic`` is a separate, explicit reporting path for the maintained
+CPU-only producer (``-dev none -ngl 0``, no tensor split). Its separately named
+artifacts are diagnostics, never serving-preset measurements or model rankings.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import signal
@@ -114,6 +120,26 @@ def argv_value(command: list[str], flag: str) -> str:
             f"recorded benchmark command has no {flag} argument") from error
 
 
+def token_count(value) -> bool:
+    """``n_prompt``/``n_gen``: llama-bench writes C ints; a count is never negative."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def measured_rate(value) -> bool:
+    """``avg_ts``/``stddev_ts``: llama-bench writes doubles; finite, never negative.
+
+    A JSON boolean is not a number here. An integer spelling of a rate is the
+    same measurement and stays valid while a double, and so the report
+    formatter, can hold it.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value) and value >= 0
+    except OverflowError:
+        return False
+
+
 def native_rows(run_dir: Path) -> tuple[dict, list[dict]]:
     """The run report and its native rows, or a refusal.
 
@@ -125,21 +151,29 @@ def native_rows(run_dir: Path) -> tuple[dict, list[dict]]:
     report_path = run_dir / "report.json"
     try:
         report = json.loads(report_path.read_text())
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, ValueError, RecursionError) as error:
+        # ValueError includes malformed JSON, text decoding and decimal limits.
         raise MissingNativeResults(f"{report_path}: {error}") from error
+    if not isinstance(report, dict):
+        raise MissingNativeResults(f"{report_path} is not a JSON object")
     if report.get("mode") != "benchmark":
         raise MissingNativeResults(f"{run_dir.name} is not a benchmark run")
-    if report.get("status") != "passed" or report.get("exit_code") != 0:
+    if (report.get("status") != "passed" or type(report.get("exit_code")) is not int
+            or report["exit_code"] != 0):
         raise MissingNativeResults(
             f"{run_dir.name} status is {report.get('status')!r} with exit code "
             f"{report.get('exit_code')!r}; an unsuccessful run has no rate to quote")
     if "native_results" not in report:
         raise MissingNativeResults(
             f"{run_dir.name} recorded no native_results; refusing to invent one")
-    native = run_dir / report["native_results"]
+    native_results = report["native_results"]
+    if not isinstance(native_results, str) or not native_results:
+        raise MissingNativeResults(
+            f"{run_dir.name} native_results is not a non-empty path string")
+    native = run_dir / native_results
     try:
         rows = json.loads(native.read_text())
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, ValueError, RecursionError) as error:
         raise MissingNativeResults(f"{native}: {error}") from error
     if not isinstance(rows, list) or not rows:
         raise MissingNativeResults(f"{native} is not a non-empty JSON array")
@@ -150,6 +184,18 @@ def native_rows(run_dir: Path) -> tuple[dict, list[dict]]:
         if missing:
             raise MissingNativeResults(
                 f"{native} row is missing measured fields: {', '.join(missing)}")
+        # Kinds and ranges are the producer's own, and nothing is coerced. An
+        # omitted or null stddev_ts still means no deviation was reported.
+        invalid = [field for field in ("n_prompt", "n_gen") if not token_count(row[field])]
+        if not measured_rate(row["avg_ts"]):
+            invalid.append("avg_ts")
+        if row.get("stddev_ts") is not None and not measured_rate(row["stddev_ts"]):
+            invalid.append("stddev_ts")
+        if invalid:
+            raise MissingNativeResults(
+                f"{native} row has invalid measured fields: {', '.join(invalid)}; "
+                "token counts must be nonnegative integers and rates nonnegative "
+                "finite numbers")
     return report, rows
 
 
@@ -294,6 +340,143 @@ def load_run(run_dir: Path, registry: dict, alias: str | None = None) -> dict:
         "serving_projector": Path(preset["mmproj"]).name if preset.get("mmproj") else None,
         "host_sample": host_sample(run_dir),
     }
+
+
+def cpu_command(command) -> dict:
+    """Admit the maintained CPU producer's canonical argv, not absent GPU data.
+
+    Unknown or duplicate options refuse: accepting another spelling of a device
+    or offload override could make ``-dev none -ngl 0`` misleading. This narrow
+    opt-in contract does not change the legacy serving-preset report path.
+    """
+    if (not isinstance(command, list) or len(command) < 2
+            or any(not isinstance(value, str) or not value for value in command)):
+        raise MissingNativeResults("CPU diagnostic recorded no canonical benchmark command")
+    valued = {"-m", "-dev", "-t", "-ngl", "-p", "-n", "-r", "-o",
+              "-lm", "-lzm", "--repack"}
+    switches = {"--no-warmup", "--offline"}
+    options = {}
+    index = 1
+    while index < len(command):
+        flag = command[index]
+        if flag in options or flag not in valued | switches:
+            raise ReportRefused(f"CPU diagnostic has an unsupported or duplicate option: {flag}")
+        if flag in switches:
+            options[flag] = True
+            index += 1
+            continue
+        if index + 1 >= len(command) or command[index + 1].startswith("-"):
+            raise ReportRefused(f"CPU diagnostic option {flag} has no canonical value")
+        options[flag] = command[index + 1]
+        index += 2
+    required = {"-m", "-dev", "-t", "-ngl", "-p", "-n", "-r", "-o"}
+    if not required <= options.keys():
+        raise ReportRefused("CPU diagnostic is missing required recorded command options")
+    if options["-dev"] != "none" or options["-ngl"] != "0" or options["-o"] != "json":
+        raise ReportRefused("CPU diagnostic requires explicit -dev none -ngl 0 -o json")
+    for flag in ("-t", "-p", "-n", "-r"):
+        try:
+            positive = re.fullmatch(r"[0-9]+", options[flag]) and int(options[flag]) > 0
+        except ValueError:
+            positive = False
+        if not positive:
+            raise ReportRefused(f"CPU diagnostic requires a positive integer for {flag}")
+    return options
+
+
+def load_cpu_diagnostic(run_dir: Path, registry: dict, alias: str | None = None) -> dict:
+    """Read a CPU-only diagnostic without claiming the alias's serving placement."""
+    report, rows = native_rows(run_dir)
+    if type(report.get("exit_code")) is not int:
+        raise MissingNativeResults("CPU diagnostic requires an observed integer-zero exit status")
+    command = report.get("command")
+    options = cpu_command(command)
+    model = Path(options["-m"]).resolve()
+    alias = resolve_alias(model, registry, alias)
+    if len(rows) != 2:
+        raise MissingNativeResults("CPU diagnostic requires exactly separate prompt and generation rows")
+    measured = throughput(rows)
+    if (measured["prompt"]["n_prompt"] != int(options["-p"])
+            or measured["generation"]["n_gen"] != int(options["-n"])):
+        raise ReportRefused("CPU diagnostic native token counts disagree with recorded argv")
+    for row in rows:
+        if "n_gpu_layers" in row and (type(row["n_gpu_layers"]) is not int
+                                     or row["n_gpu_layers"] != 0):
+            raise ReportRefused("CPU diagnostic native GPU-layer metadata contradicts CPU-only argv")
+    return {"diagnostic_kind": "cpu-only", "alias": alias, "model_path": str(model),
+            "run_dir": cite(run_dir), "command": command, "options": options,
+            "report": report, "rows": rows, "measured": measured}
+
+
+def render_cpu_diagnostic(record: dict) -> str:
+    """Keep CPU results separate from serving, functional and memory-fit claims."""
+    measured = record["measured"]
+    report = record["report"]
+    lines = [
+        f"# {record['alias']} — CPU-only diagnostic", "",
+        "This is not a serving-preset measurement, functional qualification, "
+        "memory-fit proof or model ranking. The alias identifies the configured "
+        "weight path only; GPU placement, MTP, projectors and serving context "
+        "were not measured.", "",
+        f"- Model path: `{record['model_path']}`",
+        f"- Recorded CPU-only placement: `-dev none -ngl 0`",
+        f"- Kernel: `{report.get('kernel', 'not recorded')}`",
+        f"- Boot id: `{report.get('boot_id', 'not recorded')}`",
+        f"- Source report: `{record['run_dir']}/report.json`",
+        f"- Source native JSON: `{record['run_dir']}/{report['native_results']}`", "",
+        "## Measured throughput", "",
+        "| Test | Rate |", "|---|---|",
+    ]
+    for kind, label, count in (("prompt", "pp", "n_prompt"), ("generation", "tg", "n_gen")):
+        row = measured[kind]
+        lines.append(f"| {label}{row[count]} | {rate(row['avg_ts'], row.get('stddev_ts'))} |")
+    lines += [
+        "", "## Exact recorded argv (JSON array)", "", "```json",
+        json.dumps(record["command"]), "```", "",
+        "## Native rows (unchanged values)", "", "```json",
+        json.dumps(record["rows"], indent=2), "```", "",
+        "No rate was inferred from elapsed time. Optional native backend/device "
+        "metadata is quoted, not treated as evidence that a GPU was used. "
+        "Compare diagnostics only after checking the complete workload, runtime, "
+        "thread count, cache/load options and artifact identity; this report "
+        "performs no automatic ordering or role selection.", "",
+    ]
+    return "\n".join(lines)
+
+
+def write_cpu_diagnostics(records: list[dict], out_dir: Path) -> list[Path]:
+    """Distinct filenames prevent a CPU opt-in from replacing serving artifacts."""
+    bodies = {}
+    for record in records:
+        alias = record["alias"]
+        if record.get("diagnostic_kind") != "cpu-only":
+            raise ReportRefused("CPU diagnostic output requires an admitted CPU-only record")
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", alias):
+            raise ReportRefused("CPU diagnostic alias is not a safe artifact name")
+        name = f"{alias}-cpu-diagnostic.md"
+        if name in bodies:
+            raise ReportRefused(f"two CPU diagnostic runs claim the same alias: {alias}")
+        bodies[name] = render_cpu_diagnostic(record)
+    index = ["# CPU-only diagnostics", "",
+             "Alphabetical references only, not serving-preset measurements, "
+             "functional verdicts or a model ranking.", ""]
+    index.extend(f"- [{name.removesuffix('-cpu-diagnostic.md')}]({name})" for name in sorted(bodies))
+    bodies["README-cpu-diagnostics.md"] = "\n".join(index) + "\n"
+    for name in bodies:
+        path = out_dir / name
+        if path.exists() or path.is_symlink():
+            raise ReportRefused(f"CPU diagnostic refuses to replace existing artifact: {path}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for name, body in bodies.items():
+        path = out_dir / name
+        try:
+            with path.open("x") as stream:
+                stream.write(body)
+        except FileExistsError as error:
+            raise ReportRefused(f"CPU diagnostic refuses to replace existing artifact: {path}") from error
+        written.append(path)
+    return written
 
 
 def flash_attention(value) -> str:
@@ -688,6 +871,11 @@ def parser() -> argparse.ArgumentParser:
     write.add_argument("--presets", default=str(model_catalog.PRESETS))
     write.add_argument("--functional", default=str(FUNCTIONAL))
 
+    cpu = sub.add_parser("cpu-diagnostic", help="publish separately labeled CPU-only diagnostics")
+    cpu.add_argument("runs", nargs="+", metavar="[ALIAS=]DIR")
+    cpu.add_argument("--out", default=str(OUT / "cpu-diagnostics"))
+    cpu.add_argument("--presets", default=str(model_catalog.PRESETS))
+
     watch = sub.add_parser("sample", help="poll VRAM/RAM beside a running benchmark")
     watch.add_argument("--into", required=True, help="the run directory to write into")
     watch.add_argument("--interval", type=float, default=2.0)
@@ -700,9 +888,14 @@ def main(argv: list[str] | None = None) -> int:
         return sample_host(Path(args.into), args.interval)
     try:
         registry = model_catalog.presets(Path(args.presets))
-        records = [load_run(directory, registry, alias)
-                   for alias, directory in map(parse_run, args.runs)]
-        written = write_reports(records, Path(args.out), load_functional(Path(args.functional)))
+        if args.mode == "cpu-diagnostic":
+            records = [load_cpu_diagnostic(directory, registry, alias)
+                       for alias, directory in map(parse_run, args.runs)]
+            written = write_cpu_diagnostics(records, Path(args.out))
+        else:
+            records = [load_run(directory, registry, alias)
+                       for alias, directory in map(parse_run, args.runs)]
+            written = write_reports(records, Path(args.out), load_functional(Path(args.functional)))
     except ReportRefused as refusal:
         print(f"Report refused: {refusal}", file=sys.stderr)
         return 2
