@@ -313,5 +313,70 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`ignore/strip-ai-attrib.py`](../../ignore/strip-ai-attrib.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`scripts/heretictokens.sh`](../../scripts/heretictokens.sh) | [Reference](OPERATIONS.md) |
 | [`workspace_files.json`](../../workspace_files.json) | [Reference](CONFIGURATION.md) |
+| [`.gitattributes`](../../.gitattributes) | [Repository and artifact-inventory reference](ARCHITECTURE.md) |
+| [`config/artifact-inventory.json`](../../config/artifact-inventory.json) | [Repository and artifact-inventory reference](ARCHITECTURE.md) |
+| [`config/chat-templates/cyber-frost-3.8.jinja`](../../config/chat-templates/cyber-frost-3.8.jinja) | [Chat-template configuration](CONFIGURATION.md#chat-templates) |
+| [`docs/decisions/0009-portable-host-profiles.md`](../decisions/0009-portable-host-profiles.md) | [Portable host-profile decision and pending phases](../decisions/0009-portable-host-profiles.md) |
+| [`integrations/hermes-local-worker/.gitattributes`](../../integrations/hermes-local-worker/.gitattributes) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/README.md`](../../integrations/hermes-local-worker/README.md) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/__init__.py`](../../integrations/hermes-local-worker/__init__.py) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/install_runtime.py`](../../integrations/hermes-local-worker/install_runtime.py) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/plugin.yaml`](../../integrations/hermes-local-worker/plugin.yaml) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/runtime/LICENSE.hermes`](../../integrations/hermes-local-worker/runtime/LICENSE.hermes) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/runtime/hermes-local-helper.patch`](../../integrations/hermes-local-worker/runtime/hermes-local-helper.patch) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/runtime/manifest.json`](../../integrations/hermes-local-worker/runtime/manifest.json) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/tests/test_install_runtime.py`](../../integrations/hermes-local-worker/tests/test_install_runtime.py) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`integrations/hermes-local-worker/tests/test_worker.py`](../../integrations/hermes-local-worker/tests/test_worker.py) | [Local-worker package and acceptance boundaries](../../integrations/hermes-local-worker/README.md) |
+| [`rust/src/downloads.rs`](../../rust/src/downloads.rs) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`rust/src/inventory.rs`](../../rust/src/inventory.rs) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`rust/src/report.rs`](../../rust/src/report.rs) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`rust/src/verification.rs`](../../rust/src/verification.rs) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/detect_backends.py`](../../scripts/detect_backends.py) | [Backend and physical-inventory source contracts](../decisions/0009-portable-host-profiles.md) |
+| [`scripts/serve-cyber-frost-38.sh`](../../scripts/serve-cyber-frost-38.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-cyber-ornith-9b.sh`](../../scripts/serve-cyber-ornith-9b.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-distill-35b-a3b-abliterated.sh`](../../scripts/serve-distill-35b-a3b-abliterated.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-genesis-27b.sh`](../../scripts/serve-genesis-27b.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-mindmeld-27b.sh`](../../scripts/serve-mindmeld-27b.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-occamy-10.sh`](../../scripts/serve-occamy-10.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-penjing-27b.sh`](../../scripts/serve-penjing-27b.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-qwen25-coder-32b-abliterated.sh`](../../scripts/serve-qwen25-coder-32b-abliterated.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-qwen35-9b-abliterated.sh`](../../scripts/serve-qwen35-9b-abliterated.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-qwen38-27b-ap.sh`](../../scripts/serve-qwen38-27b-ap.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-qwen38-coder.sh`](../../scripts/serve-qwen38-coder.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-qwopus-flash-v2-27b.sh`](../../scripts/serve-qwopus-flash-v2-27b.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-swift15-27b.sh`](../../scripts/serve-swift15-27b.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/serve-thinkingcap-27b.sh`](../../scripts/serve-thinkingcap-27b.sh) | [Model orchestration reference](../MODEL-RUNS.md) |
+| [`scripts/setup-python-runtimes.sh`](../../scripts/setup-python-runtimes.sh) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`scripts/start-download-queue.sh`](../../scripts/start-download-queue.sh) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`scripts/verify_llama_patches.py`](../../scripts/verify_llama_patches.py) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-0fb8f15770.patch`](../../upstream/patches/0001-convolution-kernel-types-0fb8f15770.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-184f65360.patch`](../../upstream/patches/0001-convolution-kernel-types-184f65360.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-4df9b47976.patch`](../../upstream/patches/0001-convolution-kernel-types-4df9b47976.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-5193ef1d4f.patch`](../../upstream/patches/0001-convolution-kernel-types-5193ef1d4f.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-80d2c0c2c5.patch`](../../upstream/patches/0001-convolution-kernel-types-80d2c0c2c5.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-a691b23458.patch`](../../upstream/patches/0001-convolution-kernel-types-a691b23458.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-ac8e1694d.patch`](../../upstream/patches/0001-convolution-kernel-types-ac8e1694d.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-b54752df40.patch`](../../upstream/patches/0001-convolution-kernel-types-b54752df40.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-b79696f1f5.patch`](../../upstream/patches/0001-convolution-kernel-types-b79696f1f5.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-bed0a8566.patch`](../../upstream/patches/0001-convolution-kernel-types-bed0a8566.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-d327bf1f0.patch`](../../upstream/patches/0001-convolution-kernel-types-d327bf1f0.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-ded522f830.patch`](../../upstream/patches/0001-convolution-kernel-types-ded522f830.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types-ef6bc6f367.patch`](../../upstream/patches/0001-convolution-kernel-types-ef6bc6f367.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/0001-convolution-kernel-types.patch`](../../upstream/patches/0001-convolution-kernel-types.patch) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`upstream/patches/README.md`](../../upstream/patches/README.md) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`verification/gpu-placement/test_physical_inventory.py`](../../verification/gpu-placement/test_physical_inventory.py) | [Backend and physical-inventory source contracts](../decisions/0009-portable-host-profiles.md) |
+| [`verification/local-coverage-foundation/download-queue-candidates-llm-2026-09-29.json`](../../verification/local-coverage-foundation/download-queue-candidates-llm-2026-09-29.json) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/local-coverage-foundation/download-queue-candidates-media-2026-09-29.json`](../../verification/local-coverage-foundation/download-queue-candidates-media-2026-09-29.json) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/local-coverage-foundation/download-queue-restore-router.json`](../../verification/local-coverage-foundation/download-queue-restore-router.json) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/local-coverage-foundation/download-queue-slot-qwen38-flash-next-coder.json`](../../verification/local-coverage-foundation/download-queue-slot-qwen38-flash-next-coder.json) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/python-runtimes/asr/requirements.in`](../../verification/python-runtimes/asr/requirements.in) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/python-runtimes/asr/requirements.lock`](../../verification/python-runtimes/asr/requirements.lock) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/python-runtimes/computer-use/requirements.in`](../../verification/python-runtimes/computer-use/requirements.in) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/python-runtimes/computer-use/requirements.lock`](../../verification/python-runtimes/computer-use/requirements.lock) | [Runtime setup and declared acquisition operations](OPERATIONS.md) |
+| [`verification/upstream-pin/test_build_backends.py`](../../verification/upstream-pin/test_build_backends.py) | [Backend and physical-inventory source contracts](../decisions/0009-portable-host-profiles.md) |
+| [`verification/upstream-pin/test_convolution_overlay.py`](../../verification/upstream-pin/test_convolution_overlay.py) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`verification/upstream-pin/test_cyber_frost_template.py`](../../verification/upstream-pin/test_cyber_frost_template.py) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
+| [`verification/upstream-pin/test_detect_backends.py`](../../verification/upstream-pin/test_detect_backends.py) | [Backend and physical-inventory source contracts](../decisions/0009-portable-host-profiles.md) |
+| [`verification/upstream-pin/test_llama_patches.py`](../../verification/upstream-pin/test_llama_patches.py) | [Revision-scoped patch and template evidence](../../upstream/patches/README.md) |
 
-Inventory entries: 301, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md).
+Inventory entries: 371, excluding proof placeholders and compatibility links. The pinned upstream source is covered by [ADR 0005](../decisions/0005-track-llama-cpp-submodule.md). This is navigation coverage, not implementation or runtime qualification.
