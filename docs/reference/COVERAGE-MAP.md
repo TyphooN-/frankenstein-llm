@@ -218,6 +218,8 @@ This maps outer-repository files to their documentation. It excludes ignored mod
 | [`verification/qualification-supervisor/test_qualification_supervisor.py`](../../verification/qualification-supervisor/test_qualification_supervisor.py) | [Reference](DEVELOPER-GUIDE.md) |
 | [`verification/obliterated-mmproj-manifest.json`](../../verification/obliterated-mmproj-manifest.json) | [Reference](CONFIGURATION.md) |
 | [`verification/operator-runs/test_operator_runs.py`](../../verification/operator-runs/test_operator_runs.py) | [Reference](../MODEL-RUNS.md) |
+| [`verification/operator-runs/test_run_custody.py`](../../verification/operator-runs/test_run_custody.py) | [Reference](../MODEL-RUNS.md) |
+| [`verification/operator-runs/test_runtime_selection.py`](../../verification/operator-runs/test_runtime_selection.py) | [Reference](../MODEL-RUNS.md) |
 | [`verification/operator-runs/test_serve_model.py`](../../verification/operator-runs/test_serve_model.py) | [Reference](../MODEL-RUNS.md) |
 | [`verification/prompt-corpus-admission/README.md`](../../verification/prompt-corpus-admission/README.md) | [Reference](ARCHITECTURE.md) |
 | [`verification/prompt-corpus-admission/admit_corpus.py`](../../verification/prompt-corpus-admission/admit_corpus.py) | [Reference](ARCHITECTURE.md) |

@@ -145,7 +145,9 @@ systemctl --user start llama-router.service
 
 `--confirm-kernel` means the operator has verified the intended boot/kernel and
 explicitly authorizes this performance run. Reboot alone is not authorization.
-The config defaults request GPU offload; `--gpu-layers 0` requests a CPU baseline.
+The config defaults request GPU offload. Use `--devices none --gpu-layers 0`
+together for an explicit CPU-only benchmark; `--gpu-layers 0` by itself leaves
+the configured device list and tensor split in the command.
 For split GGUFs pass the first shard. Native results measure prompt processing and
 token generation, **not** coding quality or Hermes agent reliability. They do not
 apply the router's full chat/MTP preset: the recorded argv is the benchmark
@@ -154,10 +156,15 @@ meaningful comparisons; do not label different configurations a model ranking.
 
 ## Preflight, ownership and reports
 
-Qualification and benchmarks refuse execution if the qualification lock is busy, ZFS
-cannot be positively identified as healthy, recognized compiler/download
-processes are active, or available RAM is below 16 GiB. Benchmarks additionally
-refuse live `llama-*` processes. The RAM threshold is only a minimum, not proof
+The wrapper refuses a busy qualification lock, active recognized
+compiler/download processes or less than 16 GiB available RAM. It requires
+healthy supported storage (ZFS or Btrfs) for the checkout, model input and
+report output location. Benchmarks additionally refuse live `llama-*` processes.
+The qualification supervisor still runs its own checks. The benchmark uses
+one resolved model path for its storage and GGUF header checks and for the
+child command. This is a path binding, not an immutable file identity: keep
+the selected artifact and its storage stable throughout the run. The RAM
+threshold is only a minimum, not proof
 that the selected model fits. Process inspection across this repository reads
 `stat`, `comm`, `cgroup` and the `cwd` symlink, never `cmdline`: Linux serves
 `cmdline` through `access_remote_vm`, so inspecting a compiler that holds its own
@@ -179,9 +186,11 @@ Every admitted run gets a unique ignored directory in `logs/model-runs/`:
 - for a successful benchmark, `stdout.log` contains native JSON metrics.
 
 Qualification leaves its detailed gate evidence in existing qualification locations.
-No qualification pass is fabricated from a process merely starting. Timeouts and
-interrupts terminate the owned child process group; interrupted/failed reports
-remain available. Do not interpret an interrupted benchmark as a measured result.
+No qualification pass is fabricated from a process merely starting. On timeout or interruption the wrapper attempts cleanup of the owned child
+session and records the observed outcome and custody. A passed descriptor is
+not proof that the child retains it. A descendant that starts another session
+is outside this cleanup boundary. Do not interpret an interrupted benchmark as
+a measured result.
 Failed preflight prints a reason and exits before creating a run directory.
 
 Exit status: 0 success or valid preview, 2 invalid configuration/acknowledgement,
@@ -270,9 +279,18 @@ python3 scripts/bench_report.py cpu-diagnostic \
 ```
 
 This reads existing reports only; it neither authorizes nor executes a benchmark.
-The `model-runs.py benchmark` runner in this checkout still records a ROCm device
-list and a tensor split, even with `--gpu-layers 0`. Its output does not meet the
-explicit CPU-only contract below.
+For a separate CPU-only plan without launching a benchmark, preview:
+
+```bash
+bash scripts/benchmark-model.sh \
+  --model models/Qwen3.8-27B-Ridge-3.7bpw.gguf \
+  --devices none --gpu-layers 0
+```
+
+The preview omits a tensor split. Running the plan requires separate fit and
+ownership admission, plus `--confirm-kernel --execute`. An optional
+`--bench-binary` names a local executable; it does not build or install one.
+Neither the preview nor these options qualify the selected model.
 
 The recorded command must explicitly contain `-dev none -ngl 0 -o json`, the
 maintained `-m/-t/-p/-n/-r` arguments and no tensor split. Optional producer flags
